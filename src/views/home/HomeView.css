@@ -1,0 +1,29 @@
+.app-layout {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.home-main {
+  flex: 1;
+  width: min(1120px, 100% - clamp(24px, 6vw, 64px));
+  margin: 0 auto;
+  padding: clamp(20px, 3.6vw, 38px) 0;
+}
+
+.content-window {
+  min-height: clamp(380px, 68vh, 760px);
+  border-radius: clamp(16px, 2vw, 24px);
+  border: 1px solid var(--line-300);
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.93), rgba(255, 255, 255, 0.78)),
+    linear-gradient(120deg, rgba(6, 77, 144, 0.08), rgba(252, 208, 37, 0.16));
+  box-shadow: var(--shadow-soft);
+}
+
+@media (max-width: 900px) {
+  .home-main {
+    width: min(1120px, 100% - 28px);
+    padding: 18px 0 24px;
+  }
+}

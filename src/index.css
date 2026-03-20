@@ -1,0 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Abel&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --ucb-blue: #064d90;
+  --ucb-gold: #fcd025;
+  --ink-900: #10233d;
+  --ink-700: #355170;
+  --surface-100: #ffffff;
+  --surface-200: #f3f6fa;
+  --line-300: #d8e2ee;
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+
+  --shadow-soft: 0 16px 34px rgba(6, 77, 144, 0.12);
+  --shadow-subtle: 0 8px 20px rgba(16, 35, 61, 0.06);
+
+  --font-body: 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Abel', 'Inter', 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100svh;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  color: var(--ink-900);
+  background:
+    radial-gradient(circle at 8% 12%, rgba(6, 77, 144, 0.11), transparent 42%),
+    radial-gradient(circle at 94% 84%, rgba(252, 208, 37, 0.18), transparent 34%),
+    var(--surface-200);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
