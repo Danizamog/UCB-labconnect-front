@@ -153,6 +153,7 @@ export default function AdminAssetsPage() {
               <th>Categoría</th>
               <th>Serie</th>
               <th>Estado actual</th>
+              <th>Actualizar estado</th>
             </tr>
           </thead>
           <tbody>
@@ -161,6 +162,22 @@ export default function AdminAssetsPage() {
                 <td>{asset.name}</td>
                 <td>{asset.category}</td>
                 <td>{asset.serial_number || "-"}</td>
+                <td>
+                  <span className={badgeClass(asset.status)}>
+                    {labelStatus(asset.status)}
+                  </span>
+                </td>
+                <td>
+                  <select
+                    className="select"
+                    value={asset.status}
+                    onChange={(e) => handleStatusChange(asset.id, e.target.value)}
+                  >
+                    <option value="available">Disponible</option>
+                    <option value="maintenance">En mantenimiento</option>
+                    <option value="damaged">Dañado</option>
+                  </select>
+                </td>
               </tr>
             ))}
           </tbody>
