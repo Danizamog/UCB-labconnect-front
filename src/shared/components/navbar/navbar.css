@@ -20,14 +20,10 @@
   gap: 10px;
 }
 
-.brand-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  color: var(--ucb-blue);
-  background: rgba(6, 77, 144, 0.12);
+.brand-logo {
+  width: 126px;
+  height: 40px;
+  object-fit: contain;
 }
 
 .brand {
@@ -40,7 +36,6 @@
   font-size: 0.72rem;
   color: var(--ink-700);
   letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .brand strong {
@@ -99,6 +94,11 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .brand-logo {
+    width: 104px;
+    height: 34px;
   }
 
   .nav-links {

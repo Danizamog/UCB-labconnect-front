@@ -27,14 +27,10 @@
   margin-bottom: 4px;
 }
 
-.login-brand-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  background: var(--ucb-blue);
-  color: var(--surface-100);
+.login-brand-logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
 }
 
 .login-brand-kicker {

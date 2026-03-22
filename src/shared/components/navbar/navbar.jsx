@@ -3,12 +3,12 @@ import {
   House,
   LogOut,
   Menu,
-  Shield,
   Users,
   UserRound,
   X,
 } from 'lucide-react'
 import { NAVIGATION_LINKS } from '../../config/navigationLinks'
+import ucbLapazLogo from '../../../assets/branding/ucb-san-pablo-lapaz.png'
 import './navbar.css'
 
 function Navbar({ onLogout, onNavigate, activeSection = 'home' }) {
@@ -42,11 +42,13 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home' }) {
     <header className="navbar-shell">
       <nav className="navbar">
         <div className="brand-wrap">
-          <div className="brand-icon" aria-hidden="true">
-            <Shield size={18} />
-          </div>
+          <img
+            className="brand-logo"
+            src={ucbLapazLogo}
+            alt="Universidad Católica Boliviana San Pablo Sede La Paz"
+          />
           <div className="brand">
-            <span className="brand-kicker">UCB</span>
+            <span className="brand-kicker">UCB San Pablo · La Paz</span>
             <strong>LabConnect</strong>
           </div>
         </div>

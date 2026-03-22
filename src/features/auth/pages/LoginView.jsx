@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { LogIn, Mail, LockKeyhole, ShieldCheck } from 'lucide-react'
+import { LogIn, Mail, LockKeyhole } from 'lucide-react'
+import ucbEscudoLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
 import './LoginView.css'
 
 function LoginView({ onLogin }) {
@@ -19,11 +20,13 @@ function LoginView({ onLogin }) {
     <main className="auth-screen">
       <form className="login-card" onSubmit={handleSubmit}>
         <div className="login-brand">
-          <div className="login-brand-icon" aria-hidden="true">
-            <ShieldCheck size={20} />
-          </div>
+          <img
+            className="login-brand-logo"
+            src={ucbEscudoLogo}
+            alt="Escudo Universidad Católica Boliviana San Pablo"
+          />
           <div>
-            <span className="login-brand-kicker">Universidad Católica Boliviana</span>
+            <span className="login-brand-kicker">Universidad Católica Boliviana San Pablo</span>
             <h1>Acceso institucional</h1>
           </div>
         </div>
