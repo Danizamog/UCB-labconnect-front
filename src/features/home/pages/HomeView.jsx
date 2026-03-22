@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import AdminRolesPage from '../../features/admin/pages/AdminRolesPage'
-import Navbar from '../../components/navbar/navbar'
+import AdminRolesPage from '../../admin/pages/AdminRolesPage'
+import Navbar from '../../../shared/components/navbar/navbar'
 import './HomeView.css'
 
 function HomeView({ onLogout }) {

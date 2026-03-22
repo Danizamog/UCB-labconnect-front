@@ -1,5 +1,5 @@
-import HomeView from '../views/home/HomeView'
-import LoginView from '../views/login/LoginView'
+import HomeView from '../../features/home/pages/HomeView'
+import LoginView from '../../features/auth/pages/LoginView'
 
 function AppRoutes({ isAuthenticated, onLogin, onLogout }) {
   if (!isAuthenticated) {

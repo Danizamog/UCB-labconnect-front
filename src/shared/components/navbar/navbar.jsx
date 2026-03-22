@@ -8,7 +8,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react'
-import { NAVIGATION_LINKS } from '../../utils/navigationLinks'
+import { NAVIGATION_LINKS } from '../../config/navigationLinks'
 import './navbar.css'
 
 function Navbar({ onLogout, onNavigate, activeSection = 'home' }) {
