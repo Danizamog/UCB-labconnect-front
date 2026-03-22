@@ -2,6 +2,7 @@ export type MaterialOption = {
   id: number;
   name: string;
   availableQuantity: number;
+  source?: "asset" | "stock";
 };
 
 export type LabOption = {
@@ -11,11 +12,27 @@ export type LabOption = {
   capacity: number;
   description?: string;
   is_active?: boolean;
+  area_id: number;
+  area_name?: string;
+};
+
+export type AreaOption = {
+  id: number;
+  name: string;
+  description?: string;
+  is_active: boolean;
+};
+
+export type GroupedLaboratories = {
+  area_id: number;
+  area_name: string;
+  laboratories: LabOption[];
 };
 
 export type PracticeMaterialItem = {
   asset_id: number;
   quantity: number;
+  material_name?: string;
 };
 
 export type PracticeRequestCreate = {
@@ -48,7 +65,24 @@ export type PracticeRequestResponse = {
   needs_support: boolean;
   support_topic?: string;
   notes?: string;
+  review_comment?: string;
   status: string;
   created_at: string;
+  status_updated_at: string;
+  user_notification_read: boolean;
   materials: PracticeMaterialResponse[];
+};
+
+export type ReservationNotification = {
+  id: number;
+  title: string;
+  message: string;
+  status: string;
+  review_comment?: string;
+  created_at: string;
+  read: boolean;
+  laboratory_name: string;
+  date: string;
+  start_time: string;
+  end_time: string;
 };

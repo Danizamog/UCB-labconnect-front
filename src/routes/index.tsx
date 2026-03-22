@@ -4,6 +4,7 @@ import AdminPage from "../pages/AdminPage";
 import UserPage from "../pages/UserPage";
 import PlanificarPracticaPage from "../features/reservations/pages/PlanificarPracticaPage";
 import LabsCalendarPage from "../features/availability/pages/LabsCalendarPage";
+import LabDetailPage from "../features/labs/pages/LabDetailPage";
 
 export default function AppRouter() {
   return (
@@ -13,6 +14,7 @@ export default function AppRouter() {
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/user" element={<UserPage />} />
         <Route path="/user/practicas/nueva" element={<PlanificarPracticaPage />} />
+        <Route path="/laboratorios/:labId" element={<LabDetailPage />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/laboratorios/calendario" element={<LabsCalendarPage />} />
       </Routes>

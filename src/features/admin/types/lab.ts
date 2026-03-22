@@ -5,6 +5,8 @@ export type Lab = {
   capacity: number;
   description?: string;
   is_active: boolean;
+  area_id: number;
+  area_name?: string;
 };
 
 export type LabCreate = {
@@ -13,4 +15,5 @@ export type LabCreate = {
   capacity: number;
   description?: string;
   is_active: boolean;
+  area_id: number;
 };

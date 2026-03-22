@@ -5,6 +5,8 @@ export type Asset = {
   description?: string;
   serial_number?: string;
   laboratory_id?: number;
+  quantity_total: number;
+  quantity_available: number;
   status: string;
 };
 
@@ -14,6 +16,21 @@ export type AssetCreate = {
   description?: string;
   serial_number?: string;
   laboratory_id?: number;
+  quantity_total: number;
+  quantity_available: number;
+  status: string;
+};
+
+export type AssetLoan = {
+  id: number;
+  asset_id: number;
+  borrower_name: string;
+  borrower_email: string;
+  quantity: number;
+  notes?: string;
+  created_at: string;
+  due_at?: string;
+  returned_at?: string;
   status: string;
 };
 

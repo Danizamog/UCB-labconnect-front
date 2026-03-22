@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Sidebar, { userSidebarItems, adminSidebarItems } from "../../../components/dashboard/Sidebar";
 import DashboardHero from "../../../components/dashboard/DashboardHero";
 import { getMe } from "../../../services/api";
@@ -15,17 +15,17 @@ type ViewMode = "day" | "month";
 
 export default function LabsCalendarPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>("calendar");
   const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [roleLabel, setRoleLabel] = useState("");
   const [userRole, setUserRole] = useState<"admin" | "user">("user");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const [calendarData, setCalendarData] = useState<LabCalendar[]>([]);
   const [dayReservations, setDayReservations] = useState<DayReservationsGroup[]>([]);
-  const [selectedLabId, setSelectedLabId] = useState<number | null>(null);
+  const [selectedLabId, setSelectedLabId] = useState<number | null>(Number(searchParams.get("lab") || "") || null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [error, setError] = useState("");
 
@@ -44,7 +44,7 @@ export default function LabsCalendarPage() {
     }
 
     const user = JSON.parse(rawUser);
-    const role = user.role === "admin" ? "admin" : "user";
+    const role = user.role === "admin" || user.role === "lab_manager" ? "admin" : "user";
 
     setUserRole(role);
     setRoleLabel(role === "admin" ? "Administrador" : "Usuario");
@@ -62,31 +62,20 @@ export default function LabsCalendarPage() {
 
   useEffect(() => {
     setError("");
-
     getLabsCalendar(year, month, token)
-      .then((data) => {
-        setCalendarData(data);
-      })
-      .catch((err: any) => {
-        setError(err.message || "No se pudo cargar el calendario mensual");
-      });
+      .then(setCalendarData)
+      .catch((err: any) => setError(err.message || "No se pudo cargar el calendario mensual"));
   }, [year, month, token]);
 
   useEffect(() => {
     setError("");
-
     getDayReservations(selectedDate, token, selectedLabId ?? undefined)
-      .then((data) => {
-        setDayReservations(data);
-      })
-      .catch((err: any) => {
-        setError(err.message || "No se pudo cargar la agenda del día");
-      });
+      .then(setDayReservations)
+      .catch((err: any) => setError(err.message || "No se pudo cargar la agenda del dia"));
   }, [selectedDate, selectedLabId, token]);
 
   const selectedCalendar = useMemo(() => {
-    if (calendarData.length === 0) return null;
-    if (selectedLabId === null) return null;
+    if (calendarData.length === 0 || selectedLabId === null) return null;
     return calendarData.find((lab) => lab.laboratory_id === selectedLabId) || null;
   }, [calendarData, selectedLabId]);
 
@@ -98,17 +87,14 @@ export default function LabsCalendarPage() {
   const moveMonth = (direction: number) => {
     let newMonth = month + direction;
     let newYear = year;
-
     if (newMonth < 1) {
       newMonth = 12;
       newYear -= 1;
     }
-
     if (newMonth > 12) {
       newMonth = 1;
       newYear += 1;
     }
-
     setMonth(newMonth);
     setYear(newYear);
   };
@@ -118,47 +104,25 @@ export default function LabsCalendarPage() {
       setActiveTab("profile");
       return;
     }
-
-    if (key === "home") {
+    if (key === "home" || key === "reservations" || key === "labs" || key === "assets" || key === "stock") {
       navigate(userRole === "admin" ? "/admin" : "/user");
       return;
     }
-
-    if (key === "reservations") {
-      navigate(userRole === "admin" ? "/admin" : "/user");
-      return;
-    }
-
     if (key === "new-practice") {
       navigate("/user/practicas/nueva");
       return;
     }
-
     if (key === "schedule" || key === "calendar") {
       setActiveTab("calendar");
-      navigate("/laboratorios/calendario");
-      return;
-    }
-
-    if (key === "labs" || key === "assets" || key === "stock") {
-      navigate("/admin");
       return;
     }
   };
 
-  const sidebarItems = userRole === "admin"
-    ? adminSidebarItems
-    : userSidebarItems;
-
-  const sidebarActiveKey =
-    activeTab === "profile"
-      ? "profile"
-      : userRole === "admin"
-      ? "labs"
-      : "schedule";
+  const sidebarItems = userRole === "admin" ? adminSidebarItems : userSidebarItems;
+  const sidebarActiveKey = activeTab === "profile" ? "profile" : userRole === "admin" ? "labs" : "schedule";
 
   return (
-    <div className={`dashboard-layout ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+    <div className="dashboard-layout">
       <Sidebar
         title="Disponibilidad"
         subtitle="Calendario de laboratorios"
@@ -168,22 +132,20 @@ export default function LabsCalendarPage() {
         userName={name}
         userEmail={email}
         roleLabel={roleLabel}
-        collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed((prev) => !prev)}
         items={sidebarItems}
       />
 
       <main className="dashboard-main">
         <div className="content-stack">
           <DashboardHero
-            title="Calendario dinámico de laboratorios"
-            subtitle="Consulta reservas del día y revisa la disponibilidad general del mes para planificar mejor las prácticas."
+            title="Calendario dinamico de laboratorios"
+            subtitle="Consulta reservas del dia y revisa la disponibilidad general del mes con una vista mucho mas compacta para celular y escritorio."
           />
 
           {error && <div className="alert-error">{error}</div>}
 
           {activeTab === "profile" && (
-            <div className="card">
+            <div className="card profile-editor-card">
               <h2 className="section-title">Mi perfil</h2>
               <p><b>Nombre:</b> {name}</p>
               <p><b>Correo:</b> {email}</p>
@@ -192,60 +154,37 @@ export default function LabsCalendarPage() {
           )}
 
           {activeTab === "calendar" && (
-            <div className="grid-2" style={{ gridTemplateColumns: "280px 1fr" }}>
+            <div className="calendar-layout">
               <div className="content-stack">
-                <LabsSidebar
-                  labs={calendarData}
-                  selectedLabId={selectedLabId}
-                  onSelectLab={setSelectedLabId}
-                />
+                <LabsSidebar labs={calendarData} selectedLabId={selectedLabId} onSelectLab={setSelectedLabId} />
                 <AvailabilityLegend />
               </div>
 
               <div className="content-stack">
                 <div className="card">
-                  <div className="topbar">
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      <button
-                        className={`btn ${viewMode === "day" ? "btn-primary" : "btn-secondary"}`}
-                        onClick={() => setViewMode("day")}
-                      >
-                        Ver reservas del día
+                  <div className="calendar-toolbar">
+                    <div className="editor-actions">
+                      <button className={`btn ${viewMode === "day" ? "btn-primary" : "btn-secondary"}`} onClick={() => setViewMode("day")}>
+                        Dia
                       </button>
-                      <button
-                        className={`btn ${viewMode === "month" ? "btn-primary" : "btn-secondary"}`}
-                        onClick={() => setViewMode("month")}
-                      >
-                        Ver disponibilidad del mes
+                      <button className={`btn ${viewMode === "month" ? "btn-primary" : "btn-secondary"}`} onClick={() => setViewMode("month")}>
+                        Mes
                       </button>
                     </div>
 
                     {viewMode === "day" ? (
-                      <input
-                        className="input"
-                        type="date"
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        style={{ maxWidth: 220 }}
-                      />
+                      <input className="input calendar-date-input" type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
                     ) : (
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        <button className="btn btn-secondary" onClick={() => moveMonth(-1)}>
-                          ← Mes anterior
-                        </button>
-                        <button className="btn btn-secondary" onClick={() => moveMonth(1)}>
-                          Mes siguiente →
-                        </button>
+                      <div className="editor-actions">
+                        <button className="btn btn-secondary" onClick={() => moveMonth(-1)}>Mes anterior</button>
+                        <button className="btn btn-secondary" onClick={() => moveMonth(1)}>Mes siguiente</button>
                       </div>
                     )}
                   </div>
                 </div>
 
                 {viewMode === "day" ? (
-                  <DayReservationsPanel
-                    selectedDate={selectedDate}
-                    groups={dayReservations}
-                  />
+                  <DayReservationsPanel selectedDate={selectedDate} groups={dayReservations} />
                 ) : (
                   <AvailabilityCalendar
                     calendarData={selectedCalendar}

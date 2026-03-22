@@ -5,14 +5,9 @@ type Props = {
   groups: DayReservationsGroup[];
 };
 
-const START_HOUR = 7;
-const END_HOUR = 22;
-const HOUR_HEIGHT = 72;
-
-function timeToMinutes(value: string) {
-  const [hours, minutes] = value.split(":").map(Number);
-  return hours * 60 + minutes;
-}
+const START_HOUR = 9;
+const END_HOUR = 19;
+const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60;
 
 function formatDateLabel(date: string) {
   const parsed = new Date(`${date}T00:00:00`);
@@ -24,240 +19,81 @@ function formatDateLabel(date: string) {
   });
 }
 
-function formatHourLabel(hour: number) {
-  return `${String(hour).padStart(2, "0")}:00`;
+function timeToMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function getReservationStyle(start: string, end: string) {
+  const startMinutes = timeToMinutes(start) - START_HOUR * 60;
+  const endMinutes = timeToMinutes(end) - START_HOUR * 60;
+  const left = Math.max(0, (startMinutes / TOTAL_MINUTES) * 100);
+  const width = Math.max(8, ((endMinutes - startMinutes) / TOTAL_MINUTES) * 100);
+  return { left: `${left}%`, width: `${width}%` };
 }
 
 export default function DayReservationsPanel({ selectedDate, groups }: Props) {
-  const totalHours = END_HOUR - START_HOUR;
-  const totalHeight = totalHours * HOUR_HEIGHT;
+  const hours = Array.from({ length: END_HOUR - START_HOUR + 1 }).map((_, index) => START_HOUR + index);
 
   return (
     <div className="card">
-      <div style={{ marginBottom: 20 }}>
-        <h2 className="section-title" style={{ marginBottom: 8 }}>
-          Disponibilidad diaria de laboratorios
-        </h2>
-        <p style={{ margin: 0, color: "var(--ucb-gray-700)" }}>
-          Consulta los horarios ocupados en una sola vista. Los espacios vacíos representan disponibilidad.
-        </p>
-        <p style={{ marginTop: 8, color: "var(--ucb-blue-dark)", fontWeight: 700 }}>
-          {formatDateLabel(selectedDate)}
-        </p>
+      <div className="section-head">
+        <div>
+          <h2 className="section-title">Disponibilidad diaria</h2>
+          <p className="section-copy">Visualiza los laboratorios en una linea horaria clara. Los tramos vacios representan disponibilidad.</p>
+        </div>
+        <strong style={{ color: "var(--ucb-blue-dark)", textTransform: "capitalize" }}>{formatDateLabel(selectedDate)}</strong>
       </div>
 
       {groups.length === 0 ? (
         <p>No hay laboratorios para mostrar.</p>
       ) : (
-        <div
-          style={{
-            border: "1px solid rgba(15, 76, 129, 0.10)",
-            borderRadius: 24,
-            overflow: "hidden",
-            background: "#fff",
-            boxShadow: "0 12px 30px rgba(15, 76, 129, 0.08)",
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: `80px repeat(${groups.length}, minmax(220px, 1fr))`,
-              borderBottom: "1px solid #eef2f7",
-              background: "linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)",
-              position: "sticky",
-              top: 0,
-              zIndex: 2,
-            }}
-          >
-            <div
-              style={{
-                padding: "16px 12px",
-                borderRight: "1px solid #eef2f7",
-                fontWeight: 700,
-                color: "var(--ucb-gray-700)",
-              }}
-            >
-              Hora
+        <>
+          <div className="timeline-header">
+            <div className="timeline-lab-column">Laboratorio</div>
+            <div className="timeline-hours">
+              {hours.map((hour) => (
+                <span key={hour}>{String(hour).padStart(2, "0")}:00</span>
+              ))}
             </div>
+          </div>
 
+          <div className="timeline-board">
             {groups.map((group) => (
-              <div
-                key={group.laboratory_id}
-                style={{
-                  padding: "16px 14px",
-                  borderRight: "1px solid #eef2f7",
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: 800,
-                    color: "var(--ucb-blue-dark)",
-                    fontSize: "0.96rem",
-                  }}
-                >
-                  {group.laboratory_name}
+              <div key={group.laboratory_id} className="timeline-row">
+                <div className="timeline-lab-card">
+                  <strong>{group.laboratory_name}</strong>
+                  <span className={`badge ${group.reservations.length === 0 ? "badge-available" : "badge-maintenance"}`}>
+                    {group.reservations.length === 0 ? "Libre" : `${group.reservations.length} reserva(s)`}
+                  </span>
+                </div>
+
+                <div className="timeline-track">
+                  <div className="timeline-grid">
+                    {Array.from({ length: END_HOUR - START_HOUR }).map((_, index) => (
+                      <span key={index} />
+                    ))}
+                  </div>
+
+                  {group.reservations.length === 0 ? (
+                    <div className="timeline-available">Disponible durante toda la jornada</div>
+                  ) : (
+                    group.reservations.map((reservation, index) => (
+                      <div
+                        key={`${group.laboratory_id}-${reservation.start_time}-${reservation.end_time}-${index}`}
+                        className="timeline-reservation"
+                        style={getReservationStyle(reservation.start_time, reservation.end_time)}
+                      >
+                        <strong>{reservation.start_time} - {reservation.end_time}</strong>
+                        <span>Reservado</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             ))}
           </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: `80px repeat(${groups.length}, minmax(220px, 1fr))`,
-              minWidth: 900,
-            }}
-          >
-            <div
-              style={{
-                background: "#f8fafc",
-                borderRight: "1px solid #eef2f7",
-                position: "relative",
-                height: totalHeight,
-              }}
-            >
-              {Array.from({ length: totalHours + 1 }).map((_, index) => {
-                const hour = START_HOUR + index;
-                if (hour > END_HOUR) return null;
-
-                return (
-                  <div
-                    key={hour}
-                    style={{
-                      height: HOUR_HEIGHT,
-                      borderBottom: "1px solid #eef2f7",
-                      position: "relative",
-                    }}
-                  >
-                    <span
-                      style={{
-                        position: "absolute",
-                        top: 8,
-                        left: 10,
-                        fontSize: "0.75rem",
-                        color: "var(--ucb-gray-700)",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {formatHourLabel(hour)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {groups.map((group) => (
-              <div
-                key={group.laboratory_id}
-                style={{
-                  position: "relative",
-                  height: totalHeight,
-                  borderRight: "1px solid #eef2f7",
-                  background: "#fff",
-                }}
-              >
-                {Array.from({ length: totalHours }).map((_, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      height: HOUR_HEIGHT,
-                      borderBottom: "1px solid #eef2f7",
-                    }}
-                  />
-                ))}
-
-                {group.reservations.length === 0 && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: 18,
-                    }}
-                  >
-                    <div
-                      style={{
-                        border: "1px dashed #86efac",
-                        background: "#f0fdf4",
-                        color: "#166534",
-                        borderRadius: 18,
-                        padding: "14px 16px",
-                        textAlign: "center",
-                        fontSize: "0.9rem",
-                        fontWeight: 700,
-                      }}
-                    >
-                      Disponible
-                    </div>
-                  </div>
-                )}
-
-                {group.reservations.map((reservation, index) => {
-                  const startMinutes = timeToMinutes(reservation.start_time);
-                  const endMinutes = timeToMinutes(reservation.end_time);
-
-                  const top =
-                    ((startMinutes - START_HOUR * 60) / 60) * HOUR_HEIGHT;
-
-                  const height =
-                    ((endMinutes - startMinutes) / 60) * HOUR_HEIGHT;
-
-                  return (
-                    <div
-                      key={`${group.laboratory_id}-${reservation.start_time}-${reservation.end_time}-${index}`}
-                      style={{
-                        position: "absolute",
-                        left: 10,
-                        right: 10,
-                        top,
-                        height: Math.max(height, 44),
-                        borderRadius: 16,
-                        border: "1px solid rgba(15, 76, 129, 0.16)",
-                        background:
-                          "linear-gradient(135deg, rgba(15,76,129,0.10) 0%, rgba(15,76,129,0.18) 100%)",
-                        boxShadow: "0 8px 18px rgba(15, 76, 129, 0.10)",
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div
-                        style={{
-                          height: "100%",
-                          borderLeft: "5px solid var(--ucb-blue-dark)",
-                          padding: "10px 12px",
-                          display: "flex",
-                          flexDirection: "column",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: "0.9rem",
-                            fontWeight: 800,
-                            color: "var(--ucb-blue-dark)",
-                          }}
-                        >
-                          Ocupado
-                        </div>
-
-                        <div
-                          style={{
-                            fontSize: "0.8rem",
-                            color: "var(--ucb-gray-700)",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {reservation.start_time} - {reservation.end_time}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
+        </>
       )}
     </div>
   );

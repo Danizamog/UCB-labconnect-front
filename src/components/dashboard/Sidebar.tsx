@@ -1,21 +1,25 @@
-type SidebarItem = {
+import MobileMenuButton from "./sidebar/MobileMenuButton";
+import SidebarHeader from "./sidebar/SidebarHeader";
+import SidebarItem from "./sidebar/SidebarItem";
+import { useSidebar } from "./sidebar/SidebarContext";
+
+type SidebarItemType = {
   key: string;
   label: string;
   icon?: string;
+  badge?: string | number;
 };
 
 type Props = {
   title: string;
   subtitle: string;
-  items: SidebarItem[];
+  items: SidebarItemType[];
   activeKey: string;
   onChange: (key: string) => void;
   onLogout: () => void;
   userName?: string;
   userEmail?: string;
   roleLabel?: string;
-  collapsed: boolean;
-  onToggle: () => void;
 };
 
 export default function Sidebar({
@@ -28,9 +32,10 @@ export default function Sidebar({
   userName,
   userEmail,
   roleLabel,
-  collapsed,
-  onToggle,
 }: Props) {
+  const { isOpen, isCollapsed, isMobile, isTablet, toggleSidebar, closeSidebar, toggleCollapsed } = useSidebar();
+
+  const showText = isMobile || isTablet || !isCollapsed;
   const initials = userName
     ? userName
         .split(" ")
@@ -40,101 +45,93 @@ export default function Sidebar({
         .toUpperCase()
     : "U";
 
+  const handleChange = (key: string) => {
+    onChange(key);
+    if (isMobile) closeSidebar();
+  };
+
   return (
-    <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
-      <div className="sidebar-top">
-        <div className="sidebar-brand-row">
-          <div className="sidebar-brand">
-            <span className="sidebar-brand-dot" />
-            {!collapsed && <span>UCB LabConnect</span>}
+    <>
+      {isMobile && <MobileMenuButton open={isOpen} onClick={toggleSidebar} />}
+      {isMobile && isOpen && <button className="sidebar-shell-overlay" type="button" onClick={closeSidebar} aria-label="Cerrar menu" />}
+
+      <aside
+        className={`sidebar-shell ${isOpen ? "open" : ""} ${isCollapsed ? "collapsed" : ""} ${isTablet ? "tablet" : ""}`}
+      >
+        <SidebarHeader
+          title={title}
+          subtitle={subtitle}
+          showText={showText}
+          canCollapse={!isMobile && !isTablet}
+          onCollapse={toggleCollapsed}
+          onClose={closeSidebar}
+        />
+
+        <div className="sidebar-shell-user">
+          <div className="sidebar-shell-avatar">{initials}</div>
+          {showText && (
+            <div className="sidebar-shell-user-copy">
+              <strong>{userName || "Usuario"}</strong>
+              {userEmail && <span>{userEmail}</span>}
+              {roleLabel && <small>{roleLabel}</small>}
+            </div>
+          )}
+        </div>
+
+        <div className="sidebar-shell-section">
+          {showText && <div className="sidebar-shell-caption">Menu principal</div>}
+          <div className="sidebar-shell-nav">
+            {items.map((item, index) => (
+              <div key={item.key} className="sidebar-shell-stagger" style={{ animationDelay: `${index * 50}ms` }}>
+                <SidebarItem
+                  icon={item.icon}
+                  label={item.label}
+                  badge={item.badge}
+                  active={activeKey === item.key}
+                  showText={showText}
+                  onClick={() => handleChange(item.key)}
+                />
+              </div>
+            ))}
           </div>
-
-          <button className="sidebar-toggle" onClick={onToggle} type="button">
-            {collapsed ? "☰" : "✕"}
-          </button>
         </div>
 
-        {!collapsed && (
-          <p className="sidebar-description">
-            {title}
-            <br />
-            <small>{subtitle}</small>
-          </p>
-        )}
-      </div>
-
-      <div className="sidebar-user">
-        <div className="sidebar-user-avatar">{initials}</div>
-
-        {!collapsed && (
-          <div className="sidebar-user-info">
-            <strong>{userName || "Usuario"}</strong>
-            {userEmail && <span>{userEmail}</span>}
-            {roleLabel && <small>{roleLabel}</small>}
+        <div className="sidebar-shell-section">
+          {showText && <div className="sidebar-shell-caption">Cuenta</div>}
+          <div className="sidebar-shell-nav">
+            <SidebarItem
+              icon="PF"
+              label="Mi perfil"
+              active={activeKey === "profile"}
+              showText={showText}
+              onClick={() => handleChange("profile")}
+            />
           </div>
-        )}
-      </div>
-
-      <div>
-        {!collapsed && <div className="sidebar-section-title">Menú principal</div>}
-        <div className="sidebar-nav">
-          {items.map((item) => (
-            <button
-              key={item.key}
-              className={`sidebar-link ${activeKey === item.key ? "active" : ""}`}
-              onClick={() => onChange(item.key)}
-              type="button"
-              title={collapsed ? item.label : undefined}
-            >
-              <span className="sidebar-link-icon">{item.icon || "•"}</span>
-              {!collapsed && <span>{item.label}</span>}
-            </button>
-          ))}
         </div>
-      </div>
 
-      <div>
-        {!collapsed && <div className="sidebar-section-title">Cuenta</div>}
-        <div className="sidebar-nav">
-          <button
-            className={`sidebar-link ${activeKey === "profile" ? "active" : ""}`}
-            onClick={() => onChange("profile")}
-            type="button"
-            title={collapsed ? "Ver perfil" : undefined}
-          >
-            <span className="sidebar-link-icon">👤</span>
-            {!collapsed && <span>Ver perfil</span>}
-          </button>
+        <div className="sidebar-shell-footer">
+          {showText && <div className="sidebar-shell-caption">Sesion</div>}
+          <SidebarItem icon="CS" label="Cerrar sesion" showText={showText} onClick={onLogout} />
         </div>
-      </div>
-
-      <div className="sidebar-bottom">
-        {!collapsed && <div className="sidebar-section-title">Sesión</div>}
-        <button
-          className="sidebar-link"
-          onClick={onLogout}
-          type="button"
-          title={collapsed ? "Cerrar sesión" : undefined}
-        >
-          <span className="sidebar-link-icon">⎋</span>
-          {!collapsed && <span>Cerrar sesión</span>}
-        </button>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 
-export const userSidebarItems: SidebarItem[] = [
-  { key: "home", label: "Inicio", icon: "⌂" },
-  { key: "reservations", label: "Mis reservas", icon: "🗂" },
-  { key: "schedule", label: "Consultar horarios libres", icon: "🗓" },
-  { key: "new-practice", label: "Nueva práctica", icon: "＋" },
+export const userSidebarItems: SidebarItemType[] = [
+  { key: "home", label: "Inicio", icon: "IN" },
+  { key: "reservations", label: "Mis reservas", icon: "MR" },
+  { key: "notifications", label: "Notificaciones", icon: "NT" },
+  { key: "schedule", label: "Horarios", icon: "CL" },
+  { key: "new-practice", label: "Nueva practica", icon: "NP" },
 ];
 
-export const adminSidebarItems: SidebarItem[] = [
-  { key: "home", label: "Inicio", icon: "⌂" },
-  { key: "reservations", label: "Reservas", icon: "🗂" },
-  { key: "labs", label: "Laboratorios", icon: "🧪" },
-  { key: "assets", label: "Equipos", icon: "🖥" },
-  { key: "stock", label: "Reactivos / Stock", icon: "📦" },
+export const adminSidebarItems: SidebarItemType[] = [
+  { key: "home", label: "Inicio", icon: "IN" },
+  { key: "reservations", label: "Reservas", icon: "RV" },
+  { key: "tracking", label: "Trazabilidad", icon: "TR" },
+  { key: "labs", label: "Laboratorios", icon: "LB" },
+  { key: "assets", label: "Equipos", icon: "EQ" },
+  { key: "stock", label: "Reactivos", icon: "ST" },
+  { key: "users", label: "Usuarios", icon: "US" },
 ];

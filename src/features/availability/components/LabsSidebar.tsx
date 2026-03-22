@@ -11,9 +11,9 @@ export default function LabsSidebar({ labs, selectedLabId, onSelectLab }: Props)
     <div className="card" style={{ height: "100%" }}>
       <h3 className="section-title">Laboratorios UCB</h3>
 
-      <div className="sidebar-nav" style={{ gap: 10 }}>
+      <div className="labs-filter-list">
         <button
-          className={`tab-btn ${selectedLabId === null ? "active" : ""}`}
+          className={`lab-filter-chip ${selectedLabId === null ? "active" : ""}`}
           onClick={() => onSelectLab(null)}
         >
           Todos los laboratorios
@@ -22,9 +22,8 @@ export default function LabsSidebar({ labs, selectedLabId, onSelectLab }: Props)
         {labs.map((lab) => (
           <button
             key={lab.laboratory_id}
-            className={`tab-btn ${selectedLabId === lab.laboratory_id ? "active" : ""}`}
+            className={`lab-filter-chip ${selectedLabId === lab.laboratory_id ? "active" : ""}`}
             onClick={() => onSelectLab(lab.laboratory_id)}
-            style={{ textAlign: "left" }}
           >
             {lab.laboratory_name}
           </button>

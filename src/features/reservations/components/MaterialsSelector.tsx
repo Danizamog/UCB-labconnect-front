@@ -20,37 +20,39 @@ export default function MaterialsSelector({
     selectedMaterials.find((item) => item.asset_id === materialId)?.quantity ?? 1;
 
   return (
-    <div className="card" style={{ padding: 18 }}>
-      <h3 className="section-title">Materiales e insumos</h3>
-
+    <div className="material-grid">
       {materials.map((material) => {
         const selected = isSelected(material.id);
 
         return (
-          <div key={material.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid #eef2f7" }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={selected}
-                  onChange={() => onToggleMaterial(material.id)}
-                />
-                <span>{material.name} (Disponible: {material.availableQuantity})</span>
-              </label>
+          <button
+            key={material.id}
+            type="button"
+            className={`material-card ${selected ? "selected" : ""}`}
+            onClick={() => onToggleMaterial(material.id)}
+          >
+            <div className="material-card-top">
+              <strong>{material.name}</strong>
+              <span className="lab-option-badge">Disponible: {material.availableQuantity}</span>
             </div>
+            <p className="material-card-copy">
+              {material.source === "asset" ? "Equipo o herramienta del laboratorio." : "Reactivo o insumo disponible para la practica."}
+            </p>
 
             {selected && (
-              <input
-                className="input"
-                style={{ width: 90 }}
-                type="number"
-                min={1}
-                max={material.availableQuantity}
-                value={getQuantity(material.id)}
-                onChange={(e) => onQuantityChange(material.id, Number(e.target.value))}
-              />
+              <div className="material-quantity-row" onClick={(e) => e.stopPropagation()}>
+                <label className="form-label">Cantidad solicitada</label>
+                <input
+                  className="input"
+                  type="number"
+                  min={1}
+                  max={material.availableQuantity}
+                  value={getQuantity(material.id)}
+                  onChange={(e) => onQuantityChange(material.id, Number(e.target.value))}
+                />
+              </div>
             )}
-          </div>
+          </button>
         );
       })}
     </div>

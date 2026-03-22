@@ -1,12 +1,13 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Sidebar, { userSidebarItems } from "../../../components/dashboard/Sidebar";
 import DashboardHero from "../../../components/dashboard/DashboardHero";
 import PracticePlanningForm from "../components/PracticePlanningForm";
 
 export default function PlanificarPracticaPage() {
   const navigate = useNavigate();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [searchParams] = useSearchParams();
+  const initialLabId = Number(searchParams.get("lab") || "") || null;
 
   const rawUser = localStorage.getItem("user");
   const user = useMemo(() => {
@@ -24,12 +25,7 @@ export default function PlanificarPracticaPage() {
   };
 
   const handleSidebarChange = (key: string) => {
-    if (key === "home") {
-      navigate("/user");
-      return;
-    }
-
-    if (key === "reservations") {
+    if (key === "home" || key === "reservations" || key === "profile") {
       navigate("/user");
       return;
     }
@@ -41,38 +37,31 @@ export default function PlanificarPracticaPage() {
 
     if (key === "new-practice") {
       navigate("/user/practicas/nueva");
-      return;
-    }
-
-    if (key === "profile") {
-      navigate("/user");
     }
   };
 
   return (
-    <div className={`dashboard-layout ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+    <div className="dashboard-layout">
       <Sidebar
-        title="Planificación académica"
-        subtitle="Reserva de práctica"
+        title="Planificacion academica"
+        subtitle="Reserva de practica"
         activeKey="new-practice"
         onChange={handleSidebarChange}
         onLogout={onLogout}
         userName={user?.full_name || "Usuario"}
         userEmail={user?.email || ""}
-        roleLabel="Usuario"
-        collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed((prev) => !prev)}
+        roleLabel="Estudiante"
         items={userSidebarItems}
       />
 
       <main className="dashboard-main">
         <div className="content-stack">
           <DashboardHero
-            title="Planificación de práctica"
-            subtitle="Reserva espacio, materiales y apoyo técnico en una sola solicitud, con una experiencia clara y organizada para las prácticas académicas."
+            title="Planificacion de practica"
+            subtitle="Reserva espacio, materiales y apoyo tecnico en una sola solicitud, con una experiencia clara y organizada para las practicas academicas."
           />
 
-          <PracticePlanningForm />
+          <PracticePlanningForm initialLabId={initialLabId} />
         </div>
       </main>
     </div>

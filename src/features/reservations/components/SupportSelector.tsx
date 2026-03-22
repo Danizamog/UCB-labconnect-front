@@ -16,16 +16,14 @@ export default function SupportSelector({
   onNotesChange,
 }: Props) {
   return (
-    <div className="card" style={{ marginTop: 18 }}>
-      <h3 className="section-title">Apoyo técnico o tutoría</h3>
-
+    <div>
       <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
         <input
           type="checkbox"
           checked={needsSupport}
           onChange={(e) => onNeedsSupportChange(e.target.checked)}
         />
-        Necesito apoyo durante la práctica
+        Necesito apoyo durante la practica
       </label>
 
       {needsSupport && (
@@ -36,7 +34,7 @@ export default function SupportSelector({
             type="text"
             value={supportTopic}
             onChange={(e) => onSupportTopicChange(e.target.value)}
-            placeholder="Ej. Configuración de equipos, redes, microscopía, etc."
+            placeholder="Ej. configuracion de equipos, redes, microscopia, etc."
           />
         </div>
       )}
@@ -47,7 +45,7 @@ export default function SupportSelector({
           className="textarea"
           value={notes}
           onChange={(e) => onNotesChange(e.target.value)}
-          placeholder="Describe brevemente el objetivo de la práctica"
+          placeholder="Describe brevemente el objetivo de la practica"
         />
       </div>
     </div>

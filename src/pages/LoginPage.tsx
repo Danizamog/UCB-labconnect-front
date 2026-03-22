@@ -15,12 +15,15 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const googleClientId =
+    import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+    "81257320597-3psdl1r2fbqd5dhjn4eh6tfed066p1em.apps.googleusercontent.com";
 
   const handleAuthSuccess = (data: any) => {
     localStorage.setItem("token", data.access_token);
     localStorage.setItem("user", JSON.stringify(data.user));
 
-    if (data.user.role === "admin") {
+    if (data.user.role === "admin" || data.user.role === "lab_manager") {
       navigate("/admin");
     } else {
       navigate("/user");
@@ -28,7 +31,7 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const clientId = googleClientId;
 
     if (!window.google || !clientId || !googleBtnRef.current) return;
 
@@ -51,7 +54,7 @@ export default function LoginPage() {
       shape: "rectangular",
       width: 250,
     });
-  }, [navigate]);
+  }, [googleClientId, navigate]);
 
   const validateInstitutionalEmail = (value: string) => {
     return value.trim().toLowerCase().endsWith("@ucb.edu.bo");
@@ -142,6 +145,10 @@ export default function LoginPage() {
 
           <div style={{ marginBottom: 16 }}>
             <div ref={googleBtnRef}></div>
+            <p style={{ color: "var(--ucb-gray-700)", fontSize: "0.88rem" }}>
+              Si Google no abre en otra laptop, usa el acceso institucional por correo y contrasena
+              o define `VITE_GOOGLE_CLIENT_ID` con el cliente autorizado para `http://localhost:3000`.
+            </p>
           </div>
         </div>
       </div>
