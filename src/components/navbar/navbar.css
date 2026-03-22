@@ -1,0 +1,128 @@
+.navbar-shell {
+  border-bottom: 1px solid var(--line-300);
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(8px);
+}
+
+.navbar {
+  width: min(1120px, 100% - clamp(24px, 6vw, 64px));
+  margin: 0 auto;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--ucb-blue);
+  background: rgba(6, 77, 144, 0.12);
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.brand-kicker {
+  font-size: 0.72rem;
+  color: var(--ink-700);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.brand strong {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  color: var(--ink-900);
+}
+
+.nav-toggle {
+  display: none;
+  border: 1px solid var(--line-300);
+  border-radius: var(--radius-sm);
+  width: 38px;
+  height: 38px;
+  background: var(--surface-100);
+  color: var(--ink-900);
+  cursor: pointer;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-link,
+.nav-action {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-900);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nav-link:hover,
+.nav-action:hover {
+  background: rgba(6, 77, 144, 0.08);
+}
+
+.nav-link.is-active {
+  background: rgba(6, 77, 144, 0.12);
+  color: var(--ucb-blue);
+}
+
+@media (max-width: 860px) {
+  .navbar {
+    width: min(1120px, 100% - 28px);
+  }
+
+  .nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nav-links {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    top: 78px;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--line-300);
+    background: var(--surface-100);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .nav-links.is-open {
+    display: flex;
+  }
+
+  .nav-link,
+  .nav-action {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
