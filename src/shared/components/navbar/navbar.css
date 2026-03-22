@@ -1,7 +1,6 @@
 .navbar-shell {
   border-bottom: 1px solid var(--line-300);
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(8px);
+  background: linear-gradient(180deg, #fcd025 0%, #f5c518 100%);
 }
 
 .navbar {
