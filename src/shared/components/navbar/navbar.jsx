@@ -3,6 +3,7 @@ import {
   House,
   LogOut,
   Menu,
+  MonitorCog,
   Users,
   UserRound,
   X,
@@ -17,6 +18,7 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home' }) {
   const iconMap = {
     home: House,
     roles: Users,
+    assets: MonitorCog,
     profile: UserRound,
     logout: LogOut,
   }
