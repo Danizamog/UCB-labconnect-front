@@ -1,6 +1,7 @@
 .navbar-shell {
   border-bottom: 1px solid var(--line-300);
   background: linear-gradient(180deg, #fcd025 0%, #f5c518 100%);
+  box-shadow: 0 2px 10px rgba(10, 53, 89, 0.08);
 }
 
 .navbar {
@@ -62,26 +63,38 @@
 
 .nav-link,
 .nav-action {
-  border: 1px solid transparent;
+  border: 1px solid rgba(10, 53, 89, 0.26);
   border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--ink-900);
+  background: rgba(255, 255, 255, 0.82);
+  color: #0a3559;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
   font-weight: 600;
   cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
 }
 
 .nav-link:hover,
 .nav-action:hover {
-  background: rgba(6, 77, 144, 0.08);
+  background: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(10, 53, 89, 0.12);
 }
 
 .nav-link.is-active {
-  background: rgba(6, 77, 144, 0.12);
-  color: var(--ucb-blue);
+  background: #0a3559;
+  color: #ffffff;
+  border-color: #0a3559;
+  box-shadow: 0 4px 10px rgba(10, 53, 89, 0.2);
+}
+
+.nav-link:focus-visible,
+.nav-action:focus-visible,
+.nav-toggle:focus-visible {
+  outline: 3px solid rgba(10, 53, 89, 0.35);
+  outline-offset: 2px;
 }
 
 @media (max-width: 860px) {
