@@ -1,5 +1,5 @@
-import AppRoutes from './routes/AppRoutes'
-import { useAuthStore } from './store/authStore'
+import AppRoutes from './app/routes/AppRoutes'
+import { useAuthStore } from './features/auth/store/authStore'
 
 function App() {
   const { isAuthenticated, login, logout } = useAuthStore()

@@ -1,0 +1,82 @@
+.assets-page {
+  display: grid;
+  gap: 14px;
+}
+
+.assets-header h2 {
+  margin: 0;
+}
+
+.assets-header p {
+  margin-top: 6px;
+  color: var(--ink-700);
+}
+
+.assets-message,
+.assets-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+}
+
+.assets-message {
+  background: #eaf3ff;
+  color: #0f4c81;
+}
+
+.assets-error {
+  background: #ffecec;
+  color: #9f1c1c;
+}
+
+.assets-table-wrap {
+  overflow-x: auto;
+  background: white;
+  border: 1px solid var(--line-300);
+  border-radius: 12px;
+}
+
+.assets-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.assets-table th,
+.assets-table td {
+  text-align: left;
+  padding: 12px;
+  border-bottom: 1px solid #ecf1f7;
+}
+
+.assets-select {
+  width: 100%;
+  max-width: 200px;
+  border: 1px solid var(--line-300);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: white;
+}
+
+.badge {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.badge-available {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.badge-maintenance {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-damaged {
+  background: #fee2e2;
+  color: #991b1b;
+}

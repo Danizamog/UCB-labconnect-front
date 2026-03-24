@@ -21,6 +21,25 @@
   box-shadow: var(--shadow-soft);
 }
 
+.home-placeholder {
+  min-height: clamp(380px, 68vh, 760px);
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  padding: clamp(20px, 3vw, 36px);
+  text-align: center;
+}
+
+.home-placeholder h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 2.8vw, 2.2rem);
+  color: var(--ink-900);
+}
+
+.home-placeholder p {
+  color: var(--ink-700);
+}
+
 @media (max-width: 900px) {
   .home-main {
     width: min(1120px, 100% - 28px);
