@@ -59,6 +59,112 @@
   font-weight: 600;
 }
 
+.roles-error {
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  background: rgba(219, 64, 64, 0.12);
+  color: #8e1c1c;
+  font-weight: 600;
+}
+
+.roles-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.roles-tab-button {
+  border: 1px solid var(--line-300);
+  border-radius: var(--radius-sm);
+  padding: 9px 13px;
+  background: var(--surface-100);
+  color: var(--ink-900);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.roles-tab-button.is-active {
+  background: rgba(6, 77, 144, 0.12);
+  border-color: rgba(6, 77, 144, 0.35);
+}
+
+.roles-form-card {
+  border: 1px solid var(--line-300);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  background: var(--surface-100);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.roles-form-card h3 {
+  color: var(--ink-900);
+}
+
+.roles-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.roles-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--ink-700);
+  font-weight: 600;
+}
+
+.roles-form-full {
+  grid-column: 1 / -1;
+}
+
+.roles-input {
+  border: 1px solid var(--line-300);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  background: var(--surface-100);
+  color: var(--ink-900);
+}
+
+.roles-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.roles-ghost-button {
+  border: 1px solid var(--line-300);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  background: var(--surface-100);
+  color: var(--ink-900);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.roles-danger-button {
+  border: 1px solid rgba(219, 64, 64, 0.28);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  background: rgba(219, 64, 64, 0.12);
+  color: #8e1c1c;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.roles-danger-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.roles-actions-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .roles-table-wrap {
   overflow-x: auto;
   border-radius: var(--radius-md);
@@ -98,6 +204,15 @@
   }
 
   .roles-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .roles-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .roles-actions-cell {
     flex-direction: column;
     align-items: flex-start;
   }

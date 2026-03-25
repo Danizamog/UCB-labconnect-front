@@ -1,29 +1,57 @@
-import PocketBase from 'pocketbase'
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
+const ROLES_ENDPOINT = import.meta.env.VITE_ROLES_ENDPOINT || '/roles'
+const USERS_ENDPOINT = import.meta.env.VITE_ROLE_USERS_ENDPOINT || '/users'
 
-const POCKETBASE_URL = (import.meta.env.VITE_POCKETBASE_URL || 'https://bd-labconnect.zamoranogamarra.online').replace(/\/$/, '')
-const pb = new PocketBase(POCKETBASE_URL)
-
-const ROLES_COLLECTION = 'role'
-const USERS_COLLECTION = 'users'
-
-function buildRequestOptions(token) {
-  if (!token) {
-    return undefined
+function buildHeaders(token) {
+  const headers = {
+    'Content-Type': 'application/json',
   }
 
-  return {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
   }
+
+  return headers
+}
+
+async function apiRequest(path, { method = 'GET', token, body } = {}) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers: buildHeaders(token),
+    body: body ? JSON.stringify(body) : undefined,
+  })
+
+  const data = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new Error(data?.detail || data?.message || `Error ${response.status}`)
+  }
+
+  return data
+}
+
+function normalizeArrayResponse(data) {
+  if (Array.isArray(data)) {
+    return data
+  }
+
+  if (Array.isArray(data?.items)) {
+    return data.items
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data
+  }
+
+  return []
 }
 
 function mapRoleRecord(record) {
   return {
     id: record.id,
-    nombre: record.nombre ?? '',
-    descripcion: record.descripcion ?? '',
-    permisos: record.permisos ?? [],
+    nombre: record.nombre ?? record.name ?? '',
+    descripcion: record.descripcion ?? record.description ?? '',
+    permisos: record.permisos ?? record.permissions ?? [],
     created: record.created,
     updated: record.updated,
   }
@@ -36,80 +64,110 @@ function mapUserRecord(record) {
     id: record.id,
     name: record.name ?? '',
     email: record.email ?? '',
-    roleId: record.role ?? null,
+    roleId: record.roleId ?? (typeof record.role === 'string' ? record.role : record.role?.id) ?? null,
     role: expandedRole
       ? {
           id: expandedRole.id,
-          nombre: expandedRole.nombre ?? '',
-          descripcion: expandedRole.descripcion ?? '',
-          permisos: expandedRole.permisos ?? [],
+          nombre: expandedRole.nombre ?? expandedRole.name ?? '',
+          descripcion: expandedRole.descripcion ?? expandedRole.description ?? '',
+          permisos: expandedRole.permisos ?? expandedRole.permissions ?? [],
         }
-      : null,
+      : record.role && typeof record.role === 'object'
+        ? {
+            id: record.role.id,
+            nombre: record.role.nombre ?? record.role.name ?? '',
+            descripcion: record.role.descripcion ?? record.role.description ?? '',
+            permisos: record.role.permisos ?? record.role.permissions ?? [],
+          }
+        : null,
     created: record.created,
     updated: record.updated,
   }
 }
 
 export async function listRoles({ token } = {}) {
-  const records = await pb.collection(ROLES_COLLECTION).getFullList({
-    sort: 'nombre',
-    ...buildRequestOptions(token),
-  })
+  const data = await apiRequest(ROLES_ENDPOINT, { token })
+  const records = normalizeArrayResponse(data)
 
   return records.map(mapRoleRecord)
 }
 
 export async function createRole(role, { token } = {}) {
-  const record = await pb.collection(ROLES_COLLECTION).create(
-    {
+  const record = await apiRequest(ROLES_ENDPOINT, {
+    method: 'POST',
+    token,
+    body: {
       nombre: role.nombre,
       descripcion: role.descripcion,
       permisos: role.permisos,
     },
-    buildRequestOptions(token),
-  )
+  })
 
   return mapRoleRecord(record)
 }
 
 export async function updateRole(roleId, role, { token } = {}) {
-  const record = await pb.collection(ROLES_COLLECTION).update(
-    roleId,
-    {
-      nombre: role.nombre,
-      descripcion: role.descripcion,
-      permisos: role.permisos,
-    },
-    buildRequestOptions(token),
-  )
+  const payload = {
+    nombre: role.nombre,
+    descripcion: role.descripcion,
+    permisos: role.permisos,
+  }
+
+  let record
+
+  try {
+    record = await apiRequest(`${ROLES_ENDPOINT}/${roleId}`, {
+      method: 'PUT',
+      token,
+      body: payload,
+    })
+  } catch {
+    record = await apiRequest(`${ROLES_ENDPOINT}/${roleId}`, {
+      method: 'PATCH',
+      token,
+      body: payload,
+    })
+  }
 
   return mapRoleRecord(record)
 }
 
 export async function deleteRole(roleId, { token } = {}) {
-  await pb.collection(ROLES_COLLECTION).delete(roleId, buildRequestOptions(token))
+  await apiRequest(`${ROLES_ENDPOINT}/${roleId}`, {
+    method: 'DELETE',
+    token,
+  })
 
   return true
 }
 
 export async function listUsersWithRoles({ token } = {}) {
-  const records = await pb.collection(USERS_COLLECTION).getFullList({
-    sort: 'name,email',
-    expand: 'role',
-    ...buildRequestOptions(token),
-  })
+  const data = await apiRequest(`${USERS_ENDPOINT}?expand=role`, { token })
+  const records = normalizeArrayResponse(data)
 
   return records.map(mapUserRecord)
 }
 
 export async function assignUserRole(userId, roleId, { token } = {}) {
-  const record = await pb.collection(USERS_COLLECTION).update(
-    userId,
-    {
-      role: roleId || null,
-    },
-    buildRequestOptions(token),
-  )
+  let record
+
+  try {
+    record = await apiRequest(`${USERS_ENDPOINT}/${userId}/role`, {
+      method: 'PATCH',
+      token,
+      body: {
+        roleId,
+      },
+    })
+  } catch {
+    record = await apiRequest(`${USERS_ENDPOINT}/${userId}`, {
+      method: 'PATCH',
+      token,
+      body: {
+        roleId,
+      },
+    })
+  }
 
   return mapUserRecord(record)
 }
