@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import './AdminAssetsPage.css'
 
-const INVENTORY_API = 'http://localhost:8003/v1/inventory/assets'
+const INVENTORY_API = (import.meta.env.VITE_INVENTORY_API_BASE_URL || '').replace(/\/$/, '')
 
 const FALLBACK_ASSETS = [
   { id: 1, name: 'Osciloscopio', category: 'Electrónica', serial_number: 'OSC-001', status: 'available' },

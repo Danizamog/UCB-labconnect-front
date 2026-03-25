@@ -1,4 +1,4 @@
-const RESERVATIONS_API = "http://localhost:8000/api/availability";
+const RESERVATIONS_API = (import.meta.env.VITE_AVAILABILITY_API_BASE_URL || "").replace(/\/$/, "");
 
 export async function getLabsCalendar(year, month, token, labId = null) {
   const url = new URL(`${RESERVATIONS_API}/calendar`);

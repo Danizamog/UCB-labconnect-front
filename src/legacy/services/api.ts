@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8001/api/v1";
+const API_BASE_URL = (import.meta.env.VITE_AUTH_API_BASE_URL || "").replace(/\/$/, "");
 
 export async function loginRequest(email: string, password: string) {
   const body = new URLSearchParams();

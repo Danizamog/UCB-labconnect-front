@@ -5,7 +5,7 @@ import {
   PracticeRequestResponse,
 } from "../types/reservation";
 
-const RESERVATIONS_API_BASE_URL = "http://localhost:8005/api/v1";
+const RESERVATIONS_API_BASE_URL = (import.meta.env.VITE_RESERVATIONS_API_BASE_URL || "").replace(/\/$/, "");
 
 export async function createPracticePlanning(payload: PracticeRequestCreate, token: string) {
   const response = await fetch(`${RESERVATIONS_API_BASE_URL}/practice-planning/`, {
