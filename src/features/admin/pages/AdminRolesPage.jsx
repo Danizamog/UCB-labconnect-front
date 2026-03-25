@@ -14,6 +14,43 @@ const TABS = {
   USERS: 'users',
 }
 
+const PERMISSION_OPTIONS = [
+  { value: 'gestionar_roles_permisos', label: 'Gestionar roles y permisos', icon: '🛡️' },
+  { value: 'reactivar_cuentas', label: 'Reactivar cuentas', icon: '🔄' },
+  { value: 'gestionar_reservas', label: 'Gestionar reservas', icon: '📅' },
+  { value: 'gestionar_reservas_materiales', label: 'Gestionar materiales en reservas', icon: '🧪' },
+  { value: 'gestionar_reglas_reserva', label: 'Gestionar reglas de reserva', icon: '⚙️' },
+  { value: 'gestionar_inventario', label: 'Gestionar inventario', icon: '📦' },
+  { value: 'gestionar_stock', label: 'Gestionar stock', icon: '📊' },
+  { value: 'gestionar_estado_equipos', label: 'Gestionar estado de equipos', icon: '🧰' },
+  { value: 'gestionar_mantenimiento', label: 'Gestionar mantenimiento', icon: '🛠️' },
+  { value: 'gestionar_prestamos', label: 'Gestionar préstamos', icon: '🤝' },
+  { value: 'adjuntar_evidencia_inventario', label: 'Adjuntar evidencia de inventario', icon: '📎' },
+  { value: 'gestionar_accesos_laboratorio', label: 'Gestionar accesos al laboratorio', icon: '🚪' },
+  { value: 'gestionar_penalizaciones', label: 'Gestionar penalizaciones', icon: '⚠️' },
+  { value: 'gestionar_tutorias', label: 'Gestionar tutorías', icon: '🎓' },
+  { value: 'gestionar_inscripciones_tutorias', label: 'Gestionar inscripciones de tutorías', icon: '📝' },
+  { value: 'gestionar_asistencia_tutorias', label: 'Gestionar asistencia a tutorías', icon: '✅' },
+  { value: 'gestionar_observaciones_tutorias', label: 'Gestionar observaciones de tutorías', icon: '📋' },
+  { value: 'gestionar_notificaciones', label: 'Gestionar notificaciones', icon: '🔔' },
+  { value: 'generar_reportes', label: 'Generar reportes', icon: '📈' },
+  { value: 'consultar_estadisticas', label: 'Consultar estadísticas', icon: '📉' },
+  { value: 'gestionar_reactivos_quimicos', label: 'Gestionar reactivos químicos', icon: '⚗️' },
+]
+
+function parsePermisos(permisosText) {
+  const trimmed = permisosText.trim()
+
+  if (!trimmed) {
+    return []
+  }
+
+  return trimmed
+    .split(',')
+    .map((permiso) => permiso.trim())
+    .filter(Boolean)
+}
+
 function AdminRolesPage() {
   const [activeTab, setActiveTab] = useState(TABS.ROLES)
   const [roles, setRoles] = useState([])
@@ -27,11 +64,15 @@ function AdminRolesPage() {
   const [roleUpdatingId, setRoleUpdatingId] = useState(null)
   const [roleDeletingId, setRoleDeletingId] = useState(null)
   const [userUpdatingId, setUserUpdatingId] = useState(null)
+  const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false)
 
   const roleOptions = useMemo(
     () => roles.map((role) => ({ id: role.id, nombre: role.nombre })),
     [roles],
   )
+
+  const selectedPermissions = useMemo(() => parsePermisos(roleDraft.permisosText), [roleDraft.permisosText])
+  const selectedPermissionsSet = useMemo(() => new Set(selectedPermissions), [selectedPermissions])
 
   useEffect(() => {
     let mounted = true
@@ -71,19 +112,7 @@ function AdminRolesPage() {
   const resetDraft = () => {
     setRoleDraft({ nombre: '', descripcion: '', permisosText: '' })
     setEditingRoleId(null)
-  }
-
-  const parsePermisos = (permisosText) => {
-    const trimmed = permisosText.trim()
-
-    if (!trimmed) {
-      return []
-    }
-
-    return trimmed
-      .split(',')
-      .map((permiso) => permiso.trim())
-      .filter(Boolean)
+    setIsPermissionsModalOpen(false)
   }
 
   const handleRoleDraftChange = (field, value) => {
@@ -95,12 +124,30 @@ function AdminRolesPage() {
   const handleEditRole = (role) => {
     setErrorMessage('')
     setSuccessMessage('')
+    setIsPermissionsModalOpen(false)
     setEditingRoleId(role.id)
     setRoleDraft({
       nombre: role.nombre,
       descripcion: role.descripcion,
       permisosText: Array.isArray(role.permisos) ? role.permisos.join(', ') : '',
     })
+  }
+
+  const handleTogglePermission = (permission) => {
+    const current = new Set(parsePermisos(roleDraft.permisosText))
+
+    if (current.has(permission)) {
+      current.delete(permission)
+    } else {
+      current.add(permission)
+    }
+
+    const ordered = PERMISSION_OPTIONS.map((option) => option.value).filter((value) => current.has(value))
+    handleRoleDraftChange('permisosText', ordered.join(', '))
+  }
+
+  const handleClearPermissions = () => {
+    handleRoleDraftChange('permisosText', '')
   }
 
   const handleSaveRole = async () => {
@@ -241,13 +288,22 @@ function AdminRolesPage() {
                 />
               </label>
               <label className="roles-form-full">
-                <span>Permisos (separados por coma)</span>
-                <input
-                  className="roles-input"
-                  value={roleDraft.permisosText}
-                  onChange={(event) => handleRoleDraftChange('permisosText', event.target.value)}
-                  placeholder="roles.read, roles.write"
-                />
+                <span>Permisos seleccionados</span>
+                <div className="roles-permissions-field">
+                  <input
+                    className="roles-input"
+                    value={selectedPermissions.join(', ')}
+                    readOnly
+                    placeholder="Selecciona permisos desde la ventana"
+                  />
+                  <button
+                    type="button"
+                    className="roles-ghost-button"
+                    onClick={() => setIsPermissionsModalOpen(true)}
+                  >
+                    Abrir permisos
+                  </button>
+                </div>
               </label>
             </div>
             <div className="roles-toolbar">
@@ -271,6 +327,56 @@ function AdminRolesPage() {
               </div>
             </div>
           </div>
+
+          {isPermissionsModalOpen ? (
+            <div className="roles-modal-backdrop" role="dialog" aria-modal="true" aria-label="Seleccionar permisos">
+              <div className="roles-modal">
+                <div className="roles-modal-header">
+                  <h3>Seleccionar permisos</h3>
+                  <button
+                    type="button"
+                    className="roles-ghost-button"
+                    onClick={() => setIsPermissionsModalOpen(false)}
+                  >
+                    Cerrar
+                  </button>
+                </div>
+
+                <div className="roles-permissions-grid">
+                  {PERMISSION_OPTIONS.map((permission) => {
+                    const isSelected = selectedPermissionsSet.has(permission.value)
+
+                    return (
+                      <button
+                        type="button"
+                        key={permission.value}
+                        className={`roles-permission-item ${isSelected ? 'is-selected' : ''}`}
+                        onClick={() => handleTogglePermission(permission.value)}
+                      >
+                        <span className="roles-permission-icon" aria-hidden="true">
+                          {permission.icon}
+                        </span>
+                        <span className="roles-permission-texts">
+                          <strong>{permission.label}</strong>
+                          <small>{permission.value}</small>
+                        </span>
+                        <span className="roles-permission-check">{isSelected ? '✓' : ''}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div className="roles-modal-actions">
+                  <button type="button" className="roles-ghost-button" onClick={handleClearPermissions}>
+                    Limpiar
+                  </button>
+                  <button type="button" className="roles-save-button" onClick={() => setIsPermissionsModalOpen(false)}>
+                    Listo
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="roles-table-wrap">
             <table className="roles-table">
