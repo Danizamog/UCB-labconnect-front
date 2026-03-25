@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { signIn } from '../services/authService'
 
 export function useAuthStore() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    Boolean(localStorage.getItem('token')),
+  )
 
   const login = async (credentials) => {
     const response = await signIn(credentials)
@@ -15,6 +17,9 @@ export function useAuthStore() {
   }
 
   const logout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('user')
     setIsAuthenticated(false)
   }
 

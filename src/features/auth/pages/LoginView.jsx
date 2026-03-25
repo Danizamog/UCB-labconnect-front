@@ -5,6 +5,7 @@ import './LoginView.css'
 
 function LoginView({ onLogin }) {
   const [credentials, setCredentials] = useState({ email: '', password: '' })
+  const [error, setError] = useState('')
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -13,7 +14,11 @@ function LoginView({ onLogin }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    await onLogin(credentials)
+    setError('')
+    const response = await onLogin(credentials)
+    if (!response?.success) {
+      setError(response?.message || 'No se pudo iniciar sesión')
+    }
   }
 
   return (
@@ -65,6 +70,7 @@ function LoginView({ onLogin }) {
           <LogIn size={18} aria-hidden="true" />
           Entrar
         </button>
+        {error ? <p className="auth-error">{error}</p> : null}
       </form>
     </main>
   )
