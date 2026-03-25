@@ -15,27 +15,27 @@ const TABS = {
 }
 
 const PERMISSION_OPTIONS = [
-  { value: 'gestionar_roles_permisos', label: 'Gestionar roles y permisos', icon: '🛡️' },
-  { value: 'reactivar_cuentas', label: 'Reactivar cuentas', icon: '🔄' },
-  { value: 'gestionar_reservas', label: 'Gestionar reservas', icon: '📅' },
-  { value: 'gestionar_reservas_materiales', label: 'Gestionar materiales en reservas', icon: '🧪' },
-  { value: 'gestionar_reglas_reserva', label: 'Gestionar reglas de reserva', icon: '⚙️' },
-  { value: 'gestionar_inventario', label: 'Gestionar inventario', icon: '📦' },
-  { value: 'gestionar_stock', label: 'Gestionar stock', icon: '📊' },
-  { value: 'gestionar_estado_equipos', label: 'Gestionar estado de equipos', icon: '🧰' },
-  { value: 'gestionar_mantenimiento', label: 'Gestionar mantenimiento', icon: '🛠️' },
-  { value: 'gestionar_prestamos', label: 'Gestionar préstamos', icon: '🤝' },
-  { value: 'adjuntar_evidencia_inventario', label: 'Adjuntar evidencia de inventario', icon: '📎' },
-  { value: 'gestionar_accesos_laboratorio', label: 'Gestionar accesos al laboratorio', icon: '🚪' },
-  { value: 'gestionar_penalizaciones', label: 'Gestionar penalizaciones', icon: '⚠️' },
-  { value: 'gestionar_tutorias', label: 'Gestionar tutorías', icon: '🎓' },
-  { value: 'gestionar_inscripciones_tutorias', label: 'Gestionar inscripciones de tutorías', icon: '📝' },
-  { value: 'gestionar_asistencia_tutorias', label: 'Gestionar asistencia a tutorías', icon: '✅' },
-  { value: 'gestionar_observaciones_tutorias', label: 'Gestionar observaciones de tutorías', icon: '📋' },
-  { value: 'gestionar_notificaciones', label: 'Gestionar notificaciones', icon: '🔔' },
-  { value: 'generar_reportes', label: 'Generar reportes', icon: '📈' },
-  { value: 'consultar_estadisticas', label: 'Consultar estadísticas', icon: '📉' },
-  { value: 'gestionar_reactivos_quimicos', label: 'Gestionar reactivos químicos', icon: '⚗️' },
+  { value: 'gestionar_roles_permisos', label: 'Gestionar roles y permisos', description: 'Crear, editar y eliminar roles. Asignar permisos a usuarios.', icon: '🛡️' },
+  { value: 'reactivar_cuentas', label: 'Reactivar cuentas', description: 'Reactivar cuentas de usuario desactivadas.', icon: '🔄' },
+  { value: 'gestionar_reservas', label: 'Gestionar reservas', description: 'Crear, editar, consultar y cancelar reservas de laboratorio.', icon: '📅' },
+  { value: 'gestionar_reservas_materiales', label: 'Gestionar materiales en reservas', description: 'Agregar, modificar y remover materiales de las reservas.', icon: '🧪' },
+  { value: 'gestionar_reglas_reserva', label: 'Gestionar reglas de reserva', description: 'Establecer las políticas y reglas de las reservas.', icon: '⚙️' },
+  { value: 'gestionar_inventario', label: 'Gestionar inventario', description: 'Crear, actualizar y eliminar equipos del inventario.', icon: '📦' },
+  { value: 'gestionar_stock', label: 'Gestionar stock', description: 'Administrar niveles de stock y disponibilidad de materiales.', icon: '📊' },
+  { value: 'gestionar_estado_equipos', label: 'Gestionar estado de equipos', description: 'Cambiar estado de equipos (disponible, mantenimiento, dañado, etc).', icon: '🧰' },
+  { value: 'gestionar_mantenimiento', label: 'Gestionar mantenimiento', description: 'Registrar y seguimiento del mantenimiento de equipos.', icon: '🛠️' },
+  { value: 'gestionar_prestamos', label: 'Gestionar préstamos', description: 'Autorizar, registrar y devolver préstamos de materiales.', icon: '🤝' },
+  { value: 'adjuntar_evidencia_inventario', label: 'Adjuntar evidencia de inventario', description: 'Subir documentos y fotos como evidencia de inventario.', icon: '📎' },
+  { value: 'gestionar_accesos_laboratorio', label: 'Gestionar accesos al laboratorio', description: 'Habilitar y deshabilitar acceso a espacios del laboratorio.', icon: '🚪' },
+  { value: 'gestionar_penalizaciones', label: 'Gestionar penalizaciones', description: 'Aplicar sanciones por incumplimiento de normas.', icon: '⚠️' },
+  { value: 'gestionar_tutorias', label: 'Gestionar tutorías', description: 'Crear y editar sesiones de tutorías académicas.', icon: '🎓' },
+  { value: 'gestionar_inscripciones_tutorias', label: 'Gestionar inscripciones de tutorías', description: 'Registrar estudiantes en sesiones de tutoría.', icon: '📝' },
+  { value: 'gestionar_asistencia_tutorias', label: 'Gestionar asistencia a tutorías', description: 'Registrar y consultar asistencia de tutorías.', icon: '✅' },
+  { value: 'gestionar_observaciones_tutorias', label: 'Gestionar observaciones de tutorías', description: 'Agregar notas y observaciones sobre el desempeño en tutorías.', icon: '📋' },
+  { value: 'gestionar_notificaciones', label: 'Gestionar notificaciones', description: 'Crear y enviar notificaciones a usuarios.', icon: '🔔' },
+  { value: 'generar_reportes', label: 'Generar reportes', description: 'Crear reportes detallados sobre operaciones del sistema.', icon: '📈' },
+  { value: 'consultar_estadisticas', label: 'Consultar estadísticas', description: 'Ver dashboards y estadísticas del sistema.', icon: '📉' },
+  { value: 'gestionar_reactivos_quimicos', label: 'Gestionar reactivos químicos', description: 'Controlar stock y uso de químicos en el laboratorio.', icon: '⚗️' },
 ]
 
 function parsePermisos(permisosText) {
@@ -49,6 +49,14 @@ function parsePermisos(permisosText) {
     .split(',')
     .map((permiso) => permiso.trim())
     .filter(Boolean)
+}
+
+function formatPermissionName(name) {
+  if (!name) return name
+  return name
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
 }
 
 function AdminRolesPage() {
@@ -65,6 +73,8 @@ function AdminRolesPage() {
   const [roleDeletingId, setRoleDeletingId] = useState(null)
   const [userUpdatingId, setUserUpdatingId] = useState(null)
   const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false)
+  const [viewPermissionsRoleId, setViewPermissionsRoleId] = useState(null)
+  const [confirmDeleteRoleId, setConfirmDeleteRoleId] = useState(null)
 
   const roleOptions = useMemo(
     () => roles.map((role) => ({ id: role.id, nombre: role.nombre })),
@@ -74,39 +84,25 @@ function AdminRolesPage() {
   const selectedPermissions = useMemo(() => parsePermisos(roleDraft.permisosText), [roleDraft.permisosText])
   const selectedPermissionsSet = useMemo(() => new Set(selectedPermissions), [selectedPermissions])
 
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      setErrorMessage('')
+      const [rolesResponse, usersResponse] = await Promise.all([listRoles(), listUsersWithRoles()])
+
+      setRoles(rolesResponse)
+      setUsers(usersResponse)
+      setSuccessMessage('Datos recargados correctamente.')
+      setTimeout(() => setSuccessMessage(''), 3000)
+    } catch (error) {
+      setErrorMessage(error?.message || 'No se pudo cargar la información de roles.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    let mounted = true
-
-    const loadData = async () => {
-      try {
-        setLoading(true)
-        setErrorMessage('')
-        const [rolesResponse, usersResponse] = await Promise.all([listRoles(), listUsersWithRoles()])
-
-        if (!mounted) {
-          return
-        }
-
-        setRoles(rolesResponse)
-        setUsers(usersResponse)
-      } catch (error) {
-        if (!mounted) {
-          return
-        }
-
-        setErrorMessage(error?.message || 'No se pudo cargar la información de roles.')
-      } finally {
-        if (mounted) {
-          setLoading(false)
-        }
-      }
-    }
-
     loadData()
-
-    return () => {
-      mounted = false
-    }
   }, [])
 
   const resetDraft = () => {
@@ -146,8 +142,19 @@ function AdminRolesPage() {
     handleRoleDraftChange('permisosText', ordered.join(', '))
   }
 
+  const handleRemovePermission = (permissionToRemove) => {
+    const current = new Set(parsePermisos(roleDraft.permisosText))
+    current.delete(permissionToRemove)
+    const ordered = PERMISSION_OPTIONS.map((option) => option.value).filter((value) => current.has(value))
+    handleRoleDraftChange('permisosText', ordered.join(', '))
+  }
+
   const handleClearPermissions = () => {
     handleRoleDraftChange('permisosText', '')
+  }
+
+  const getPermissionLabel = (value) => {
+    return PERMISSION_OPTIONS.find((opt) => opt.value === value)?.label || value
   }
 
   const handleSaveRole = async () => {
@@ -193,11 +200,16 @@ function AdminRolesPage() {
       await deleteRole(roleId)
       setRoles((previous) => previous.filter((role) => role.id !== roleId))
       setSuccessMessage('Rol eliminado correctamente.')
+      setConfirmDeleteRoleId(null)
     } catch (error) {
       setErrorMessage(error?.message || 'No se pudo eliminar el rol.')
     } finally {
       setRoleDeletingId(null)
     }
+  }
+
+  const handleConfirmDelete = (roleId) => {
+    setConfirmDeleteRoleId(roleId)
   }
 
   const handleAssignUserRole = async (userId, newRoleId) => {
@@ -235,8 +247,22 @@ function AdminRolesPage() {
   return (
     <section className="roles-page" aria-label="Administración de roles">
       <header className="roles-header">
-        <h2>Administración de roles</h2>
-        <p>Asigna y actualiza los permisos de acceso para cada usuario.</p>
+        <div className="roles-header-content">
+          <div>
+            <h2>Administración de roles</h2>
+            <p>Asigna y actualiza los permisos de acceso para cada usuario.</p>
+          </div>
+          <button
+            type="button"
+            className="roles-reload-button"
+            onClick={loadData}
+            disabled={loading}
+            title="Recargar datos de la base de datos"
+            aria-label="Recargar información de roles y usuarios"
+          >
+            🔄 {loading ? 'Cargando...' : 'Recargar'}
+          </button>
+        </div>
       </header>
 
       <div className="roles-tabs" role="tablist" aria-label="Gestión de roles">
@@ -288,22 +314,40 @@ function AdminRolesPage() {
                 />
               </label>
               <label className="roles-form-full">
-                <span>Permisos seleccionados</span>
-                <div className="roles-permissions-field">
-                  <input
-                    className="roles-input"
-                    value={selectedPermissions.join(', ')}
-                    readOnly
-                    placeholder="Selecciona permisos desde la ventana"
-                  />
-                  <button
-                    type="button"
-                    className="roles-ghost-button"
-                    onClick={() => setIsPermissionsModalOpen(true)}
-                  >
-                    Abrir permisos
-                  </button>
+                <span>Permisos seleccionados ({selectedPermissions.length})</span>
+                <div className="roles-permissions-display">
+                  {selectedPermissions.length > 0 ? (
+                    <div className="roles-chips-container">
+                      {selectedPermissions.map((permission) => {
+                        const option = PERMISSION_OPTIONS.find((opt) => opt.value === permission)
+
+                        return (
+                          <div key={permission} className="roles-chip" title={option?.label || permission}>
+                            <span className="roles-chip-icon">{option?.icon || '•'}</span>
+                            <span className="roles-chip-label">{option?.label || permission}</span>
+                            <button
+                              type="button"
+                              className="roles-chip-remove"
+                              onClick={() => handleRemovePermission(permission)}
+                              aria-label={`Eliminar ${option?.label || permission}`}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="roles-empty-state">No hay permisos seleccionados</p>
+                  )}
                 </div>
+                <button
+                  type="button"
+                  className="roles-primary-button"
+                  onClick={() => setIsPermissionsModalOpen(true)}
+                >
+                  {selectedPermissions.length > 0 ? 'Editar permisos' : 'Seleccionar permisos'}
+                </button>
               </label>
             </div>
             <div className="roles-toolbar">
@@ -389,30 +433,56 @@ function AdminRolesPage() {
                 </tr>
               </thead>
               <tbody>
-                {roles.map((role) => (
-                  <tr key={role.id}>
-                    <td>{role.nombre}</td>
-                    <td>{role.descripcion || '—'}</td>
-                    <td>
-                      {Array.isArray(role.permisos) && role.permisos.length
-                        ? role.permisos.join(', ')
-                        : '—'}
-                    </td>
-                    <td className="roles-actions-cell">
-                      <button type="button" className="roles-ghost-button" onClick={() => handleEditRole(role)}>
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="roles-danger-button"
-                        onClick={() => handleDeleteRole(role.id)}
-                        disabled={roleDeletingId === role.id}
-                      >
-                        Eliminar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {roles.map((role) => {
+                  const displayPermissions = Array.isArray(role.permisos) ? role.permisos.slice(0, 3) : []
+                  const remainingCount = Array.isArray(role.permisos) ? role.permisos.length - 3 : 0
+
+                  return (
+                    <tr key={role.id}>
+                      <td className="roles-table-name">{role.nombre}</td>
+                      <td className="roles-table-description">{role.descripcion || '—'}</td>
+                      <td className="roles-table-permissions">
+                        <div className="roles-badges-container">
+                          {displayPermissions.map((perm) => {
+                            const option = PERMISSION_OPTIONS.find((opt) => opt.value === perm)
+
+                            return (
+                              <div key={perm} className="roles-badge-wrapper">
+                                <span className="roles-badge" title={option?.label || perm}>
+                                  <span>{option?.icon || '•'}</span>
+                                </span>
+                                <div className="roles-badge-tooltip">{option?.label || perm}</div>
+                              </div>
+                            )
+                          })}
+                          {remainingCount > 0 ? (
+                            <button
+                              type="button"
+                              className="roles-badge-more"
+                              onClick={() => setViewPermissionsRoleId(role.id)}
+                              title={Array.isArray(role.permisos) ? role.permisos.slice(3).map((p) => PERMISSION_OPTIONS.find((opt) => opt.value === p)?.label || p).join(', ') : ''}
+                            >
+                              +{remainingCount}
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="roles-actions-cell">
+                        <button type="button" className="roles-action-button roles-action-edit" onClick={() => handleEditRole(role)}>
+                          ✎ Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="roles-action-button roles-action-delete"
+                          onClick={() => handleConfirmDelete(role.id)}
+                          disabled={roleDeletingId === role.id}
+                        >
+                          🗑 Eliminar
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -465,6 +535,91 @@ function AdminRolesPage() {
       {!loading && activeTab === TABS.USERS && users.length === 0 ? (
         <p className="roles-counter">No hay usuarios para asignar roles.</p>
       ) : null}
+
+      {viewPermissionsRoleId ? (() => {
+        const roleWithFullPerms = roles.find((r) => r.id === viewPermissionsRoleId)
+
+        return roleWithFullPerms ? (
+          <div className="roles-modal-backdrop" role="dialog" aria-modal="true" aria-label="Ver todos los permisos">
+            <div className="roles-modal roles-modal-permissions">
+              <div className="roles-modal-header">
+                <h3>Permisos de "{roleWithFullPerms.nombre}"</h3>
+                <button
+                  type="button"
+                  className="roles-ghost-button"
+                  onClick={() => setViewPermissionsRoleId(null)}
+                >
+                  Cerrar
+                </button>
+              </div>
+
+              <div className="roles-permissions-list">
+                {Array.isArray(roleWithFullPerms.permisos) && roleWithFullPerms.permisos.length > 0 ? (
+                  <ul>
+                    {roleWithFullPerms.permisos.map((perm) => {
+                      const option = PERMISSION_OPTIONS.find((opt) => opt.value === perm)
+
+                      return (
+                        <li key={perm} className="roles-permission-list-item">
+                          <span className="roles-permission-list-icon">{option?.icon || '•'}</span>
+                          <div>
+                            <strong>{option?.label || perm}</strong>
+                            <small>{option?.value || perm}</small>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                ) : (
+                  <p className="roles-empty-state">Este rol no tiene permisos asignados.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null
+      })() : null}
+
+      {confirmDeleteRoleId ? (() => {
+        const roleToDelete = roles.find((r) => r.id === confirmDeleteRoleId)
+
+        return roleToDelete ? (
+          <div className="roles-modal-backdrop" role="alertdialog" aria-modal="true" aria-label="Confirmar eliminación">
+            <div className="roles-modal roles-modal-confirm">
+              <div className="roles-modal-header">
+                <h3>⚠️ Confirmar eliminación</h3>
+              </div>
+
+              <div className="roles-modal-content">
+                <p>
+                  ¿Está seguro de que desea eliminar el rol <strong>"{roleToDelete.nombre}"</strong>?
+                </p>
+                <p className="roles-warning-text">
+                  Esta acción no se puede deshacer y afectará a los usuarios asignados a este rol.
+                </p>
+              </div>
+
+              <div className="roles-modal-actions">
+                <button
+                  type="button"
+                  className="roles-ghost-button"
+                  onClick={() => setConfirmDeleteRoleId(null)}
+                  disabled={roleDeletingId === confirmDeleteRoleId}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="roles-danger-button"
+                  onClick={() => handleDeleteRole(confirmDeleteRoleId)}
+                  disabled={roleDeletingId === confirmDeleteRoleId}
+                >
+                  {roleDeletingId === confirmDeleteRoleId ? 'Eliminando...' : 'Eliminar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null
+      })() : null}
     </section>
   )
 }
