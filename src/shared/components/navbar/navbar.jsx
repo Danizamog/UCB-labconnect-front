@@ -1,27 +1,49 @@
 import { useState } from 'react'
 import {
+  BellRing,
+  CalendarDays,
+  CalendarCheck2,
+  CalendarClock,
+  ClipboardList,
   House,
   LogOut,
   Menu,
   MonitorCog,
+  Package,
   Users,
   UserRound,
   X,
 } from 'lucide-react'
 import { NAVIGATION_LINKS } from '../../config/navigationLinks'
+import { hasAnyPermission } from '../../lib/permissions'
 import ucbLapazLogo from '../../../assets/branding/ucb-san-pablo-lapaz.png'
 import './navbar.css'
 
-function Navbar({ onLogout, onNavigate, activeSection = 'home' }) {
+function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const isAdmin = user?.role === 'admin'
 
   const iconMap = {
     home: House,
+    reserve: CalendarClock,
+    calendar: CalendarDays,
+    requests: ClipboardList,
+    reservations: CalendarCheck2,
+    notifications: BellRing,
+    profiles: UserRound,
     roles: Users,
+    sessions: CalendarClock,
     assets: MonitorCog,
+    loans: Package,
     profile: UserRound,
     logout: LogOut,
   }
+
+  const visibleLinks = NAVIGATION_LINKS.filter((link) => {
+    if (link.requiredAnyPermission) return hasAnyPermission(user, link.requiredAnyPermission)
+    if (link.userOnly) return !isAdmin
+    return true
+  })
 
   const handleToggleMenu = () => {
     setIsMenuOpen((previous) => !previous)
@@ -32,11 +54,11 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home' }) {
     onLogout()
   }
 
-  const handleNavigate = (section) => {
+  const handleNavigate = (path) => {
     setIsMenuOpen(false)
 
     if (onNavigate) {
-      onNavigate(section)
+      onNavigate(path)
     }
   }
 
@@ -66,7 +88,7 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home' }) {
         </button>
 
         <div className={`nav-links ${isMenuOpen ? 'is-open' : ''}`}>
-          {NAVIGATION_LINKS.map((link) => {
+          {visibleLinks.map((link) => {
             const Icon = iconMap[link.icon]
 
             if (link.action === 'logout') {
@@ -84,15 +106,19 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home' }) {
             }
 
             return (
-              <button
+              <a
                 key={link.id}
-                type="button"
+                href={link.path}
                 className={`nav-link ${activeSection === link.id ? 'is-active' : ''}`}
-                onClick={() => handleNavigate(link.id)}
+                aria-current={activeSection === link.id ? 'page' : undefined}
+                onClick={(event) => {
+                  event.preventDefault()
+                  handleNavigate(link.path)
+                }}
               >
                 {Icon ? <Icon size={16} aria-hidden="true" /> : null}
                 {link.label}
-              </button>
+              </a>
             )
           })}
         </div>

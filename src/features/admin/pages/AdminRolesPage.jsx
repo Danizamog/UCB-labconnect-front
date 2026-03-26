@@ -3,6 +3,7 @@ import {
   assignUserRole,
   createRole,
   deleteRole,
+  listPermissionsCatalog,
   listRoles,
   listUsersWithRoles,
   updateRole,
@@ -14,7 +15,15 @@ const TABS = {
   USERS: 'users',
 }
 
-const PERMISSION_OPTIONS = [
+const ASSIGNABLE_ROLE_NAMES = [
+  'Administrador',
+  'Estudiante',
+  'Docente',
+  'Encargado de Laboratorio',
+  'Invitado',
+]
+
+const FALLBACK_PERMISSION_OPTIONS = [
   { value: 'gestionar_roles_permisos', label: 'Gestionar roles y permisos', description: 'Crear, editar y eliminar roles. Asignar permisos a usuarios.', icon: '🛡️' },
   { value: 'reactivar_cuentas', label: 'Reactivar cuentas', description: 'Reactivar cuentas de usuario desactivadas.', icon: '🔄' },
   { value: 'gestionar_reservas', label: 'Gestionar reservas', description: 'Crear, editar, consultar y cancelar reservas de laboratorio.', icon: '📅' },
@@ -51,18 +60,11 @@ function parsePermisos(permisosText) {
     .filter(Boolean)
 }
 
-function formatPermissionName(name) {
-  if (!name) return name
-  return name
-    .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ')
-}
-
-function AdminRolesPage() {
+function AdminRolesPage({ user, onSessionRefresh }) {
   const [activeTab, setActiveTab] = useState(TABS.ROLES)
   const [roles, setRoles] = useState([])
   const [users, setUsers] = useState([])
+  const [permissionOptions, setPermissionOptions] = useState(FALLBACK_PERMISSION_OPTIONS)
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -77,9 +79,14 @@ function AdminRolesPage() {
   const [confirmDeleteRoleId, setConfirmDeleteRoleId] = useState(null)
 
   const roleOptions = useMemo(
-    () => roles.map((role) => ({ id: role.id, nombre: role.nombre })),
+    () =>
+      ASSIGNABLE_ROLE_NAMES
+        .map((roleName) => roles.find((role) => role.nombre === roleName))
+        .filter(Boolean)
+        .map((role) => ({ id: role.id, nombre: role.nombre })),
     [roles],
   )
+  const currentPermissionOptions = permissionOptions.length ? permissionOptions : FALLBACK_PERMISSION_OPTIONS
 
   const selectedPermissions = useMemo(() => parsePermisos(roleDraft.permisosText), [roleDraft.permisosText])
   const selectedPermissionsSet = useMemo(() => new Set(selectedPermissions), [selectedPermissions])
@@ -88,10 +95,15 @@ function AdminRolesPage() {
     try {
       setLoading(true)
       setErrorMessage('')
-      const [rolesResponse, usersResponse] = await Promise.all([listRoles(), listUsersWithRoles()])
+      const [rolesResponse, usersResponse, permissionsResponse] = await Promise.all([
+        listRoles(),
+        listUsersWithRoles(),
+        listPermissionsCatalog().catch(() => FALLBACK_PERMISSION_OPTIONS),
+      ])
 
       setRoles(rolesResponse)
       setUsers(usersResponse)
+      setPermissionOptions(Array.isArray(permissionsResponse) && permissionsResponse.length ? permissionsResponse : FALLBACK_PERMISSION_OPTIONS)
       setSuccessMessage('Datos recargados correctamente.')
       setTimeout(() => setSuccessMessage(''), 3000)
     } catch (error) {
@@ -138,23 +150,19 @@ function AdminRolesPage() {
       current.add(permission)
     }
 
-    const ordered = PERMISSION_OPTIONS.map((option) => option.value).filter((value) => current.has(value))
+    const ordered = currentPermissionOptions.map((option) => option.value).filter((value) => current.has(value))
     handleRoleDraftChange('permisosText', ordered.join(', '))
   }
 
   const handleRemovePermission = (permissionToRemove) => {
     const current = new Set(parsePermisos(roleDraft.permisosText))
     current.delete(permissionToRemove)
-    const ordered = PERMISSION_OPTIONS.map((option) => option.value).filter((value) => current.has(value))
+    const ordered = currentPermissionOptions.map((option) => option.value).filter((value) => current.has(value))
     handleRoleDraftChange('permisosText', ordered.join(', '))
   }
 
   const handleClearPermissions = () => {
     handleRoleDraftChange('permisosText', '')
-  }
-
-  const getPermissionLabel = (value) => {
-    return PERMISSION_OPTIONS.find((opt) => opt.value === value)?.label || value
   }
 
   const handleSaveRole = async () => {
@@ -236,7 +244,21 @@ function AdminRolesPage() {
         }),
       )
 
-      setSuccessMessage('Rol de usuario actualizado correctamente.')
+      const isCurrentSessionUser =
+        updatedUser?.id === user?.user_id ||
+        (updatedUser?.email && updatedUser.email === user?.username)
+
+      if (isCurrentSessionUser && typeof onSessionRefresh === 'function') {
+        const refreshResult = await onSessionRefresh()
+        if (refreshResult?.success) {
+          setSuccessMessage('Tu rol y tus permisos se actualizaron al instante en esta sesion.')
+        } else {
+          setSuccessMessage('Rol de usuario actualizado correctamente. La sesion se validara de nuevo al continuar.')
+        }
+        return
+      }
+
+      setSuccessMessage('Rol de usuario actualizado correctamente. Los permisos nuevos ya quedan disponibles al validar la sesion.')
     } catch (error) {
       setErrorMessage(error?.message || 'No se pudo actualizar el rol del usuario.')
     } finally {
@@ -319,7 +341,7 @@ function AdminRolesPage() {
                   {selectedPermissions.length > 0 ? (
                     <div className="roles-chips-container">
                       {selectedPermissions.map((permission) => {
-                        const option = PERMISSION_OPTIONS.find((opt) => opt.value === permission)
+                        const option = currentPermissionOptions.find((opt) => opt.value === permission)
 
                         return (
                           <div key={permission} className="roles-chip" title={option?.label || permission}>
@@ -387,7 +409,7 @@ function AdminRolesPage() {
                 </div>
 
                 <div className="roles-permissions-grid">
-                  {PERMISSION_OPTIONS.map((permission) => {
+                  {currentPermissionOptions.map((permission) => {
                     const isSelected = selectedPermissionsSet.has(permission.value)
 
                     return (
@@ -403,6 +425,7 @@ function AdminRolesPage() {
                         <span className="roles-permission-texts">
                           <strong>{permission.label}</strong>
                           <small>{permission.value}</small>
+                          <small>{permission.description || 'Sin descripcion disponible.'}</small>
                         </span>
                         <span className="roles-permission-check">{isSelected ? '✓' : ''}</span>
                       </button>
@@ -444,7 +467,7 @@ function AdminRolesPage() {
                       <td className="roles-table-permissions">
                         <div className="roles-badges-container">
                           {displayPermissions.map((perm) => {
-                            const option = PERMISSION_OPTIONS.find((opt) => opt.value === perm)
+                            const option = currentPermissionOptions.find((opt) => opt.value === perm)
 
                             return (
                               <div key={perm} className="roles-badge-wrapper">
@@ -460,7 +483,7 @@ function AdminRolesPage() {
                               type="button"
                               className="roles-badge-more"
                               onClick={() => setViewPermissionsRoleId(role.id)}
-                              title={Array.isArray(role.permisos) ? role.permisos.slice(3).map((p) => PERMISSION_OPTIONS.find((opt) => opt.value === p)?.label || p).join(', ') : ''}
+                              title={Array.isArray(role.permisos) ? role.permisos.slice(3).map((p) => currentPermissionOptions.find((opt) => opt.value === p)?.label || p).join(', ') : ''}
                             >
                               +{remainingCount}
                             </button>
@@ -491,12 +514,16 @@ function AdminRolesPage() {
 
       {!loading && activeTab === TABS.USERS ? (
         <div className="roles-table-wrap">
+          <p className="roles-counter">
+            La asignacion RBAC institucional se limita a cinco roles base: <strong>Administrador</strong>, <strong>Estudiante</strong>, <strong>Docente</strong>, <strong>Encargado de Laboratorio</strong> e <strong>Invitado</strong>.
+          </p>
           <table className="roles-table">
             <thead>
               <tr>
                 <th>Usuario</th>
                 <th>Correo</th>
                 <th>Rol actual</th>
+                <th>Permisos del rol</th>
                 <th>Asignar rol</th>
               </tr>
             </thead>
@@ -506,10 +533,30 @@ function AdminRolesPage() {
                   <td>{user.name || 'Sin nombre'}</td>
                   <td>{user.email}</td>
                   <td>{user.role?.nombre || 'Sin rol'}</td>
+                  <td className="roles-table-permissions">
+                    <div className="roles-badges-container">
+                      {(user.role?.permisos || []).length > 0 ? (
+                        user.role.permisos.map((perm) => {
+                          const option = currentPermissionOptions.find((opt) => opt.value === perm)
+
+                          return (
+                            <div key={`${user.id}-${perm}`} className="roles-badge-wrapper">
+                              <span className="roles-badge" title={option?.label || perm}>
+                                <span>{option?.icon || '*'}</span>
+                              </span>
+                              <div className="roles-badge-tooltip">{option?.label || perm}</div>
+                            </div>
+                          )
+                        })
+                      ) : (
+                        <span className="roles-empty-state">Sin permisos</span>
+                      )}
+                    </div>
+                  </td>
                   <td>
                     <select
                       className="roles-select"
-                      value={user.roleId || ''}
+                      value={roleOptions.some((role) => role.id === user.roleId) ? user.roleId : ''}
                       disabled={userUpdatingId === user.id}
                       onChange={(event) => handleAssignUserRole(user.id, event.target.value)}
                     >
@@ -557,7 +604,7 @@ function AdminRolesPage() {
                 {Array.isArray(roleWithFullPerms.permisos) && roleWithFullPerms.permisos.length > 0 ? (
                   <ul>
                     {roleWithFullPerms.permisos.map((perm) => {
-                      const option = PERMISSION_OPTIONS.find((opt) => opt.value === perm)
+                      const option = currentPermissionOptions.find((opt) => opt.value === perm)
 
                       return (
                         <li key={perm} className="roles-permission-list-item">
@@ -565,6 +612,7 @@ function AdminRolesPage() {
                           <div>
                             <strong>{option?.label || perm}</strong>
                             <small>{option?.value || perm}</small>
+                            <small>{option?.description || 'Sin descripcion disponible.'}</small>
                           </div>
                         </li>
                       )

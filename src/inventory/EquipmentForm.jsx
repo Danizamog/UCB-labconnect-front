@@ -25,7 +25,7 @@ const EquipmentForm = ({ onSuccess }) => {
             await inventoryService.createEquipment(formData);
             alert('Equipo registrado con éxito en el inventario');
             if(onSuccess) onSuccess();
-        } catch (err) {
+        } catch {
             setError('Error al guardar el equipo en el servidor.');
         }
     };

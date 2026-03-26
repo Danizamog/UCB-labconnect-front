@@ -1,14 +1,22 @@
-const API_BASE_URL = (import.meta.env.VITE_GATEWAY_API_BASE_URL || '').replace(/\/$/, '')
+const API_BASE_URL = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
 const ROLES_ENDPOINT = import.meta.env.VITE_ROLES_ENDPOINT || '/roles'
 const USERS_ENDPOINT = import.meta.env.VITE_ROLE_USERS_ENDPOINT || '/users'
+
+function getStoredToken() {
+  if (typeof window === 'undefined') {
+    return ''
+  }
+  return localStorage.getItem('token') || localStorage.getItem('access_token') || ''
+}
 
 function buildHeaders(token) {
   const headers = {
     'Content-Type': 'application/json',
   }
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
+  const resolvedToken = token || getStoredToken()
+  if (resolvedToken) {
+    headers.Authorization = `Bearer ${resolvedToken}`
   }
 
   return headers
@@ -90,6 +98,10 @@ export async function listRoles({ token } = {}) {
   const records = normalizeArrayResponse(data)
 
   return records.map(mapRoleRecord)
+}
+
+export async function listPermissionsCatalog({ token } = {}) {
+  return apiRequest(`${ROLES_ENDPOINT}/permissions/catalog`, { token })
 }
 
 export async function createRole(role, { token } = {}) {
