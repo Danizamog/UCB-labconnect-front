@@ -18,12 +18,15 @@ import './navbar.css'
 
 const iconMap = {
   home: House,
+  admin_reservas: Users,
   profiles: UserRound,
   roles: Users,
   areas: Layers,
   laboratorios: FlaskConical,
   equipos: MonitorCog,
   materiales: Package,
+  calendar: Layers,
+  reserve: FlaskConical,
   logout: LogOut,
 }
 
@@ -56,7 +59,10 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
       <div className="sidebar-topbar">
         <div className="sidebar-brand-mobile">
           <img src={ucbLapazLogo} alt="UCB San Pablo La Paz" className="sidebar-logo" />
-          <strong className="sidebar-title">LabConnect</strong>
+          <div style={{display: 'flex', flexDirection: 'column', gap: '2px'}}>
+            <span style={{fontSize: '0.7rem', color: '#0a2540', fontWeight: 600, lineHeight: 1}}>UCB San Pablo</span>
+            <strong className="sidebar-title" style={{fontSize: '0.95rem'}}>LabConnect</strong>
+          </div>
         </div>
         <button
           type="button"
@@ -77,7 +83,7 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
         <div className="sidebar-brand">
           <img src={ucbLapazLogo} alt="UCB San Pablo La Paz" className="sidebar-logo" />
           <div className="sidebar-brand-text">
-            <span className="sidebar-kicker">UCB San Pablo · La Paz</span>
+            <span className="sidebar-kicker"><span style={{color: '#0a2540'}}>UCB San Pablo</span> · La Paz</span>
             <strong className="sidebar-title">LabConnect</strong>
           </div>
         </div>

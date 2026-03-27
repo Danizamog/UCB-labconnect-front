@@ -1,142 +1,85 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getAllPracticePlannings, subscribeReservationsRealtime, updatePracticeStatus } from '../api/reservationsApi'
+import {
+  listReservations,
+  subscribeReservationsRealtime,
+  updateReservationStatus,
+} from '../services/reservationsService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
-import { formatDate, formatStatus, statusClass } from '../../../shared/utils/formatters'
-import { getAuthToken } from '../../../shared/utils/storage'
-import './AdminReservationsPage.css'
-
-function formatTrackingStatus(status) {
-  if (!status) return 'Sin seguimiento'
-  return status
-}
+import './ReservationsPages.css'
 
 function AdminReservationsPage({ user }) {
-  const token = getAuthToken()
-  const [reservations, setReservations] = useState([])
-  const [reviewComments, setReviewComments] = useState({})
   const [statusFilter, setStatusFilter] = useState('all')
-  const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [savingId, setSavingId] = useState(null)
+  const [reservations, setReservations] = useState([])
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
-  const loadReservations = async () => {
-    setLoading(true)
+  const canManage = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
+
+  const loadData = async () => {
     try {
-      const data = await getAllPracticePlannings(token)
+      const data = await listReservations()
       setReservations(data)
-      setReviewComments(
-        Object.fromEntries(data.map((item) => [item.id, item.review_comment || ''])),
-      )
       setError('')
     } catch (err) {
-      setError(err.message || 'No se pudieron cargar las reservas')
-    } finally {
-      setLoading(false)
+      setError(err.message || 'No se pudo cargar el panel de reservas.')
     }
   }
 
   useEffect(() => {
-    loadReservations()
+    loadData()
+
+    const unsubscribe = subscribeReservationsRealtime((event) => {
+      if (event?.topic === 'lab_reservation') {
+        loadData()
+      }
+    })
+
+    return () => unsubscribe?.()
   }, [])
 
-  useEffect(() => {
-    if (!token) {
-      return undefined
-    }
-
-    return subscribeReservationsRealtime(token, {
-      onMessage: (message) => {
-        if (!message || message.entity !== 'practice_request') {
-          return
-        }
-        loadReservations()
-      },
-    })
-  }, [token])
-
-  const filteredReservations = useMemo(() => {
-    return reservations.filter((item) => {
-      const matchesStatus = statusFilter === 'all' ? true : item.status === statusFilter
-      const haystack = `${item.username} ${item.subject_name || ''} ${item.laboratory_name} ${item.notes || ''}`.toLowerCase()
-      const matchesSearch = haystack.includes(search.trim().toLowerCase())
-      return matchesStatus && matchesSearch
-    })
-  }, [reservations, search, statusFilter])
+  const filtered = useMemo(() => {
+    if (statusFilter === 'all') return reservations
+    return reservations.filter((item) => item.status === statusFilter)
+  }, [reservations, statusFilter])
 
   const pendingCount = reservations.filter((item) => item.status === 'pending').length
   const approvedCount = reservations.filter((item) => item.status === 'approved').length
-  const canManageReservations = hasAnyPermission(user, ['gestionar_reservas'])
-  const canManageMaterials = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reservas_materiales'])
-  const canManageRules = hasAnyPermission(user, ['gestionar_reglas_reserva'])
 
-  const handleUpdateStatus = async (reservationId, nextStatus) => {
-    setSavingId(reservationId)
+  const handleUpdate = async (reservationId, status) => {
+    if (!canManage) return
     setError('')
     setMessage('')
-
     try {
-      const updated = await updatePracticeStatus(
-        reservationId,
-        nextStatus,
-        token,
-        reviewComments[reservationId] || undefined,
-      )
-
-      setReservations((previous) =>
-        previous.map((item) => (item.id === reservationId ? updated : item)),
-      )
-      setReviewComments((previous) => ({
-        ...previous,
-        [reservationId]: updated.review_comment || previous[reservationId] || '',
-      }))
-      setMessage(
-        nextStatus === 'approved' && updated.materials?.length
-          ? 'La reserva fue aprobada y sus materiales ya entraron automaticamente al seguimiento de prestamos.'
-          : 'La reserva fue actualizada y el usuario ya puede verla en sus notificaciones.',
-      )
+      await updateReservationStatus(reservationId, status, user?.username || user?.name || 'admin')
+      setMessage('Estado actualizado correctamente.')
+      await loadData()
     } catch (err) {
-      setError(err.message || 'No se pudo actualizar la reserva')
-    } finally {
-      setSavingId(null)
+      setError(err.message || 'No se pudo actualizar la reserva.')
     }
   }
 
   return (
-    <section className="admin-reservations-page" aria-label="Gestion de reservas">
-      <header className="admin-reservations-hero">
+    <section className="reservations-page" aria-label="Panel de reservas">
+      <header className="reservations-header">
         <div>
-          <p className="admin-reservations-kicker">Revision operativa</p>
-          <h2>Gestiona solicitudes de practicas</h2>
-          <p>
-            Aprueba, rechaza o cancela reservas completas con espacio, materiales y apoyo tecnico.
-          </p>
+          <p className="reservations-kicker">Gestion operativa</p>
+          <h2>Reservas de laboratorios</h2>
+          <p>Aprueba o rechaza solicitudes y revisa el historial por estado.</p>
         </div>
-        <div className="admin-reservations-stats">
+        <div className="reservations-summary">
           <div><span>Total</span><strong>{reservations.length}</strong></div>
           <div><span>Pendientes</span><strong>{pendingCount}</strong></div>
           <div><span>Aprobadas</span><strong>{approvedCount}</strong></div>
         </div>
       </header>
 
-      {message ? <p className="admin-reservations-alert success">{message}</p> : null}
-      {error ? <p className="admin-reservations-alert error">{error}</p> : null}
-      {!canManageReservations ? (
-        <p className="admin-reservations-alert error">
-          Tu rol puede revisar esta bandeja, pero no aprobar o rechazar reservas porque no tiene el permiso <strong>gestionar_reservas</strong>.
-        </p>
-      ) : null}
-      {canManageRules ? (
-        <p className="admin-reservations-alert success">
-          Tu rol incluye <strong>gestionar_reglas_reserva</strong>. Puedes usar esta vista como referencia operativa mientras definimos el módulo dedicado de reglas.
-        </p>
-      ) : null}
+      {message ? <p className="reservations-message success">{message}</p> : null}
+      {error ? <p className="reservations-message error">{error}</p> : null}
 
-      <section className="admin-reservations-toolbar-card">
-        <div className="admin-reservations-toolbar">
+      <section className="reservations-panel">
+        <div className="reservations-controls" style={{gridTemplateColumns: '240px'}}>
           <label>
-            <span>Estado</span>
+            <span>Filtrar por estado</span>
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <option value="all">Todos</option>
               <option value="pending">Pendientes</option>
@@ -145,133 +88,59 @@ function AdminReservationsPage({ user }) {
               <option value="cancelled">Canceladas</option>
             </select>
           </label>
-
-          <label className="search">
-            <span>Buscar</span>
-            <input
-              type="text"
-              placeholder="Usuario, materia, laboratorio o nota"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </label>
         </div>
-      </section>
 
-      {loading ? (
-        <p className="admin-reservations-empty">Cargando reservas...</p>
-      ) : filteredReservations.length === 0 ? (
-        <p className="admin-reservations-empty">No hay reservas para este filtro.</p>
-      ) : (
-        <div className="admin-reservations-list">
-          {filteredReservations.map((reservation) => (
-            <article key={reservation.id} className="admin-reservation-card">
-              <div className="admin-reservation-head">
-                <div>
-                  <h3>{reservation.subject_name || 'Practica de laboratorio'}</h3>
-                  <p>
-                    {reservation.username} · {formatDate(reservation.date)} · {reservation.start_time} - {reservation.end_time}
-                  </p>
-                </div>
-                <span className={`admin-reservation-status ${statusClass(reservation.status)}`}>
-                  {formatStatus(reservation.status)}
-                </span>
-              </div>
-
-              <div className="admin-reservation-grid">
-                <div className="admin-reservation-block">
-                  <span>Materia o asignatura</span>
-                  <strong>{reservation.subject_name || 'Sin materia registrada'}</strong>
-                </div>
-                <div className="admin-reservation-block">
-                  <span>Apoyo tecnico</span>
-                  <strong>{reservation.needs_support ? reservation.support_topic || 'Solicitado' : 'No requerido'}</strong>
-                </div>
-                <div className="admin-reservation-block">
-                  <span>Materiales</span>
-                  <strong>
-                    {canManageMaterials && reservation.materials.length > 0
-                      ? reservation.materials.map((material) => `${material.material_name} x${material.quantity}`).join(', ')
-                      : canManageMaterials ? 'Sin materiales' : 'Materiales protegidos por permisos'}
-                  </strong>
-                </div>
-                <div className="admin-reservation-block">
-                  <span>Seguimiento de materiales</span>
-                  <strong>{formatTrackingStatus(reservation.material_tracking_status)}</strong>
-                </div>
-              </div>
-
-              <p className="admin-reservation-notes">
-                {reservation.notes || 'Sin observaciones adicionales.'}
-              </p>
-
-              {reservation.material_loans?.length ? (
-                <div className="admin-reservation-grid">
-                  {reservation.material_loans.map((loan) => (
-                    <div key={loan.loan_id} className="admin-reservation-block">
-                      <span>{loan.material_name}</span>
-                      <strong>
-                        {loan.quantity} unidad(es) · {formatStatus(loan.status)}
-                      </strong>
-                      {loan.return_condition ? (
-                        <small>
-                          {loan.return_condition === 'ok'
-                            ? 'Devuelto sin novedades'
-                            : loan.return_condition === 'issues'
-                              ? 'Devuelto con observaciones'
-                              : 'Seguimiento cancelado'}
-                        </small>
-                      ) : null}
+        {filtered.length === 0 ? (
+          <p className="reservations-empty">No hay reservas para este filtro.</p>
+        ) : (
+          <table className="reservations-table">
+            <thead>
+              <tr>
+                <th>Laboratorio</th>
+                <th>Solicitante</th>
+                <th>Fecha</th>
+                <th>Horario</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((item) => (
+                <tr key={item.id}>
+                  <td>
+                    <strong>{item.laboratory_name || item.laboratory_id}</strong>
+                    <div>{item.purpose || 'Sin motivo registrado'}</div>
+                  </td>
+                  <td>{item.requested_by_name || item.requested_by || '-'}</td>
+                  <td>{item.date}</td>
+                  <td>{item.start_time} - {item.end_time}</td>
+                  <td><span className={`reservations-status ${item.status}`}>{item.status}</span></td>
+                  <td>
+                    <div className="reservations-actions">
+                      <button
+                        type="button"
+                        className="reservations-primary"
+                        disabled={!canManage || item.status === 'approved'}
+                        onClick={() => handleUpdate(item.id, 'approved')}
+                      >
+                        Aprobar
+                      </button>
+                      <button
+                        type="button"
+                        className="reservations-danger"
+                        disabled={!canManage || item.status === 'rejected'}
+                        onClick={() => handleUpdate(item.id, 'rejected')}
+                      >
+                        Rechazar
+                      </button>
                     </div>
-                  ))}
-                </div>
-              ) : null}
-
-              <label className="admin-reservation-comment">
-                <span>Comentario para el usuario</span>
-                <textarea
-                  rows="3"
-                  value={reviewComments[reservation.id] || ''}
-                  onChange={(event) =>
-                    setReviewComments((previous) => ({
-                      ...previous,
-                      [reservation.id]: event.target.value,
-                    }))
-                  }
-                  placeholder="Ej. aprobada para el grupo 1, llevar guia impresa"
-                />
-              </label>
-
-              <div className="admin-reservation-actions">
-                <button
-                  type="button"
-                  className="approve"
-                  disabled={savingId === reservation.id || !canManageReservations}
-                  onClick={() => handleUpdateStatus(reservation.id, 'approved')}
-                >
-                  Aprobar
-                </button>
-                <button
-                  type="button"
-                  className="reject"
-                  disabled={savingId === reservation.id || !canManageReservations}
-                  onClick={() => handleUpdateStatus(reservation.id, 'rejected')}
-                >
-                  Rechazar
-                </button>
-                <button
-                  type="button"
-                  className="neutral"
-                  disabled={savingId === reservation.id || !canManageReservations}
-                  onClick={() => handleUpdateStatus(reservation.id, 'cancelled')}
-                >
-                  Cancelar
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
     </section>
   )
 }
