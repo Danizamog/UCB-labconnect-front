@@ -322,6 +322,26 @@
   font-weight: 600;
 }
 
+/* ── Form sections ─────────────────────────────────────── */
+.profiles-form-section {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid var(--line-300);
+}
+
+.profiles-form-section-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ucb-blue);
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(6, 77, 144, 0.1);
+}
+
 /* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .profiles-header {

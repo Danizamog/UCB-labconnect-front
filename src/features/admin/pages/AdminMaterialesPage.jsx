@@ -10,6 +10,7 @@ import {
 } from '../services/infrastructureService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import { formatDateTime, movementTypeLabel } from '../../../shared/utils/formatters'
+import ConfirmModal from '../../../shared/components/ConfirmModal'
 import './AdminAssetsPage.css'
 
 const defaultMaterialForm = { name: '', category: '', unit: 'unidad', quantity_available: 0, minimum_stock: 0, laboratory_id: '', description: '' }
@@ -29,6 +30,8 @@ function AdminMaterialesPage({ user }) {
   const [editingId, setEditingId] = useState(null)
   const [materialForm, setMaterialForm] = useState(defaultMaterialForm)
   const [movementForm, setMovementForm] = useState(defaultMovementForm)
+
+  const [confirmModal, setConfirmModal] = useState(null)
 
   const canManage = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos'])
 
@@ -111,17 +114,22 @@ function AdminMaterialesPage({ user }) {
     }
   }
 
-  const handleDelete = async (materialId) => {
-    if (!window.confirm('Deseas eliminar este material?')) return
-    setError('')
-    setMessage('')
-    try {
-      await deleteMaterial(materialId)
-      setMessage('Material eliminado correctamente.')
-      await loadData()
-    } catch (err) {
-      setError(err.message || 'No se pudo eliminar el material')
-    }
+  const handleDelete = (materialId) => {
+    setConfirmModal({
+      message: 'Esta accion no se puede deshacer.',
+      onConfirm: async () => {
+        setConfirmModal(null)
+        setError('')
+        setMessage('')
+        try {
+          await deleteMaterial(materialId)
+          setMessage('Material eliminado correctamente.')
+          await loadData()
+        } catch (err) {
+          setError(err.message || 'No se pudo eliminar el material')
+        }
+      },
+    })
   }
 
   const handleMovementSubmit = async (event) => {
@@ -153,6 +161,14 @@ function AdminMaterialesPage({ user }) {
 
   return (
     <section className="infra-page" aria-label="Materiales y reactivos">
+      {confirmModal ? (
+        <ConfirmModal
+          title="Eliminar material"
+          message={confirmModal.message}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
+      ) : null}
       <header className="infra-header">
         <div>
           <p className="infra-kicker">Inventario</p>
@@ -181,41 +197,49 @@ function AdminMaterialesPage({ user }) {
             </div>
 
             <form className="infra-form" onSubmit={handleMaterialSubmit}>
-              <div className="infra-form-grid">
+              <div className="infra-form-section">
+                <span className="infra-form-section-label">1 — Identificacion</span>
+                <div className="infra-form-grid">
+                  <label>
+                    <span>Nombre del material</span>
+                    <input value={materialForm.name} onChange={(e) => setMaterialForm((prev) => ({ ...prev, name: e.target.value }))} required disabled={!canManage} />
+                  </label>
+                  <label>
+                    <span>Categoria</span>
+                    <input value={materialForm.category} onChange={(e) => setMaterialForm((prev) => ({ ...prev, category: e.target.value }))} required disabled={!canManage} />
+                  </label>
+                </div>
                 <label>
-                  <span>Nombre del material</span>
-                  <input value={materialForm.name} onChange={(e) => setMaterialForm((prev) => ({ ...prev, name: e.target.value }))} required disabled={!canManage} />
-                </label>
-                <label>
-                  <span>Categoria</span>
-                  <input value={materialForm.category} onChange={(e) => setMaterialForm((prev) => ({ ...prev, category: e.target.value }))} required disabled={!canManage} />
-                </label>
-                <label>
-                  <span>Unidad</span>
-                  <input value={materialForm.unit} onChange={(e) => setMaterialForm((prev) => ({ ...prev, unit: e.target.value }))} required disabled={!canManage} />
-                </label>
-                <label>
-                  <span>Stock disponible</span>
-                  <input type="number" min="0" value={materialForm.quantity_available} onChange={(e) => setMaterialForm((prev) => ({ ...prev, quantity_available: e.target.value }))} required disabled={!canManage} />
-                </label>
-                <label>
-                  <span>Stock minimo</span>
-                  <input type="number" min="0" value={materialForm.minimum_stock} onChange={(e) => setMaterialForm((prev) => ({ ...prev, minimum_stock: e.target.value }))} required disabled={!canManage} />
-                </label>
-                <label>
-                  <span>Laboratorio</span>
-                  <select value={materialForm.laboratory_id} onChange={(e) => setMaterialForm((prev) => ({ ...prev, laboratory_id: e.target.value }))} disabled={!canManage}>
-                    <option value="">Disponible para cualquier laboratorio</option>
-                    {labs.map((lab) => (
-                      <option key={lab.id} value={lab.id}>{lab.name}</option>
-                    ))}
-                  </select>
+                  <span>Descripcion</span>
+                  <textarea rows="3" value={materialForm.description} onChange={(e) => setMaterialForm((prev) => ({ ...prev, description: e.target.value }))} disabled={!canManage} />
                 </label>
               </div>
-              <label>
-                <span>Descripcion</span>
-                <textarea rows="3" value={materialForm.description} onChange={(e) => setMaterialForm((prev) => ({ ...prev, description: e.target.value }))} disabled={!canManage} />
-              </label>
+              <div className="infra-form-section">
+                <span className="infra-form-section-label">2 — Stock y asignacion</span>
+                <div className="infra-form-grid">
+                  <label>
+                    <span>Unidad</span>
+                    <input value={materialForm.unit} onChange={(e) => setMaterialForm((prev) => ({ ...prev, unit: e.target.value }))} required disabled={!canManage} />
+                  </label>
+                  <label>
+                    <span>Laboratorio</span>
+                    <select value={materialForm.laboratory_id} onChange={(e) => setMaterialForm((prev) => ({ ...prev, laboratory_id: e.target.value }))} disabled={!canManage}>
+                      <option value="">Disponible para cualquier laboratorio</option>
+                      {labs.map((lab) => (
+                        <option key={lab.id} value={lab.id}>{lab.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Stock disponible</span>
+                    <input type="number" min="0" value={materialForm.quantity_available} onChange={(e) => setMaterialForm((prev) => ({ ...prev, quantity_available: e.target.value }))} required disabled={!canManage} />
+                  </label>
+                  <label>
+                    <span>Stock minimo</span>
+                    <input type="number" min="0" value={materialForm.minimum_stock} onChange={(e) => setMaterialForm((prev) => ({ ...prev, minimum_stock: e.target.value }))} required disabled={!canManage} />
+                  </label>
+                </div>
+              </div>
               {canManage ? (
                 <div className="infra-actions">
                   <button type="submit" className="infra-primary">
@@ -242,45 +266,53 @@ function AdminMaterialesPage({ user }) {
                 </div>
 
                 <form className="infra-form" onSubmit={handleMovementSubmit}>
-                  <div className="infra-form-grid">
+                  <div className="infra-form-section">
+                    <span className="infra-form-section-label">1 — Material y tipo</span>
+                    <div className="infra-form-grid">
+                      <label>
+                        <span>Material</span>
+                        <select value={movementForm.stock_item_id} onChange={(e) => setMovementForm((prev) => ({ ...prev, stock_item_id: e.target.value }))} disabled={!canManage} required>
+                          <option value="">Selecciona un material</option>
+                          {materials.map((m) => (
+                            <option key={m.id} value={m.id}>{m.name} ({m.quantity_available} {m.unit})</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        <span>Tipo de movimiento</span>
+                        <select value={movementForm.movement_type} onChange={(e) => setMovementForm((prev) => ({ ...prev, movement_type: e.target.value }))} disabled={!canManage}>
+                          <option value="entry">Ingreso / compra</option>
+                          <option value="return">Devolucion</option>
+                          <option value="consumption">Consumo / merma</option>
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="infra-form-section">
+                    <span className="infra-form-section-label">2 — Cantidad y observaciones</span>
+                    <div className="infra-form-grid">
+                      <label>
+                        <span>Cantidad</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max={movementForm.movement_type === 'consumption' ? selectedMovementMaterial?.quantity_available || 1 : undefined}
+                          value={movementForm.quantity}
+                          onChange={(e) => setMovementForm((prev) => ({ ...prev, quantity: e.target.value }))}
+                          disabled={!canManage}
+                          required
+                        />
+                      </label>
+                      <label>
+                        <span>Stock actual</span>
+                        <input value={selectedMovementMaterial ? `${selectedMovementMaterial.quantity_available} ${selectedMovementMaterial.unit}` : 'Selecciona un material'} disabled />
+                      </label>
+                    </div>
                     <label>
-                      <span>Material</span>
-                      <select value={movementForm.stock_item_id} onChange={(e) => setMovementForm((prev) => ({ ...prev, stock_item_id: e.target.value }))} disabled={!canManage} required>
-                        <option value="">Selecciona un material</option>
-                        {materials.map((m) => (
-                          <option key={m.id} value={m.id}>{m.name} ({m.quantity_available} {m.unit})</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <span>Tipo de movimiento</span>
-                      <select value={movementForm.movement_type} onChange={(e) => setMovementForm((prev) => ({ ...prev, movement_type: e.target.value }))} disabled={!canManage}>
-                        <option value="entry">Ingreso / compra</option>
-                        <option value="return">Devolucion</option>
-                        <option value="consumption">Consumo / merma</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>Cantidad</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max={movementForm.movement_type === 'consumption' ? selectedMovementMaterial?.quantity_available || 1 : undefined}
-                        value={movementForm.quantity}
-                        onChange={(e) => setMovementForm((prev) => ({ ...prev, quantity: e.target.value }))}
-                        disabled={!canManage}
-                        required
-                      />
-                    </label>
-                    <label>
-                      <span>Stock actual</span>
-                      <input value={selectedMovementMaterial ? `${selectedMovementMaterial.quantity_available} ${selectedMovementMaterial.unit}` : 'Selecciona un material'} disabled />
+                      <span>Motivo u observaciones</span>
+                      <textarea rows="3" value={movementForm.notes} onChange={(e) => setMovementForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="Ej. consumo en practica de quimica, compra semestral o devolucion del grupo 2" disabled={!canManage} />
                     </label>
                   </div>
-                  <label>
-                    <span>Motivo u observaciones</span>
-                    <textarea rows="3" value={movementForm.notes} onChange={(e) => setMovementForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="Ej. consumo en practica de quimica, compra semestral o devolucion del grupo 2" disabled={!canManage} />
-                  </label>
                   {movementWillExceedStock ? (
                     <p className="infra-inline-error">La cantidad a descontar supera el stock disponible del material seleccionado.</p>
                   ) : null}

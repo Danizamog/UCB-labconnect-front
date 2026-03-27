@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { deleteUserProfile, listUserProfiles, updateUserProfile } from '../services/profileService'
 import { assignUserRole, listRoles } from '../services/rolesService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
+import ConfirmModal from '../../../shared/components/ConfirmModal'
 import './AdminProfilesPage.css'
 
 const defaultForm = {
@@ -19,6 +20,7 @@ function AdminProfilesPage({ user }) {
   const [message, setMessage] = useState('')
   const [editingUser, setEditingUser] = useState(null)
   const [form, setForm] = useState(defaultForm)
+  const [confirmModal, setConfirmModal] = useState(null)
 
   const loadData = async () => {
     setLoading(true)
@@ -53,17 +55,23 @@ function AdminProfilesPage({ user }) {
 
   const resetFeedback = () => { setError(''); setMessage('') }
 
-  const handleDelete = async (profile) => {
-    if (!window.confirm(`¿Eliminar la cuenta de ${profile.name || profile.username}? Esta acción no se puede deshacer.`)) return
-    resetFeedback()
-    try {
-      await deleteUserProfile(profile.id)
-      setMessage('Usuario eliminado correctamente.')
-      if (editingUser?.id === profile.id) cancelEdit()
-      await loadData()
-    } catch (err) {
-      setError(err.message || 'No se pudo eliminar el usuario')
-    }
+  const handleDelete = (profile) => {
+    setConfirmModal({
+      title: `Eliminar cuenta`,
+      message: `Se eliminara la cuenta de ${profile.name || profile.username}. Esta accion no se puede deshacer.`,
+      onConfirm: async () => {
+        setConfirmModal(null)
+        resetFeedback()
+        try {
+          await deleteUserProfile(profile.id)
+          setMessage('Usuario eliminado correctamente.')
+          if (editingUser?.id === profile.id) cancelEdit()
+          await loadData()
+        } catch (err) {
+          setError(err.message || 'No se pudo eliminar el usuario')
+        }
+      },
+    })
   }
 
   const cancelEdit = () => {
@@ -113,6 +121,14 @@ function AdminProfilesPage({ user }) {
 
   return (
     <section className="profiles-page" aria-label="Gestión de perfiles">
+      {confirmModal ? (
+        <ConfirmModal
+          title={confirmModal.title || 'Eliminar usuario'}
+          message={confirmModal.message}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
+      ) : null}
       <header className="profiles-header">
         <div>
           <p className="profiles-kicker">Gestión de usuarios</p>
@@ -143,7 +159,8 @@ function AdminProfilesPage({ user }) {
               </div>
 
               <form className="profiles-form" onSubmit={handleSubmit}>
-                <div className="profiles-form-grid">
+                <div className="profiles-form-section">
+                  <span className="profiles-form-section-label">1 — Datos del usuario</span>
                   <label>
                     <span>Nombre completo</span>
                     <input
@@ -153,7 +170,6 @@ function AdminProfilesPage({ user }) {
                       disabled={!canManage}
                     />
                   </label>
-
                   <label>
                     <span>Rol</span>
                     <select
@@ -167,7 +183,9 @@ function AdminProfilesPage({ user }) {
                       ))}
                     </select>
                   </label>
-
+                </div>
+                <div className="profiles-form-section">
+                  <span className="profiles-form-section-label">2 — Seguridad y acceso</span>
                   <label>
                     <span>Nueva contraseña (opcional)</span>
                     <input
@@ -178,18 +196,16 @@ function AdminProfilesPage({ user }) {
                       disabled={!canManage}
                     />
                   </label>
+                  <label className="profiles-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={form.is_active}
+                      onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))}
+                      disabled={!canReactivate}
+                    />
+                    <span>Cuenta activa</span>
+                  </label>
                 </div>
-
-                <label className="profiles-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={form.is_active}
-                    onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))}
-                    disabled={!canReactivate}
-                  />
-                  <span>Cuenta activa</span>
-                </label>
-
                 <div className="profiles-actions">
                   <button
                     type="submit"

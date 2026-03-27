@@ -90,72 +90,64 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
               {isAdmin ? (
                 <>
                   <div className="home-placeholder-icon">
-                    <img src={ucbEscudoLogo} alt="UCB Escudo" style={{width: '80px', height: '80px'}} />
+                    <img src={ucbEscudoLogo} alt="UCB Escudo" width="80" height="80" />
                   </div>
-                  <h2>LabConnect - Panel de administración</h2>
-                  <p>
-                    Bienvenido a LabConnect de la Universidad Católica Boliviana San Pablo.
+                  <h2>LabConnect</h2>
+                  <p className="home-placeholder-subtitle">
+                    Panel de administración — Universidad Católica Boliviana San Pablo
                   </p>
-                  <p style={{fontSize: '14px', marginTop: '12px'}}>
-                    Usa la barra lateral para navegar entre <strong>Perfiles</strong>, <strong>Roles</strong>, <strong>Areas</strong>, <strong>Laboratorios</strong>, <strong>Equipos</strong> y <strong>Materiales</strong>.
+                  <p className="home-placeholder-hint">
+                    Usa la barra lateral para navegar entre <strong>Perfiles</strong>, <strong>Roles</strong>, <strong>Áreas</strong>, <strong>Laboratorios</strong>, <strong>Equipos</strong> y <strong>Materiales</strong>.
                   </p>
                 </>
               ) : (
                 <>
-                  <header className="home-news-header" style={{display: 'block'}}>
-                    <div style={{display: 'grid', gridTemplateColumns: '120px 1fr', gap: '24px', alignItems: 'center', marginBottom: '40px'}}>
-                      <div style={{textAlign: 'center'}}>
-                        <img src={ucbEscudoLogo} alt="UCB Escudo" style={{width: '100px', height: 'auto'}} />
-                      </div>
-                      <div>
-                        <h2 style={{marginTop: 0, marginBottom: '12px'}}>Universidad Católica Boliviana San Pablo</h2>
-                        <p style={{fontSize: '16px', margin: 0, color: '#666'}}>
-                          Desde 1966 formando profesionales comprometidos con la excelencia académica y la responsabilidad social.
-                        </p>
-                      </div>
+                  <div className="home-hero">
+                    <img src={ucbEscudoLogo} alt="UCB Escudo" className="home-hero-logo" />
+                    <div className="home-hero-meta">
+                      <h2>Universidad Católica Boliviana San Pablo</h2>
+                      <p>Desde 1966 formando profesionales comprometidos con la excelencia académica y la responsabilidad social.</p>
                     </div>
-                  </header>
+                  </div>
 
-                  <section style={{marginBottom: '40px', paddingBottom: '24px', borderBottom: '1px solid #f0f0f0'}}>
-                    <h3 style={{marginTop: 0, marginBottom: '16px'}}>¿Qué es LabConnect?</h3>
-                    <p>
-                      LabConnect es la plataforma integral de gestión de laboratorios de la Universidad Católica Boliviana San Pablo. 
+                  <div className="home-section">
+                    <h3 className="home-section-title">¿Qué es LabConnect?</h3>
+                    <p className="home-section-text">
+                      LabConnect es la plataforma integral de gestión de laboratorios de la UCB San Pablo.
                       Conecta docentes, estudiantes y personal administrativo en un ecosistema colaborativo que facilita:
                     </p>
-                    <ul style={{margin: '16px 0', paddingLeft: '24px'}}>
+                    <ul className="home-features">
                       <li><strong>Reserva de laboratorios</strong> para prácticas y proyectos académicos</li>
                       <li><strong>Gestión de inventario</strong> de equipos y materiales disponibles</li>
                       <li><strong>Control de acceso</strong> seguro a espacios especializados</li>
                       <li><strong>Seguimiento de préstamos</strong> y mantenimiento preventivo</li>
                     </ul>
-                  </section>
+                  </div>
 
-                  <section style={{marginBottom: '40px', paddingBottom: '24px', borderBottom: '1px solid #f0f0f0'}}>
-                    <h3 style={{marginTop: 0, marginBottom: '16px'}}>Nuestros Laboratorios</h3>
-                    <p style={{marginBottom: '16px'}}>
+                  <div className="home-section">
+                    <h3 className="home-section-title">Nuestros Laboratorios</h3>
+                    <p className="home-section-text">
                       Contamos con espacios modernos y completamente equipados para diferentes disciplinas:
                     </p>
-                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px'}}>
-                      <div style={{padding: '12px', borderRadius: '8px', backgroundColor: '#f8f8f8', borderLeft: '4px solid #B3860E'}}>
-                        <strong style={{fontSize: '14px', color: '#333'}}>Laboratorios de Ciencias</strong>
-                        <p style={{fontSize: '13px', margin: '6px 0 0', color: '#666'}}>Física, Química y Biología</p>
+                    <div className="home-labs-grid">
+                      <div className="home-lab-card">
+                        <strong>Laboratorios de Ciencias</strong>
+                        <p>Física, Química y Biología</p>
                       </div>
-                      <div style={{padding: '12px', borderRadius: '8px', backgroundColor: '#f8f8f8', borderLeft: '4px solid #B3860E'}}>
-                        <strong style={{fontSize: '14px', color: '#333'}}>Laboratorios de Ingeniería</strong>
-                        <p style={{fontSize: '13px', margin: '6px 0 0', color: '#666'}}>Sistemas, Mecánica y Electrónica</p>
+                      <div className="home-lab-card">
+                        <strong>Laboratorios de Ingeniería</strong>
+                        <p>Sistemas, Mecánica y Electrónica</p>
                       </div>
-                      <div style={{padding: '12px', borderRadius: '8px', backgroundColor: '#f8f8f8', borderLeft: '4px solid #B3860E'}}>
-                        <strong style={{fontSize: '14px', color: '#333'}}>Laboratorios de Administración</strong>
-                        <p style={{fontSize: '13px', margin: '6px 0 0', color: '#666'}}>Sistemas de Información y Negocios</p>
+                      <div className="home-lab-card">
+                        <strong>Laboratorios de Administración</strong>
+                        <p>Sistemas de Información y Negocios</p>
                       </div>
                     </div>
-                  </section>
-
-
+                  </div>
 
                   {hasManagementModules ? (
-                    <p className="home-role-note" style={{marginTop: '24px'}}>
-                      Tu rol actual también incluye accesos de gestión. Puedes usar las pestañas habilitadas arriba según tus permisos.
+                    <p className="home-role-note">
+                      Tu rol actual también incluye accesos de gestión. Puedes usar las pestañas habilitadas según tus permisos.
                     </p>
                   ) : null}
                 </>

@@ -465,6 +465,26 @@
   border: 1px solid rgba(185,28,28,0.14);
 }
 
+/* ── Form sections (numbered) ──────────────────────────── */
+.infra-form-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--line-300);
+}
+
+.infra-form-section-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ucb-blue);
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(6, 77, 144, 0.1);
+}
+
 /* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .infra-header {

@@ -7,6 +7,8 @@ import {
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import './ReservationsPages.css'
 
+const STATUS_LABELS = { pending: 'Pendiente', approved: 'Aprobada', rejected: 'Rechazada', cancelled: 'Cancelada' }
+
 function AdminReservationsPage({ user }) {
   const [statusFilter, setStatusFilter] = useState('all')
   const [reservations, setReservations] = useState([])
@@ -117,7 +119,7 @@ function AdminReservationsPage({ user }) {
                   </td>
                   <td>{item.date}</td>
                   <td>{item.start_time} - {item.end_time}</td>
-                  <td><span className={`reservations-status ${item.status}`}>{item.status}</span></td>
+                  <td><span className={`reservations-status ${item.status}`}>{STATUS_LABELS[item.status] ?? item.status}</span></td>
                   <td>
                     <div className="reservations-actions">
                       <button
