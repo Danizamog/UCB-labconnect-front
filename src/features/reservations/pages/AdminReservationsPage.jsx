@@ -111,7 +111,10 @@ function AdminReservationsPage({ user }) {
                     <strong>{item.laboratory_name || item.laboratory_id}</strong>
                     <div>{item.purpose || 'Sin motivo registrado'}</div>
                   </td>
-                  <td>{item.requested_by_name || item.requested_by || '-'}</td>
+                  <td>
+                    <strong>{item.requested_by_name || item.requested_by || '-'}</strong>
+                    <div>{item.requested_by_email || '-'}</div>
+                  </td>
                   <td>{item.date}</td>
                   <td>{item.start_time} - {item.end_time}</td>
                   <td><span className={`reservations-status ${item.status}`}>{item.status}</span></td>
