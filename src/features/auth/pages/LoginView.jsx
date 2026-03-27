@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { LogIn, Mail, LockKeyhole } from 'lucide-react'
 import ucbEscudoLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
 import { getInstitutionalSSOConfig } from '../services/authService'
 import './LoginView.css'
@@ -31,9 +30,6 @@ function loadGoogleScript() {
   })
 }
 
-function LoginView({ onLogin, onInstitutionalLogin }) {
-  const [credentials, setCredentials] = useState({ email: '', password: '' })
-  const [error, setError] = useState('')
 function LoginView({ onInstitutionalLogin }) {
   const [institutionalError, setInstitutionalError] = useState('')
   const [institutionalReady, setInstitutionalReady] = useState(false)
@@ -161,6 +157,12 @@ function LoginView({ onInstitutionalLogin }) {
                 <p className="google-helper">
                   Cargando {institutionalConfig?.button_label || 'acceso institucional'}...
                 </p>
+              ) : null}
+            </>
+          ) : (
+            <p className="google-helper">El acceso institucional no esta habilitado en este entorno.</p>
+          )}
+        </div>
 
         {institutionalError ? <p className="auth-error">{institutionalError}</p> : null}
       </section>
