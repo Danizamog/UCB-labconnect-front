@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import AdminAssetsPage from '../../admin/pages/AdminAssetsPage'
-import AdminClassTutorialsPage from '../../admin/pages/AdminClassTutorialsPage'
-import AdminLoansPage from '../../admin/pages/AdminLoansPage'
+import AdminAreasPage from '../../admin/pages/AdminAreasPage'
+import AdminEquiposPage from '../../admin/pages/AdminEquiposPage'
+import AdminLaboratoriosPage from '../../admin/pages/AdminLaboratoriosPage'
+import AdminMaterialesPage from '../../admin/pages/AdminMaterialesPage'
 import AdminProfilesPage from '../../admin/pages/AdminProfilesPage'
 import AdminRolesPage from '../../admin/pages/AdminRolesPage'
 import { getClassTutorials } from '../../reservations/api/reservationsApi'
-import AdminReservationsPage from '../../reservations/pages/AdminReservationsPage'
 import UserAvailabilityCalendarPage from '../../reservations/pages/UserAvailabilityCalendarPage'
 import UserPracticePlannerPage from '../../reservations/pages/UserPracticePlannerPage'
 import UserReservationCenterPage from '../../reservations/pages/UserReservationCenterPage'
@@ -43,16 +43,12 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
   const [newsError, setNewsError] = useState('')
 
   const isAdmin = user?.role === 'admin'
-  const canManageReservations = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reservas_materiales', 'gestionar_reglas_reserva', 'gestionar_roles_permisos'])
   const canManageRoles = hasAnyPermission(user, ['gestionar_roles_permisos'])
   const canManageProfiles = hasAnyPermission(user, ['gestionar_roles_permisos', 'reactivar_cuentas'])
-  const canManageSessions = hasAnyPermission(user, ['gestionar_tutorias', 'gestionar_inscripciones_tutorias', 'gestionar_asistencia_tutorias', 'gestionar_observaciones_tutorias', 'gestionar_notificaciones'])
-  const canViewLoans = hasAnyPermission(user, ['gestionar_prestamos', 'generar_reportes', 'consultar_estadisticas'])
-  const canManageAssets = hasAnyPermission(
-    user,
-    ['gestionar_inventario', 'gestionar_stock', 'gestionar_estado_equipos', 'gestionar_mantenimiento', 'gestionar_reactivos_quimicos', 'adjuntar_evidencia_inventario'],
-  )
-  const hasManagementModules = canManageReservations || canManageRoles || canManageProfiles || canManageSessions || canManageAssets || canViewLoans
+  const canManageStructure = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
+  const canManageEquipos = hasAnyPermission(user, ['gestionar_inventario', 'gestionar_estado_equipos', 'gestionar_mantenimiento'])
+  const canManageMateriales = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos'])
+  const hasManagementModules = canManageRoles || canManageProfiles || canManageStructure || canManageEquipos || canManageMateriales
   const activeSection = getSectionIdFromPath(currentPath) || 'home'
 
   useEffect(() => {
@@ -60,13 +56,12 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
     const matchedSection = getSectionIdFromPath(normalizedPath)
     const canAccessCurrentSection =
       activeSection === 'home' ||
-      activeSection === 'profile' ||
-      (activeSection === 'reservations' && canManageReservations) ||
       (activeSection === 'profiles' && canManageProfiles) ||
       (activeSection === 'roles' && canManageRoles) ||
-      (activeSection === 'sessions' && canManageSessions) ||
-      (activeSection === 'assets' && canManageAssets) ||
-      (activeSection === 'loans' && canViewLoans) ||
+      (activeSection === 'areas' && canManageStructure) ||
+      (activeSection === 'laboratorios' && canManageStructure) ||
+      (activeSection === 'equipos' && canManageEquipos) ||
+      (activeSection === 'materiales' && canManageMateriales) ||
       (activeSection === 'reserve' && !isAdmin) ||
       (activeSection === 'calendar' && !isAdmin) ||
       (activeSection === 'requests' && !isAdmin)
@@ -81,12 +76,11 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
     }
   }, [
     activeSection,
-    canManageAssets,
+    canManageEquipos,
+    canManageMateriales,
     canManageProfiles,
-    canManageReservations,
     canManageRoles,
-    canManageSessions,
-    canViewLoans,
+    canManageStructure,
     currentPath,
     isAdmin,
     onNavigate,
@@ -119,48 +113,38 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
         if (!isMounted) return
         setNewsError(error?.message || 'No se pudieron cargar las novedades académicas')
       } finally {
-        if (isMounted) {
-          setNewsLoading(false)
-        }
+        if (isMounted) setNewsLoading(false)
       }
     }
 
     loadNews()
-    return () => {
-      isMounted = false
-    }
+    return () => { isMounted = false }
   }, [])
 
   const newsSummary = useMemo(() => {
     const counts = { class: 0, tutorial: 0, guest: 0 }
     newsItems.forEach((item) => {
-      if (counts[item.session_type] !== undefined) {
-        counts[item.session_type] += 1
-      }
+      if (counts[item.session_type] !== undefined) counts[item.session_type] += 1
     })
     return counts
   }, [newsItems])
-
-  const handleNavigate = (nextPath) => {
-    onNavigate?.(nextPath)
-  }
 
   return (
     <div className="app-layout">
       <Navbar
         user={user}
         onLogout={onLogout}
-        onNavigate={handleNavigate}
+        onNavigate={onNavigate}
         activeSection={activeSection}
       />
       <main className="home-main">
         <section className="content-window" aria-label="Ventana principal">
-          {canManageReservations && activeSection === 'reservations' ? <AdminReservationsPage user={user} /> : null}
           {canManageProfiles && activeSection === 'profiles' ? <AdminProfilesPage user={user} /> : null}
           {canManageRoles && activeSection === 'roles' ? <AdminRolesPage user={user} onSessionRefresh={onRefreshSession} /> : null}
-          {canManageSessions && activeSection === 'sessions' ? <AdminClassTutorialsPage user={user} /> : null}
-          {canManageAssets && activeSection === 'assets' ? <AdminAssetsPage user={user} /> : null}
-          {canViewLoans && activeSection === 'loans' ? <AdminLoansPage user={user} /> : null}
+          {canManageStructure && activeSection === 'areas' ? <AdminAreasPage user={user} /> : null}
+          {canManageStructure && activeSection === 'laboratorios' ? <AdminLaboratoriosPage user={user} /> : null}
+          {canManageEquipos && activeSection === 'equipos' ? <AdminEquiposPage user={user} /> : null}
+          {canManageMateriales && activeSection === 'materiales' ? <AdminMaterialesPage user={user} /> : null}
           {!isAdmin && activeSection === 'reserve' ? <UserPracticePlannerPage user={user} /> : null}
           {!isAdmin && activeSection === 'calendar' ? <UserAvailabilityCalendarPage /> : null}
           {!isAdmin && activeSection === 'requests' ? <UserReservationCenterPage /> : null}
@@ -169,9 +153,12 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
             <section className={isAdmin ? 'home-placeholder' : 'home-dashboard'} aria-label="Panel de inicio">
               {isAdmin ? (
                 <>
-                  <h2>Panel principal</h2>
+                  <div className="home-placeholder-icon">
+                    <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25A2.25 2.25 0 0113.5 8.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
+                  </div>
+                  <h2>Panel de administración</h2>
                   <p>
-                    Selecciona <strong>Reservas</strong>, <strong>Prestamos</strong>, <strong>Perfiles</strong>, <strong>Roles</strong>, <strong>Clases y tutorias</strong> o <strong>Infraestructura</strong> en la barra superior para administrar el sistema.
+                    Usa la barra lateral para navegar entre <strong>Perfiles</strong>, <strong>Roles</strong>, <strong>Areas</strong>, <strong>Laboratorios</strong>, <strong>Equipos</strong> y <strong>Materiales</strong>.
                   </p>
                 </>
               ) : (
@@ -239,30 +226,6 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
                   </section>
                 </>
               )}
-            </section>
-          ) : null}
-
-          {!isAdmin && activeSection === 'profile' ? (
-            <section className="home-placeholder" aria-label="Perfil de usuario">
-              <h2>Perfil</h2>
-              <p>
-                Usuario: <strong>{user?.name || user?.username || 'Sin nombre'}</strong>
-              </p>
-              <p>
-                Rol actual: <strong>{user?.role || 'user'}</strong>
-              </p>
-            </section>
-          ) : null}
-
-          {isAdmin && activeSection === 'profile' ? (
-            <section className="home-placeholder" aria-label="Perfil administrativo">
-              <h2>Perfil</h2>
-              <p>
-                Usuario: <strong>{user?.name || user?.username || 'Sin nombre'}</strong>
-              </p>
-              <p>
-                Rol actual: <strong>{user?.role || 'admin'}</strong>
-              </p>
             </section>
           ) : null}
         </section>

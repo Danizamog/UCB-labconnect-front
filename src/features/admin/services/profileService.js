@@ -2,16 +2,14 @@ const gatewayBase = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localh
 const apiBase = gatewayBase.endsWith('/v1') ? gatewayBase.slice(0, -3) : gatewayBase
 const profilesBase = `${apiBase}/users`
 
-function getToken() {
-  return localStorage.getItem('token') || localStorage.getItem('access_token') || ''
-}
+import { getAuthToken } from '../../../shared/utils/storage'
 
 async function parseJson(response, fallback) {
   return response.json().catch(() => fallback)
 }
 
 async function request(url, options = {}) {
-  const token = getToken()
+  const token = getAuthToken()
   const headers = {
     ...(options.body ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers || {}),
@@ -46,5 +44,11 @@ export function updateUserProfile(userId, payload) {
   return request(`${profilesBase}/${userId}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
+  })
+}
+
+export function deleteUserProfile(userId) {
+  return request(`${profilesBase}/${userId}`, {
+    method: 'DELETE',
   })
 }

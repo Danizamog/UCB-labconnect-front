@@ -9,6 +9,7 @@ import {
   returnLoanRecord,
 } from '../services/infrastructureService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
+import { formatDateTime } from '../../../shared/utils/formatters'
 import './AdminLoansPage.css'
 
 function getDefaultDueAt() {
@@ -53,20 +54,6 @@ const returnConditionLabels = {
   cancelled: 'Cerrado por cancelacion',
 }
 
-function formatDateTime(value) {
-  if (!value) return 'Sin fecha'
-  try {
-    return new Intl.DateTimeFormat('es-BO', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(value))
-  } catch {
-    return value
-  }
-}
 
 function AdminLoansPage({ user }) {
   const [dashboard, setDashboard] = useState(null)

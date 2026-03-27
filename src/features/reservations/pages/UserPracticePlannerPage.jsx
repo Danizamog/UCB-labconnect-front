@@ -7,23 +7,9 @@ import {
   getMyPracticePlannings,
   subscribeReservationsRealtime,
 } from '../api/reservationsApi'
+import { formatDate, formatStatus } from '../../../shared/utils/formatters'
+import { getAuthToken } from '../../../shared/utils/storage'
 import './UserPracticePlannerPage.css'
-
-function formatDate(value) {
-  return new Date(`${value}T00:00:00`).toLocaleDateString('es-BO', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-function formatStatus(status) {
-  if (status === 'approved') return 'Aprobada'
-  if (status === 'pending') return 'Pendiente'
-  if (status === 'rejected') return 'Rechazada'
-  if (status === 'cancelled') return 'Cancelada'
-  return status
-}
 
 function todayPlusDays(days = 1) {
   const date = new Date()
@@ -32,7 +18,7 @@ function todayPlusDays(days = 1) {
 }
 
 function UserPracticePlannerPage({ user }) {
-  const token = localStorage.getItem('token') || localStorage.getItem('access_token') || ''
+  const token = getAuthToken()
   const [areas, setAreas] = useState([])
   const [labs, setLabs] = useState([])
   const [materials, setMaterials] = useState([])

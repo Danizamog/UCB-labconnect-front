@@ -5,41 +5,17 @@ import {
   markNotificationAsRead,
   subscribeReservationsRealtime,
 } from '../api/reservationsApi'
+import { formatDate, formatStatus, statusClass } from '../../../shared/utils/formatters'
+import { getAuthToken } from '../../../shared/utils/storage'
 import './UserReservationCenterPage.css'
-
-function formatDate(date) {
-  return new Date(`${date}T00:00:00`).toLocaleDateString('es-BO', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-function formatStatus(status) {
-  if (status === 'approved') return 'Aprobada'
-  if (status === 'pending') return 'Pendiente'
-  if (status === 'rejected') return 'Rechazada'
-  if (status === 'cancelled') return 'Cancelada'
-  if (status === 'active') return 'Activo'
-  if (status === 'overdue') return 'Vencido'
-  if (status === 'returned') return 'Devuelto'
-  return status
-}
 
 function formatTrackingStatus(status) {
   if (!status) return 'Sin seguimiento de materiales'
   return status
 }
 
-function statusClass(status) {
-  if (status === 'approved') return 'approved'
-  if (status === 'pending') return 'pending'
-  if (status === 'rejected' || status === 'cancelled') return 'rejected'
-  return 'neutral'
-}
-
 function UserReservationCenterPage() {
-  const token = localStorage.getItem('token') || localStorage.getItem('access_token') || ''
+  const token = getAuthToken()
   const [reservations, setReservations] = useState([])
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)

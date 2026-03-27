@@ -6,6 +6,7 @@ import {
   getWeekAvailability,
   subscribeReservationsRealtime,
 } from '../api/reservationsApi'
+import { getAuthToken } from '../../../shared/utils/storage'
 import './UserAvailabilityCalendarPage.css'
 
 const OPENING_HOUR = 7
@@ -167,7 +168,7 @@ function normalizeWeekAvailability(items) {
 }
 
 function UserAvailabilityCalendarPage() {
-  const token = localStorage.getItem('token') || localStorage.getItem('access_token') || ''
+  const token = getAuthToken()
   const [mode, setMode] = useState('day')
   const [selectedDate, setSelectedDate] = useState(getToday())
   const [areas, setAreas] = useState([])

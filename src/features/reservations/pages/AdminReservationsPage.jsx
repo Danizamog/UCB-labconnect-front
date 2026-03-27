@@ -1,41 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getAllPracticePlannings, subscribeReservationsRealtime, updatePracticeStatus } from '../api/reservationsApi'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
+import { formatDate, formatStatus, statusClass } from '../../../shared/utils/formatters'
+import { getAuthToken } from '../../../shared/utils/storage'
 import './AdminReservationsPage.css'
-
-function formatDate(date) {
-  return new Date(`${date}T00:00:00`).toLocaleDateString('es-BO', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-function formatStatus(status) {
-  if (status === 'approved') return 'Aprobada'
-  if (status === 'pending') return 'Pendiente'
-  if (status === 'rejected') return 'Rechazada'
-  if (status === 'cancelled') return 'Cancelada'
-  if (status === 'active') return 'Activo'
-  if (status === 'overdue') return 'Vencido'
-  if (status === 'returned') return 'Devuelto'
-  return status
-}
 
 function formatTrackingStatus(status) {
   if (!status) return 'Sin seguimiento'
   return status
 }
 
-function statusClass(status) {
-  if (status === 'approved') return 'approved'
-  if (status === 'pending') return 'pending'
-  if (status === 'rejected' || status === 'cancelled') return 'rejected'
-  return 'neutral'
-}
-
 function AdminReservationsPage({ user }) {
-  const token = localStorage.getItem('token') || localStorage.getItem('access_token') || ''
+  const token = getAuthToken()
   const [reservations, setReservations] = useState([])
   const [reviewComments, setReviewComments] = useState({})
   const [statusFilter, setStatusFilter] = useState('all')
