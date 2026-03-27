@@ -2,6 +2,7 @@
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  overflow-x: clip;
 }
 
 .home-main {
@@ -9,6 +10,7 @@
   width: min(1120px, 100% - clamp(24px, 6vw, 64px));
   margin: 0 auto;
   padding: clamp(20px, 3.6vw, 38px) 0;
+  min-width: 0;
 }
 
 .content-window {
@@ -19,6 +21,7 @@
     linear-gradient(160deg, rgba(255, 255, 255, 0.93), rgba(255, 255, 255, 0.78)),
     linear-gradient(120deg, rgba(6, 77, 144, 0.08), rgba(252, 208, 37, 0.16));
   box-shadow: var(--shadow-soft);
+  overflow-x: clip;
 }
 
 .home-placeholder {
@@ -28,6 +31,7 @@
   gap: 8px;
   padding: clamp(20px, 3vw, 36px);
   text-align: center;
+  min-width: 0;
 }
 
 .home-placeholder h2 {
@@ -45,11 +49,13 @@
   display: grid;
   gap: 1.4rem;
   padding: clamp(20px, 3vw, 36px);
+  min-width: 0;
 }
 
 .home-news-header {
   display: grid;
   gap: 1rem;
+  min-width: 0;
 }
 
 .home-news-header h2,
@@ -58,10 +64,24 @@
   color: var(--ink-900);
 }
 
+.home-news-header h2,
+.home-news-header p,
+.home-news-title h3,
+.home-role-note,
+.home-news-card h4,
+.home-news-card small,
+.home-news-meta span,
+.home-news-copy,
+.home-news-date {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .home-news-summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 0.85rem;
+  min-width: 0;
 }
 
 .home-news-summary div {
@@ -69,6 +89,7 @@
   background: rgba(255, 255, 255, 0.86);
   border: 1px solid rgba(10, 53, 89, 0.1);
   padding: 0.85rem 1rem;
+  min-width: 0;
 }
 
 .home-news-summary span,
@@ -92,11 +113,13 @@
   background: rgba(6, 77, 144, 0.08);
   border: 1px solid rgba(6, 77, 144, 0.12);
   padding: 0.9rem 1rem;
+  min-width: 0;
 }
 
 .home-news-board {
   display: grid;
   gap: 1rem;
+  min-width: 0;
 }
 
 .home-news-kicker {
@@ -115,8 +138,9 @@
 
 .home-news-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 1rem;
+  min-width: 0;
 }
 
 .home-news-card {
@@ -127,6 +151,7 @@
   display: grid;
   gap: 0.75rem;
   box-shadow: 0 18px 35px rgba(10, 53, 89, 0.08);
+  min-width: 0;
 }
 
 .home-news-card.type-class {
@@ -146,6 +171,12 @@
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
+  min-width: 0;
+}
+
+.home-news-card-head small {
+  min-width: 0;
+  text-align: right;
 }
 
 .home-news-badge {
@@ -204,5 +235,118 @@
   .home-main {
     width: min(1120px, 100% - 28px);
     padding: 18px 0 24px;
+  }
+}
+
+@media (max-width: 640px) {
+  .home-main {
+    width: calc(100% - 16px);
+    padding: 12px 0 18px;
+  }
+
+  .content-window {
+    border-radius: 18px;
+  }
+
+  .home-dashboard,
+  .home-placeholder {
+    padding: 14px;
+  }
+
+  .home-dashboard {
+    gap: 1rem;
+  }
+
+  .home-news-header h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    line-height: 1.12;
+  }
+
+  .home-news-header p,
+  .home-role-note,
+  .home-news-copy,
+  .home-news-date,
+  .home-news-meta {
+    font-size: 0.96rem;
+    line-height: 1.5;
+  }
+
+  .home-news-summary {
+    grid-template-columns: 1fr;
+    gap: 0.7rem;
+  }
+
+  .home-news-summary div {
+    padding: 0.78rem 0.85rem;
+  }
+
+  .home-news-title h3 {
+    font-size: 1.06rem;
+    line-height: 1.2;
+  }
+
+  .home-news-grid {
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+
+  .home-news-card {
+    padding: 0.9rem;
+    border-radius: 1rem;
+    gap: 0.65rem;
+  }
+
+  .home-news-card-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.45rem;
+  }
+
+  .home-news-card-head small {
+    text-align: left;
+  }
+
+  .home-news-card h4 {
+    font-size: 1rem;
+    line-height: 1.3;
+  }
+}
+
+@media (max-width: 420px) {
+  .home-main {
+    width: calc(100% - 12px);
+    padding: 10px 0 14px;
+  }
+
+  .content-window {
+    border-radius: 16px;
+  }
+
+  .home-dashboard,
+  .home-placeholder {
+    padding: 12px;
+  }
+
+  .home-news-header h2 {
+    font-size: 1.02rem;
+  }
+
+  .home-news-header p,
+  .home-role-note {
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  .home-news-kicker {
+    font-size: 0.68rem;
+  }
+
+  .home-news-title h3 {
+    font-size: 0.98rem;
+  }
+
+  .home-news-card {
+    padding: 0.82rem;
   }
 }

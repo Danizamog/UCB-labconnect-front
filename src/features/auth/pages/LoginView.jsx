@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Chrome, KeyRound, LockKeyhole, LogIn, Mail, Eye, EyeOff } from 'lucide-react'
 import ucbEscudoLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
 import { getInstitutionalSSOConfig } from '../services/authService'
 import './LoginView.css'
@@ -30,6 +31,11 @@ function loadGoogleScript() {
   })
 }
 
+function LoginView({ onLogin, onInstitutionalLogin }) {
+  const [credentials, setCredentials] = useState({ email: '', password: '' })
+  const [loginMode, setLoginMode] = useState('institutional')
+  const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState('')
 function LoginView({ onInstitutionalLogin }) {
   const [institutionalError, setInstitutionalError] = useState('')
   const [institutionalReady, setInstitutionalReady] = useState(false)
@@ -157,14 +163,6 @@ function LoginView({ onInstitutionalLogin }) {
                 <p className="google-helper">
                   Cargando {institutionalConfig?.button_label || 'acceso institucional'}...
                 </p>
-              ) : null}
-            </>
-          ) : (
-            <p className="google-helper">
-              El acceso por SSO institucional se configura desde backend.
-            </p>
-          )}
-        </div>
 
         {institutionalError ? <p className="auth-error">{institutionalError}</p> : null}
       </section>

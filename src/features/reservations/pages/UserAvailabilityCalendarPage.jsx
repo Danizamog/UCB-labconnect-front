@@ -452,59 +452,61 @@ function UserAvailabilityCalendarPage() {
                 </div>
 
                 <div className="availability-week-shell">
-                  <div className="availability-week-header-row">
-                    <div className="availability-week-corner" />
-                    <div className="availability-week-days-header">
-                      {lab.days.map((day) => (
-                        <div key={`${lab.laboratory_id}-${day.date}`} className={`availability-week-day-summary ${day.status}`}>
-                          <strong>{formatWeekday(day.date)}</strong>
-                          <span>{day.occupied_slots}/{day.total_slots} h</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="availability-week-body">
-                    <div className="availability-time-rail compact" style={{ '--slot-height': `${WEEK_SLOT_HEIGHT}px` }}>
-                      {hourSlots.map((slot) => (
-                        <span key={`${lab.laboratory_id}-week-${slot.start_time}`}>{slot.label}</span>
-                      ))}
+                  <div className="availability-week-scroll">
+                    <div className="availability-week-header-row">
+                      <div className="availability-week-corner" />
+                      <div className="availability-week-days-header">
+                        {lab.days.map((day) => (
+                          <div key={`${lab.laboratory_id}-${day.date}`} className={`availability-week-day-summary ${day.status}`}>
+                            <strong>{formatWeekday(day.date)}</strong>
+                            <span>{day.occupied_slots}/{day.total_slots} h</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
-                    <div className="availability-week-columns">
-                      {lab.days.map((day) => (
-                        <div
-                          key={`${lab.laboratory_id}-${day.date}-column`}
-                          className="availability-week-column"
-                          style={{
-                            '--slot-count': hourSlots.length,
-                            '--slot-height': `${WEEK_SLOT_HEIGHT}px`,
-                            height: `${weekTrackHeight}px`,
-                          }}
-                        >
-                          <div className="availability-slot-grid">
-                            {day.time_slots.map((slot) => (
-                              <div key={`${day.date}-${slot.start_time}`} className={`availability-slot-cell ${slot.status}`} />
-                            ))}
-                          </div>
+                    <div className="availability-week-body">
+                      <div className="availability-time-rail compact" style={{ '--slot-height': `${WEEK_SLOT_HEIGHT}px` }}>
+                        {hourSlots.map((slot) => (
+                          <span key={`${lab.laboratory_id}-week-${slot.start_time}`}>{slot.label}</span>
+                        ))}
+                      </div>
 
-                          <div className="availability-event-layer">
-                            {day.reservations.map((event) => (
-                              <button
-                                key={`${day.date}-${event.type}-${event.id}`}
-                                type="button"
-                                className={`availability-event-block ${event.type} compact`}
-                                style={buildEventStyle(event, WEEK_SLOT_HEIGHT)}
-                                onClick={() => openEventDetails(event, lab.laboratory_name, day.date)}
-                              >
-                                <span>{eventTypeLabel(event)}</span>
-                                <strong>{event.title}</strong>
-                                <small>{event.start_time} - {event.end_time}</small>
-                              </button>
-                            ))}
+                      <div className="availability-week-columns">
+                        {lab.days.map((day) => (
+                          <div
+                            key={`${lab.laboratory_id}-${day.date}-column`}
+                            className="availability-week-column"
+                            style={{
+                              '--slot-count': hourSlots.length,
+                              '--slot-height': `${WEEK_SLOT_HEIGHT}px`,
+                              height: `${weekTrackHeight}px`,
+                            }}
+                          >
+                            <div className="availability-slot-grid">
+                              {day.time_slots.map((slot) => (
+                                <div key={`${day.date}-${slot.start_time}`} className={`availability-slot-cell ${slot.status}`} />
+                              ))}
+                            </div>
+
+                            <div className="availability-event-layer">
+                              {day.reservations.map((event) => (
+                                <button
+                                  key={`${day.date}-${event.type}-${event.id}`}
+                                  type="button"
+                                  className={`availability-event-block ${event.type} compact`}
+                                  style={buildEventStyle(event, WEEK_SLOT_HEIGHT)}
+                                  onClick={() => openEventDetails(event, lab.laboratory_name, day.date)}
+                                >
+                                  <span>{eventTypeLabel(event)}</span>
+                                  <strong>{event.title}</strong>
+                                  <small>{event.start_time} - {event.end_time}</small>
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
