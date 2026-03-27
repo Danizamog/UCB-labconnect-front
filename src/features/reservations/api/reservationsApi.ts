@@ -6,6 +6,7 @@ import {
   PracticeRequestResponse,
   ReservationNotification,
 } from "../types/reservation";
+import { clearStoredSession } from "../../auth/services/authService";
 
 const API_BASE_URL = (import.meta.env.VITE_RESERVATIONS_API_BASE_URL || "http://localhost:8000/api/v1").replace(/\/$/, "");
 const REALTIME_WS_URL = (
@@ -15,6 +16,28 @@ const REALTIME_WS_URL = (
 
 async function parseResponse<T>(response: Response, fallback: T): Promise<T> {
   return response.json().catch(() => fallback);
+}
+
+function shouldInvalidateSession(response: Response, data: any) {
+  const detail = typeof data?.detail === "string" ? data.detail.toLowerCase() : "";
+  return (
+    response.status === 401 ||
+    detail.includes("token invalido") ||
+    detail.includes("token inválido") ||
+    detail.includes("token expirado")
+  );
+}
+
+function ensureResponseOk(response: Response, data: any, fallbackMessage: string) {
+  if (response.ok) {
+    return;
+  }
+
+  if (shouldInvalidateSession(response, data)) {
+    clearStoredSession();
+  }
+
+  throw new Error(data?.detail || fallbackMessage);
 }
 
 export async function createPracticePlanning(payload: PracticeRequestCreate, token: string) {
@@ -28,9 +51,7 @@ export async function createPracticePlanning(payload: PracticeRequestCreate, tok
   });
 
   const data = await parseResponse<any>(response, null);
-  if (!response.ok) {
-    throw new Error(data?.detail || `Error ${response.status}`);
-  }
+  ensureResponseOk(response, data, `Error ${response.status}`);
 
   return data;
 }
@@ -40,9 +61,7 @@ export async function getAllPracticePlannings(token: string): Promise<PracticeRe
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await parseResponse<PracticeRequestResponse[]>(response, []);
-  if (!response.ok) {
-    throw new Error((data as any)?.detail || "No se pudieron obtener las reservas");
-  }
+  ensureResponseOk(response, data, "No se pudieron obtener las reservas");
   return data;
 }
 
@@ -51,9 +70,7 @@ export async function getMyPracticePlannings(token: string): Promise<PracticeReq
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await parseResponse<PracticeRequestResponse[]>(response, []);
-  if (!response.ok) {
-    throw new Error((data as any)?.detail || "No se pudieron obtener tus reservas");
-  }
+  ensureResponseOk(response, data, "No se pudieron obtener tus reservas");
   return data;
 }
 
@@ -62,9 +79,7 @@ export async function getMyNotifications(token: string): Promise<ReservationNoti
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await parseResponse<ReservationNotification[]>(response, []);
-  if (!response.ok) {
-    throw new Error((data as any)?.detail || "No se pudieron obtener las notificaciones");
-  }
+  ensureResponseOk(response, data, "No se pudieron obtener las notificaciones");
   return data;
 }
 
@@ -74,9 +89,7 @@ export async function markNotificationAsRead(practiceId: number, token: string) 
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await parseResponse<any>(response, { ok: false });
-  if (!response.ok) {
-    throw new Error(data?.detail || "No se pudo actualizar la notificacion");
-  }
+  ensureResponseOk(response, data, "No se pudo actualizar la notificacion");
   return data;
 }
 
@@ -96,9 +109,7 @@ export async function updatePracticeStatus(
   });
 
   const data = await parseResponse<any>(response, null);
-  if (!response.ok) {
-    throw new Error(data?.detail || "No se pudo actualizar el estado");
-  }
+  ensureResponseOk(response, data, "No se pudo actualizar el estado");
 
   return data;
 }
@@ -108,9 +119,7 @@ export async function getAreas(token?: string): Promise<AreaOption[]> {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   const data = await parseResponse<AreaOption[]>(response, []);
-  if (!response.ok) {
-    throw new Error((data as any)?.detail || "No se pudieron obtener las areas");
-  }
+  ensureResponseOk(response, data, "No se pudieron obtener las areas");
   return data;
 }
 
@@ -119,9 +128,7 @@ export async function getLabs(token?: string): Promise<LabOption[]> {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   const data = await parseResponse<LabOption[]>(response, []);
-  if (!response.ok) {
-    throw new Error((data as any)?.detail || "No se pudieron obtener los laboratorios");
-  }
+  ensureResponseOk(response, data, "No se pudieron obtener los laboratorios");
   return data;
 }
 
@@ -138,9 +145,7 @@ export async function getMaterials(token?: string, laboratoryId?: number | null)
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   const data = await parseResponse<any[]>(response, []);
-  if (!response.ok) {
-    throw new Error((data as any)?.detail || "No se pudieron obtener los materiales");
-  }
+  ensureResponseOk(response, data, "No se pudieron obtener los materiales");
 
   return data.map((item) => ({
     id: Number(item.id),
@@ -176,9 +181,7 @@ export async function getDayAvailability(
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   const data = await parseResponse<any[]>(response, []);
-  if (!response.ok) {
-    throw new Error((data as any)?.detail || "No se pudo cargar la disponibilidad diaria");
-  }
+  ensureResponseOk(response, data, "No se pudo cargar la disponibilidad diaria");
   return data;
 }
 
@@ -202,9 +205,7 @@ export async function getWeekAvailability(
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   const data = await parseResponse<any[]>(response, []);
-  if (!response.ok) {
-    throw new Error((data as any)?.detail || "No se pudo cargar la disponibilidad semanal");
-  }
+  ensureResponseOk(response, data, "No se pudo cargar la disponibilidad semanal");
   return data;
 }
 
@@ -230,9 +231,7 @@ export async function getClassTutorials(
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   const data = await parseResponse<any[]>(response, []);
-  if (!response.ok) {
-    throw new Error((data as any)?.detail || "No se pudieron obtener las clases y tutorías");
-  }
+  ensureResponseOk(response, data, "No se pudieron obtener las clases y tutorias");
   return data;
 }
 

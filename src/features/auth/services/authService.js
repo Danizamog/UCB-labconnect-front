@@ -4,6 +4,7 @@ const AUTH_LOGIN_ENDPOINT = `${apiBase}/auth/login`
 const AUTH_INSTITUTIONAL_ENDPOINT = `${apiBase}/auth/institutional`
 const AUTH_INSTITUTIONAL_CONFIG_ENDPOINT = `${apiBase}/auth/institutional/config`
 const AUTH_VALIDATE_ENDPOINT = `${apiBase}/auth/validate`
+const SESSION_CLEARED_EVENT = 'labconnect:session-cleared'
 
 function decodeJwtPayload(token) {
   try {
@@ -68,6 +69,9 @@ function clearStoredSession() {
   localStorage.removeItem('token')
   localStorage.removeItem('access_token')
   localStorage.removeItem('user')
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(SESSION_CLEARED_EVENT))
+  }
 }
 
 export async function signIn(credentials) {
@@ -217,4 +221,4 @@ export async function validateSession() {
   }
 }
 
-export { clearStoredSession }
+export { clearStoredSession, SESSION_CLEARED_EVENT }

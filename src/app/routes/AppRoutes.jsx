@@ -30,6 +30,7 @@ function updateBrowserPath(nextPath, { replace = false } = {}) {
 
 function AppRoutes({ isAuthenticated, user, onLogin, onInstitutionalLogin, onRefreshSession, onLogout }) {
   const [currentPath, setCurrentPath] = useState(getCurrentPath)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   useEffect(() => {
     const syncPath = () => {
@@ -43,6 +44,16 @@ function AppRoutes({ isAuthenticated, user, onLogin, onInstitutionalLogin, onRef
   }, [])
 
   useEffect(() => {
+    if (isLoggingOut && !isAuthenticated) {
+      setIsLoggingOut(false)
+    }
+  }, [isAuthenticated, isLoggingOut])
+
+  useEffect(() => {
+    if (isLoggingOut) {
+      return
+    }
+
     if (!isAuthenticated && (currentPath === '/' || (!currentPath.startsWith('/app') && currentPath !== LOGIN_PATH))) {
       updateBrowserPath(LOGIN_PATH, { replace: true })
       return
@@ -51,15 +62,16 @@ function AppRoutes({ isAuthenticated, user, onLogin, onInstitutionalLogin, onRef
     if (isAuthenticated && (currentPath === '/' || currentPath === LOGIN_PATH)) {
       updateBrowserPath(APP_ROOT_PATH, { replace: true })
     }
-  }, [currentPath, isAuthenticated])
+  }, [currentPath, isAuthenticated, isLoggingOut])
 
   const handleNavigate = (nextPath, options = {}) => {
     updateBrowserPath(nextPath, options)
   }
 
   const handleLogout = () => {
-    updateBrowserPath(LOGIN_PATH, { replace: true })
+    setIsLoggingOut(true)
     onLogout?.()
+    updateBrowserPath(LOGIN_PATH, { replace: true })
   }
 
   if (!isAuthenticated) {

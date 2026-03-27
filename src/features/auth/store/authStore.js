@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { clearStoredSession, signIn, signInWithInstitutionalSSO, validateSession } from '../services/authService'
+import {
+  clearStoredSession,
+  SESSION_CLEARED_EVENT,
+  signIn,
+  signInWithInstitutionalSSO,
+  validateSession,
+} from '../services/authService'
 
 const SESSION_REFRESH_COOLDOWN_MS = 15000
 
@@ -104,6 +110,18 @@ export function useAuthStore() {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [refreshSession])
+
+  useEffect(() => {
+    const handleSessionCleared = () => {
+      setIsAuthenticated(false)
+      setUser(null)
+    }
+
+    window.addEventListener(SESSION_CLEARED_EVENT, handleSessionCleared)
+    return () => {
+      window.removeEventListener(SESSION_CLEARED_EVENT, handleSessionCleared)
+    }
+  }, [])
 
   const logout = () => {
     clearSession()

@@ -5,7 +5,6 @@ import { getInstitutionalSSOConfig } from '../services/authService'
 import './LoginView.css'
 
 const GOOGLE_SCRIPT_SRC = 'https://accounts.google.com/gsi/client'
-const GOOGLE_PROVIDERS = new Set(['google_oidc', 'google'])
 
 function loadGoogleScript() {
   return new Promise((resolve, reject) => {
@@ -36,12 +35,25 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
   const [loginMode, setLoginMode] = useState('institutional')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
-function LoginView({ onInstitutionalLogin }) {
   const [institutionalError, setInstitutionalError] = useState('')
   const [institutionalReady, setInstitutionalReady] = useState(false)
   const [institutionalConfig, setInstitutionalConfig] = useState(null)
   const [institutionalConfigLoading, setInstitutionalConfigLoading] = useState(true)
   const googleButtonRef = useRef(null)
+
+  const handleChange = (event) => {
+    const { name, value } = event.target
+    setCredentials((previous) => ({ ...previous, [name]: value }))
+  }
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    setError('')
+    const response = await onLogin(credentials)
+    if (!response?.success) {
+      setError(response?.message || 'No se pudo iniciar sesion')
+    }
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -73,7 +85,7 @@ function LoginView({ onInstitutionalLogin }) {
 
     if (
       !institutionalConfig?.enabled ||
-      !GOOGLE_PROVIDERS.has(institutionalConfig.provider) ||
+      institutionalConfig.provider !== 'google_oidc' ||
       !institutionalConfig.client_id ||
       !onInstitutionalLogin ||
       !googleButtonRef.current
@@ -95,6 +107,7 @@ function LoginView({ onInstitutionalLogin }) {
               return
             }
 
+            setError('')
             setInstitutionalError('')
 
             const loginResponse = await onInstitutionalLogin(response.credential)
@@ -133,38 +146,141 @@ function LoginView({ onInstitutionalLogin }) {
 
   return (
     <main className="auth-screen">
-      <section className="login-card">
-        <div className="login-brand">
-          <img
-            className="login-brand-logo"
-            src={ucbEscudoLogo}
-            alt="Escudo Universidad Catolica Boliviana San Pablo"
-          />
-          <div>
-            <span className="login-brand-kicker">Universidad Catolica Boliviana San Pablo</span>
-            <h1>Acceso institucional</h1>
-          </div>
+      <section className="auth-hero" aria-label="Acceso al sistema">
+        <div className="auth-hero-copy">
+          <div className="auth-badge">UCB LabConnect</div>
+          <h1>Laboratorios conectados, acceso simple y seguro.</h1>
+          <p>
+            Ingresa con tu cuenta institucional o usa tus credenciales para administrar reservas,
+            inventario y operaciones de laboratorio desde cualquier dispositivo.
+          </p>
         </div>
 
-        <p className="login-subtitle">Ingresa con tu cuenta institucional @ucb.edu.bo para continuar.</p>
+        <div className="login-card-shell">
+          <div className="login-card">
+            <div className="login-brand">
+              <img
+                className="login-brand-logo"
+                src={ucbEscudoLogo}
+                alt="Escudo Universidad Catolica Boliviana San Pablo"
+              />
+              <div>
+                <span className="login-brand-kicker">Universidad Catolica Boliviana San Pablo</span>
+                <h2>Iniciar sesion</h2>
+              </div>
+            </div>
 
-        <div className="google-login-block">
-          {institutionalConfigLoading ? (
-            <p className="google-helper">Cargando configuracion del acceso institucional...</p>
-          ) : institutionalConfig?.enabled && !GOOGLE_PROVIDERS.has(institutionalConfig.provider) ? (
-            <p className="google-helper">
-              El proveedor institucional <strong>{institutionalConfig.provider}</strong> ya esta configurado en backend.
-              Esta interfaz aun no tiene renderizador visual para ese proveedor.
-            </p>
-          ) : institutionalConfig?.enabled ? (
-            <>
-              <div ref={googleButtonRef} className="google-button-host" />
-              {!institutionalReady ? (
-                <p className="google-helper">
-                  Cargando {institutionalConfig?.button_label || 'acceso institucional'}...
+            <div className="login-mode-tabs" role="tablist" aria-label="Tipo de acceso">
+              <button
+                type="button"
+                className={`login-mode-tab ${loginMode === 'institutional' ? 'is-active' : ''}`}
+                onClick={() => setLoginMode('institutional')}
+                aria-pressed={loginMode === 'institutional'}
+              >
+                <Chrome size={18} aria-hidden="true" />
+                Google
+              </button>
+              <button
+                type="button"
+                className={`login-mode-tab ${loginMode === 'credentials' ? 'is-active' : ''}`}
+                onClick={() => setLoginMode('credentials')}
+                aria-pressed={loginMode === 'credentials'}
+              >
+                <KeyRound size={18} aria-hidden="true" />
+                Credenciales
+              </button>
+            </div>
+
+            {loginMode === 'institutional' ? (
+              <div className="login-panel">
+                <div className="login-panel-copy">
+                  <div className="login-panel-icon">
+                    <Chrome size={34} aria-hidden="true" />
+                  </div>
+                  <h3>Acceso institucional</h3>
+                  <p>
+                    Utiliza tu cuenta oficial <strong>@ucb.edu.bo</strong> para ingresar de forma
+                    segura a los servicios academicos.
+                  </p>
+                </div>
+
+                <div className="google-login-block">
+                  {institutionalConfigLoading ? (
+                    <p className="google-helper">Cargando configuracion del acceso institucional...</p>
+                  ) : institutionalConfig?.enabled && institutionalConfig.provider !== 'google_oidc' ? (
+                    <p className="google-helper">
+                      El proveedor institucional <strong>{institutionalConfig.provider}</strong> ya esta configurado en backend.
+                      Esta interfaz aun no tiene renderizador visual para ese proveedor.
+                    </p>
+                  ) : institutionalConfig?.enabled ? (
+                    <>
+                      <div ref={googleButtonRef} className="google-button-host" />
+                      {!institutionalReady ? (
+                        <p className="google-helper">
+                          Cargando {institutionalConfig?.button_label || 'acceso institucional'}...
+                        </p>
+                      ) : null}
+                    </>
+                  ) : (
+                    <p className="google-helper">
+                      El acceso por SSO institucional se configura desde backend.
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <form className="login-panel login-form-panel" onSubmit={handleSubmit}>
+                <p className="login-subtitle">
+                  Ingresa con tu correo institucional y tu contrasena temporal o asignada.
                 </p>
 
-        {institutionalError ? <p className="auth-error">{institutionalError}</p> : null}
+                <label htmlFor="email">Correo institucional</label>
+                <div className="field-wrap">
+                  <Mail size={18} aria-hidden="true" />
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={credentials.email}
+                    onChange={handleChange}
+                    placeholder="nombre@ucb.edu.bo"
+                    required
+                  />
+                </div>
+
+                <label htmlFor="password">Contrasena</label>
+                <div className="field-wrap">
+                  <LockKeyhole size={18} aria-hidden="true" />
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={credentials.password}
+                    onChange={handleChange}
+                    placeholder="Ingresa tu contrasena"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="field-toggle"
+                    onClick={() => setShowPassword((previous) => !previous)}
+                    aria-label={showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'}
+                  >
+                    {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                  </button>
+                </div>
+
+                <button type="submit" className="login-submit">
+                  <LogIn size={18} aria-hidden="true" />
+                  Entrar con credenciales
+                </button>
+              </form>
+            )}
+
+            {error ? <p className="auth-error">{error}</p> : null}
+            {institutionalError ? <p className="auth-error">{institutionalError}</p> : null}
+          </div>
+        </div>
       </section>
     </main>
   )
