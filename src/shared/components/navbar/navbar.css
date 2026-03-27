@@ -1,0 +1,140 @@
+.navbar-shell {
+  border-bottom: 1px solid var(--line-300);
+  background: linear-gradient(180deg, #fcd025 0%, #f5c518 100%);
+  box-shadow: 0 2px 10px rgba(10, 53, 89, 0.08);
+}
+
+.navbar {
+  width: min(1120px, 100% - clamp(24px, 6vw, 64px));
+  margin: 0 auto;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-logo {
+  width: 126px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.brand-kicker {
+  font-size: 0.72rem;
+  color: var(--ink-700);
+  letter-spacing: 0.06em;
+}
+
+.brand strong {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  color: var(--ink-900);
+}
+
+.nav-toggle {
+  display: none;
+  border: 1px solid var(--line-300);
+  border-radius: var(--radius-sm);
+  width: 38px;
+  height: 38px;
+  background: var(--surface-100);
+  color: var(--ink-900);
+  cursor: pointer;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-link,
+.nav-action {
+  border: 1px solid rgba(10, 53, 89, 0.26);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.82);
+  color: #0a3559;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.nav-link:hover,
+.nav-action:hover {
+  background: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(10, 53, 89, 0.12);
+}
+
+.nav-link.is-active {
+  background: #0a3559;
+  color: #ffffff;
+  border-color: #0a3559;
+  box-shadow: 0 4px 10px rgba(10, 53, 89, 0.2);
+}
+
+.nav-link:focus-visible,
+.nav-action:focus-visible,
+.nav-toggle:focus-visible {
+  outline: 3px solid rgba(10, 53, 89, 0.35);
+  outline-offset: 2px;
+}
+
+@media (max-width: 860px) {
+  .navbar {
+    width: min(1120px, 100% - 28px);
+  }
+
+  .nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .brand-logo {
+    width: 104px;
+    height: 34px;
+  }
+
+  .nav-links {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    top: 78px;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--line-300);
+    background: var(--surface-100);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .nav-links.is-open {
+    display: flex;
+  }
+
+  .nav-link,
+  .nav-action {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
