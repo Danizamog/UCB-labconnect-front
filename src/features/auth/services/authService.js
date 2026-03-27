@@ -4,6 +4,7 @@ const AUTH_LOGIN_ENDPOINT = `${apiBase}/auth/login`
 const AUTH_INSTITUTIONAL_ENDPOINT = `${apiBase}/auth/institutional`
 const AUTH_INSTITUTIONAL_CONFIG_ENDPOINT = `${apiBase}/auth/institutional/config`
 const AUTH_VALIDATE_ENDPOINT = `${apiBase}/auth/validate`
+const FRONTEND_GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim()
 
 function decodeJwtPayload(token) {
   try {
@@ -104,27 +105,52 @@ export async function signIn(credentials) {
 }
 
 export async function getInstitutionalSSOConfig() {
+  const frontendFallbackConfig = FRONTEND_GOOGLE_CLIENT_ID
+    ? {
+        enabled: true,
+        provider: 'google_oidc',
+        client_id: FRONTEND_GOOGLE_CLIENT_ID,
+        button_label: 'Continuar con Google UCB',
+      }
+    : {
+        enabled: false,
+        provider: null,
+        client_id: null,
+        button_label: 'Continuar con cuenta institucional',
+      }
+
   try {
     const response = await fetch(AUTH_INSTITUTIONAL_CONFIG_ENDPOINT)
     const data = await response.json().catch(() => ({}))
 
     if (!response.ok) {
+      if (frontendFallbackConfig.enabled) {
+        return { success: true, config: frontendFallbackConfig }
+      }
+
       return {
         success: false,
         message: data?.detail || 'No se pudo cargar la configuracion del acceso institucional',
       }
     }
 
+    const backendEnabled = Boolean(data?.enabled)
+    const backendClientId = data?.client_id || null
+
     return {
       success: true,
       config: {
-        enabled: Boolean(data?.enabled),
-        provider: data?.provider || null,
-        client_id: data?.client_id || null,
+        enabled: backendEnabled || frontendFallbackConfig.enabled,
+        provider: data?.provider || (frontendFallbackConfig.enabled ? 'google_oidc' : null),
+        client_id: backendClientId || frontendFallbackConfig.client_id,
         button_label: data?.button_label || 'Continuar con cuenta institucional',
       },
     }
   } catch {
+    if (frontendFallbackConfig.enabled) {
+      return { success: true, config: frontendFallbackConfig }
+    }
+
     return {
       success: false,
       message: 'No se pudo cargar la configuracion del acceso institucional',

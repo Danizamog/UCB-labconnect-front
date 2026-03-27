@@ -3,16 +3,14 @@ const apiBase = gatewayBase.endsWith('/v1') ? gatewayBase.slice(0, -3) : gateway
 const reservationsBase = `${apiBase}/v1`
 const inventoryBase = `${apiBase}/inventory`
 
-function getToken() {
-  return localStorage.getItem('token') || localStorage.getItem('access_token') || ''
-}
+import { getAuthToken } from '../../../shared/utils/storage'
 
 async function parseJson(response, fallback) {
   return response.json().catch(() => fallback)
 }
 
 async function request(url, options = {}) {
-  const token = getToken()
+  const token = getAuthToken()
   const headers = {
     ...(options.body ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers || {}),
@@ -41,7 +39,7 @@ export function listAdminAreas() {
 }
 
 export function createArea(payload) {
-  return request(`${reservationsBase}/areas/`, {
+  return request(`${reservationsBase}/areas`, {
     method: 'POST',
     body: JSON.stringify(payload),
   })
@@ -65,7 +63,7 @@ export function listAdminLabs() {
 }
 
 export function createLab(payload) {
-  return request(`${reservationsBase}/labs/`, {
+  return request(`${reservationsBase}/labs`, {
     method: 'POST',
     body: JSON.stringify(payload),
   })
@@ -85,11 +83,11 @@ export function deleteLab(labId) {
 }
 
 export function listAssets() {
-  return request(`${inventoryBase}/assets/`)
+  return request(`${inventoryBase}/assets`)
 }
 
 export function createAsset(payload) {
-  return request(`${inventoryBase}/assets/`, {
+  return request(`${inventoryBase}/assets`, {
     method: 'POST',
     body: JSON.stringify(payload),
   })
@@ -120,11 +118,11 @@ export function deleteAsset(assetId) {
 }
 
 export function listMaterials() {
-  return request(`${inventoryBase}/stock-items/`)
+  return request(`${inventoryBase}/stock-items`)
 }
 
 export function createMaterial(payload) {
-  return request(`${inventoryBase}/stock-items/`, {
+  return request(`${inventoryBase}/stock-items`, {
     method: 'POST',
     body: JSON.stringify(payload),
   })
@@ -188,7 +186,7 @@ export function listLoanRecords(filters = {}) {
 }
 
 export function createLoanRecord(payload) {
-  return request(`${inventoryBase}/loans/`, {
+  return request(`${inventoryBase}/loans`, {
     method: 'POST',
     body: JSON.stringify(payload),
   })
