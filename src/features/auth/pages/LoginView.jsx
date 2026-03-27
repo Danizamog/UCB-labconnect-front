@@ -5,6 +5,7 @@ import { getInstitutionalSSOConfig } from '../services/authService'
 import './LoginView.css'
 
 const GOOGLE_SCRIPT_SRC = 'https://accounts.google.com/gsi/client'
+const GOOGLE_PROVIDERS = new Set(['google_oidc', 'google'])
 
 function loadGoogleScript() {
   return new Promise((resolve, reject) => {
@@ -33,25 +34,12 @@ function loadGoogleScript() {
 function LoginView({ onLogin, onInstitutionalLogin }) {
   const [credentials, setCredentials] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
+function LoginView({ onInstitutionalLogin }) {
   const [institutionalError, setInstitutionalError] = useState('')
   const [institutionalReady, setInstitutionalReady] = useState(false)
   const [institutionalConfig, setInstitutionalConfig] = useState(null)
   const [institutionalConfigLoading, setInstitutionalConfigLoading] = useState(true)
   const googleButtonRef = useRef(null)
-
-  const handleChange = (event) => {
-    const { name, value } = event.target
-    setCredentials((previous) => ({ ...previous, [name]: value }))
-  }
-
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    setError('')
-    const response = await onLogin(credentials)
-    if (!response?.success) {
-      setError(response?.message || 'No se pudo iniciar sesion')
-    }
-  }
 
   useEffect(() => {
     let isMounted = true
@@ -83,7 +71,7 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
 
     if (
       !institutionalConfig?.enabled ||
-      institutionalConfig.provider !== 'google_oidc' ||
+      !GOOGLE_PROVIDERS.has(institutionalConfig.provider) ||
       !institutionalConfig.client_id ||
       !onInstitutionalLogin ||
       !googleButtonRef.current
@@ -105,7 +93,6 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
               return
             }
 
-            setError('')
             setInstitutionalError('')
 
             const loginResponse = await onInstitutionalLogin(response.credential)
@@ -144,7 +131,7 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
 
   return (
     <main className="auth-screen">
-      <form className="login-card" onSubmit={handleSubmit}>
+      <section className="login-card">
         <div className="login-brand">
           <img
             className="login-brand-logo"
@@ -157,49 +144,12 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
           </div>
         </div>
 
-        <p className="login-subtitle">Ingresa para continuar a tu espacio de trabajo.</p>
-
-        <label htmlFor="email">Correo</label>
-        <div className="field-wrap">
-          <Mail size={18} aria-hidden="true" />
-          <input
-            id="email"
-            name="email"
-            type="email"
-            value={credentials.email}
-            onChange={handleChange}
-            placeholder="correo@ejemplo.com"
-            required
-          />
-        </div>
-
-        <label htmlFor="password">Contrasena</label>
-        <div className="field-wrap">
-          <LockKeyhole size={18} aria-hidden="true" />
-          <input
-            id="password"
-            name="password"
-            type="password"
-            value={credentials.password}
-            onChange={handleChange}
-            placeholder="********"
-            required
-          />
-        </div>
-
-        <button type="submit">
-          <LogIn size={18} aria-hidden="true" />
-          Entrar
-        </button>
-
-        <div className="auth-divider" aria-hidden="true">
-          <span>o</span>
-        </div>
+        <p className="login-subtitle">Ingresa con tu cuenta institucional @ucb.edu.bo para continuar.</p>
 
         <div className="google-login-block">
           {institutionalConfigLoading ? (
             <p className="google-helper">Cargando configuracion del acceso institucional...</p>
-          ) : institutionalConfig?.enabled && institutionalConfig.provider !== 'google_oidc' ? (
+          ) : institutionalConfig?.enabled && !GOOGLE_PROVIDERS.has(institutionalConfig.provider) ? (
             <p className="google-helper">
               El proveedor institucional <strong>{institutionalConfig.provider}</strong> ya esta configurado en backend.
               Esta interfaz aun no tiene renderizador visual para ese proveedor.
@@ -211,18 +161,9 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
                 <p className="google-helper">
                   Cargando {institutionalConfig?.button_label || 'acceso institucional'}...
                 </p>
-              ) : null}
-            </>
-          ) : (
-            <p className="google-helper">
-              El acceso por SSO institucional se configura desde backend.
-            </p>
-          )}
-        </div>
 
-        {error ? <p className="auth-error">{error}</p> : null}
         {institutionalError ? <p className="auth-error">{institutionalError}</p> : null}
-      </form>
+      </section>
     </main>
   )
 }
