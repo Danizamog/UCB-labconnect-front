@@ -47,6 +47,7 @@ function mapTutorialSession(record) {
     tutor_email: record?.tutor_email || '',
     topic: record?.topic || '',
     description: record?.description || '',
+    laboratory_id: record?.laboratory_id || '',
     location: record?.location || '',
     session_date: record?.session_date || '',
     start_time: record?.start_time || '',
@@ -78,12 +79,22 @@ export async function listMyTutorialSessions() {
   return Array.isArray(data) ? data.map(mapTutorialSession) : []
 }
 
+export async function getTutorialSessionById(sessionId) {
+  if (!sessionId) {
+    throw new Error('No se pudo identificar la tutoria seleccionada.')
+  }
+
+  const data = await request(`${tutorialsBase}/tutorial-sessions/${sessionId}`)
+  return mapTutorialSession(data || {})
+}
+
 export async function createTutorialSession(payload) {
   const record = await request(`${tutorialsBase}/tutorial-sessions`, {
     method: 'POST',
     body: JSON.stringify({
       topic: String(payload.topic || '').trim(),
       description: String(payload.description || '').trim(),
+      laboratory_id: String(payload.laboratory_id || '').trim(),
       location: String(payload.location || '').trim(),
       session_date: String(payload.session_date || ''),
       start_time: String(payload.start_time || ''),

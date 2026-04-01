@@ -301,10 +301,22 @@
   color: #1d4ed8;
 }
 
+.reservations-slot.tutorial {
+  border-left-color: #0a3559;
+  background: rgba(10, 53, 89, 0.08);
+  color: #0a3559;
+}
+
 .reservations-slot.blocked-other {
   border-left-color: #7c3aed;
   background: rgba(124, 58, 237, 0.06);
   color: #6d28d9;
+}
+
+.reservations-slot.past {
+  border-left-color: #475569;
+  background: rgba(71, 85, 105, 0.08);
+  color: #334155;
 }
 
 .reservations-slot.is-selected {
@@ -360,6 +372,14 @@
   color: #6d28d9;
 }
 
+.reservation-slot-legend-item.tutorial {
+  color: #0a3559;
+}
+
+.reservation-slot-legend-item.past {
+  color: #334155;
+}
+
 .reservation-slot-legend-dot {
   width: 10px;
   height: 10px;
@@ -373,6 +393,14 @@
 
 .reservation-slot-legend-item.blocked-other .reservation-slot-legend-dot {
   background: #7c3aed;
+}
+
+.reservation-slot-legend-item.tutorial .reservation-slot-legend-dot {
+  background: #0a3559;
+}
+
+.reservation-slot-legend-item.past .reservation-slot-legend-dot {
+  background: #475569;
 }
 
 .reservation-slot-grid {
@@ -607,6 +635,10 @@
   color: #7f1d1d;
   font-size: 0.85rem;
   line-height: 1.55;
+}
+
+.reservation-history-header {
+  margin-top: 24px;
 }
 
 .reservation-focus-panel {

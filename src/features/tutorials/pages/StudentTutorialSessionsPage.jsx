@@ -4,10 +4,22 @@ import {
   listPublicTutorialSessions,
   subscribeTutorialSessionsRealtime,
 } from '../services/tutorialSessionsService'
+import { FOCUSED_TUTORIAL_KEY, OPEN_TUTORIAL_EVENT } from '../utils/focusTutorialNavigation'
 import './TutorialPages.css'
 
-const FOCUSED_TUTORIAL_KEY = 'labconnect.focus_tutorial_session_id'
-const OPEN_TUTORIAL_EVENT = 'labconnect:open-tutorial-session'
+function getEnrollmentState(session, userId) {
+  const normalizedUserId = String(userId || '')
+  const isOwnSession = session.tutor_id === normalizedUserId
+  const isEnrolled = session.enrolled_students.some((student) => student.student_id === normalizedUserId)
+  const isFull = session.seats_left <= 0
+
+  return {
+    isOwnSession,
+    isEnrolled,
+    isFull,
+    canEnroll: !isOwnSession && !isEnrolled && !isFull,
+  }
+}
 
 function StudentTutorialSessionsPage({ user }) {
   const [sessions, setSessions] = useState([])
@@ -57,6 +69,7 @@ function StudentTutorialSessionsPage({ user }) {
       }
       setFocusedSessionId(normalizedId)
       localStorage.removeItem(FOCUSED_TUTORIAL_KEY)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
 
     const storedId = localStorage.getItem(FOCUSED_TUTORIAL_KEY)
@@ -82,6 +95,11 @@ function StudentTutorialSessionsPage({ user }) {
   const availableSessions = useMemo(
     () => sessions.filter((session) => session.is_published),
     [sessions],
+  )
+
+  const focusedState = useMemo(
+    () => (focusedSession ? getEnrollmentState(focusedSession, user?.user_id) : null),
+    [focusedSession, user?.user_id],
   )
 
   const handleEnroll = async (session) => {
@@ -122,15 +140,23 @@ function StudentTutorialSessionsPage({ user }) {
           <div className="tutorials-panel-header">
             <h3>Tutoria destacada</h3>
             <p className="tutorials-panel-subtitle">
-              Se muestra aqui cuando entras desde una notificacion o tras completar una inscripcion.
+              Aqui se enfoca la sesion seleccionada desde el calendario, las notificaciones o la cartelera de tutorias.
             </p>
           </div>
 
-          <div className="tutorial-focus-grid">
-            <div className="tutorial-focus-card">
-              <span>Tema</span>
-              <strong>{focusedSession.topic}</strong>
+          <div className="tutorial-focus-hero">
+            <div className="tutorial-focus-hero-copy">
+              <span className="tutorial-badge">Sesion recomendada</span>
+              <h4>{focusedSession.topic}</h4>
+              <p>{focusedSession.description || 'Sesion pensada para reforzar contenidos y resolver dudas academicas con apoyo del tutor.'}</p>
             </div>
+            <div className="tutorial-focus-hero-side">
+              <span className="tutorial-focus-chip">{focusedSession.location || 'Laboratorio por definir'}</span>
+              <strong>{focusedSession.seats_left} cupos disponibles</strong>
+            </div>
+          </div>
+
+          <div className="tutorial-focus-grid">
             <div className="tutorial-focus-card">
               <span>Tutor</span>
               <strong>{focusedSession.tutor_name}</strong>
@@ -141,13 +167,38 @@ function StudentTutorialSessionsPage({ user }) {
             </div>
             <div className="tutorial-focus-card">
               <span>Cupos</span>
-              <strong>{focusedSession.seats_left} disponibles</strong>
+              <strong>{focusedSession.enrolled_count} / {focusedSession.max_students}</strong>
+            </div>
+            <div className="tutorial-focus-card">
+              <span>Disponibles</span>
+              <strong>{focusedSession.seats_left}</strong>
             </div>
           </div>
 
           <div className="tutorial-focus-copy">
             <p><strong>Ubicacion:</strong> {focusedSession.location || 'Por definir'}</p>
             <p><strong>Descripcion:</strong> {focusedSession.description || 'Sin descripcion adicional.'}</p>
+          </div>
+
+          <div className="tutorial-focus-actions">
+            {focusedState?.isOwnSession ? (
+              <button type="button" className="tutorials-secondary" disabled>
+                Es tu tutoria
+              </button>
+            ) : focusedState?.isEnrolled ? (
+              <button type="button" className="tutorials-secondary" disabled>
+                Ya inscrito
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="tutorials-primary"
+                disabled={!focusedState?.canEnroll || enrollingId === focusedSession.id}
+                onClick={() => handleEnroll(focusedSession)}
+              >
+                {enrollingId === focusedSession.id ? 'Inscribiendo...' : focusedState?.isFull ? 'Sin cupos' : 'Inscribirme ahora'}
+              </button>
+            )}
           </div>
         </section>
       ) : null}
@@ -159,9 +210,7 @@ function StudentTutorialSessionsPage({ user }) {
           <div className="tutorials-grid">
             {availableSessions.map((session) => {
               const isFocused = focusedSessionId === session.id
-              const isOwnSession = session.tutor_id === (user?.user_id || '')
-              const isEnrolled = session.enrolled_students.some((student) => student.student_id === (user?.user_id || ''))
-              const isFull = session.seats_left <= 0
+              const sessionState = getEnrollmentState(session, user?.user_id)
 
               return (
                 <article
@@ -178,24 +227,35 @@ function StudentTutorialSessionsPage({ user }) {
 
                   <p className="tutorial-copy">{session.description || 'Sesion abierta para resolver dudas y reforzar contenidos.'}</p>
 
-                  <div className="tutorial-meta">
+                  <div className="tutorial-card-facts">
                     <span>{session.tutor_name}</span>
                     <span>{session.session_date}</span>
                     <span>{session.start_time} - {session.end_time}</span>
                     <span>{session.location || 'Ubicacion por definir'}</span>
                   </div>
 
-                  <div className="tutorial-students">
-                    <strong>Inscritos</strong>
-                    <span>{session.enrolled_count} de {session.max_students} ocupados</span>
+                  <div className="tutorial-meta">
+                    <span>Inscritos: {session.enrolled_count} de {session.max_students}</span>
+                    <span>{session.seats_left} cupos disponibles</span>
                   </div>
 
-                  <div className="tutorials-actions">
-                    {isOwnSession ? (
+                  <div className="tutorial-card-action-row">
+                    <button
+                      type="button"
+                      className="tutorials-secondary"
+                      onClick={() => {
+                        setFocusedSessionId(session.id)
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                    >
+                      Ver detalle
+                    </button>
+
+                    {sessionState.isOwnSession ? (
                       <button type="button" className="tutorials-secondary" disabled>
                         Es tu tutoria
                       </button>
-                    ) : isEnrolled ? (
+                    ) : sessionState.isEnrolled ? (
                       <button type="button" className="tutorials-secondary" disabled>
                         Ya inscrito
                       </button>
@@ -203,10 +263,10 @@ function StudentTutorialSessionsPage({ user }) {
                       <button
                         type="button"
                         className="tutorials-primary"
-                        disabled={isFull || enrollingId === session.id}
+                        disabled={!sessionState.canEnroll || enrollingId === session.id}
                         onClick={() => handleEnroll(session)}
                       >
-                        {enrollingId === session.id ? 'Inscribiendo...' : isFull ? 'Sin cupos' : 'Inscribirme'}
+                        {enrollingId === session.id ? 'Inscribiendo...' : sessionState.isFull ? 'Sin cupos' : 'Inscribirme'}
                       </button>
                     )}
                   </div>

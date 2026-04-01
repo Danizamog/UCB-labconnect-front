@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
+import TutorialSessionDetailModal from '../../tutorials/pages/TutorialSessionDetailModal'
+import { getTutorialSessionById } from '../../tutorials/services/tutorialSessionsService'
+import { openTutorialSessionFlow } from '../../tutorials/utils/focusTutorialNavigation'
 import {
   createReservation,
   deleteReservation,
+  getReservationById,
   getLabAvailability,
   isLabAccessibleToUser,
   listAvailableLabs,
@@ -11,21 +15,80 @@ import {
   subscribeReservationsRealtime,
   updateReservation,
 } from '../services/reservationsService'
+import ReservationDetailModal from './ReservationDetailModal'
 import ReservationEditModal from './ReservationEditModal'
 import './ReservationsPages.css'
 
-const defaultForm = {
-  laboratory_id: '',
-  date: new Date().toISOString().slice(0, 10),
-  start_time: '08:00',
-  end_time: '09:00',
-  purpose: '',
+const MIN_PURPOSE_LENGTH = 5
+const CLOCK_REFRESH_MS = 30 * 1000
+
+function todayLocalDateString() {
+  const value = new Date()
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function createDefaultForm(overrides = {}) {
+  return {
+    laboratory_id: '',
+    date: todayLocalDateString(),
+    start_time: '',
+    end_time: '',
+    purpose: '',
+    ...overrides,
+  }
+}
+
+function maxReservableDateString() {
+  const value = new Date()
+  value.setMonth(value.getMonth() + 1)
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 const STATUS_LABELS = { pending: 'Pendiente', approved: 'Aprobada', rejected: 'Rechazada', cancelled: 'Cancelada' }
 const FOCUSED_RESERVATION_KEY = 'labconnect.focus_reservation_id'
 const OPEN_RESERVATION_EVENT = 'labconnect:open-reservation-details'
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000
+
+function getTutorialPrimaryAction(session, userId) {
+  const normalizedUserId = String(userId || '')
+  const isOwnTutorial = session?.tutor_id === normalizedUserId
+  const isEnrolled = Array.isArray(session?.enrolled_students)
+    ? session.enrolled_students.some((student) => student.student_id === normalizedUserId)
+    : false
+  const isFull = Number(session?.seats_left || 0) <= 0
+
+  if (isOwnTutorial) {
+    return {
+      label: 'Ver en Tutorias',
+      hint: 'Abriremos la cartelera de tutorias con esta sesion destacada para que la revises con mas detalle.',
+    }
+  }
+
+  if (isEnrolled) {
+    return {
+      label: 'Ver mi inscripcion',
+      hint: 'Te llevaremos a la cartelera de tutorias para revisar esta sesion destacada.',
+    }
+  }
+
+  if (isFull) {
+    return {
+      label: 'Ver en Tutorias',
+      hint: 'Esta sesion ya no tiene cupos, pero puedes revisar su detalle completo desde la cartelera de tutorias.',
+    }
+  }
+
+  return {
+    label: 'Inscribirme',
+    hint: 'Te llevaremos a la cartelera de tutorias con esta sesion destacada para completar tu inscripcion.',
+  }
+}
 
 function formatNotificationDateTime(value) {
   if (!value) {
@@ -46,6 +109,40 @@ function formatNotificationDateTime(value) {
 
 function buildReservationStart(reservation) {
   return new Date(`${reservation.date}T${reservation.start_time}:00`)
+}
+
+function isDateBeforeToday(value) {
+  return Boolean(value) && value < todayLocalDateString()
+}
+
+function isDateBeyondReservationLimit(value) {
+  return Boolean(value) && value > maxReservableDateString()
+}
+
+function buildLocalDateTime(dateValue, timeValue) {
+  if (!dateValue || !timeValue) {
+    return null
+  }
+
+  const [year, month, day] = String(dateValue).split('-').map(Number)
+  const [hour, minute] = String(timeValue).split(':').map(Number)
+  if (!year || !month || !day || Number.isNaN(hour) || Number.isNaN(minute)) {
+    return null
+  }
+
+  return new Date(year, month - 1, day, hour, minute, 0, 0)
+}
+
+function isPastSlotForDate(slot, dateValue, referenceNow = new Date()) {
+  const slotStart = buildLocalDateTime(dateValue, slot?.start_time)
+  if (!slotStart) {
+    return false
+  }
+  return slotStart.getTime() <= referenceNow.getTime()
+}
+
+function compareReservationsByStart(a, b) {
+  return buildReservationStart(a).getTime() - buildReservationStart(b).getTime()
 }
 
 function getReservationActionState(reservation) {
@@ -77,6 +174,14 @@ function getSlotKey(slot) {
 }
 
 function getSlotTone(slot) {
+  if (slot.source === 'tutorial_session') {
+    return 'tutorial'
+  }
+
+  if (slot.state === 'blocked' && slot.status === 'past') {
+    return 'past'
+  }
+
   if (slot.state === 'blocked' && slot.status === 'maintenance') {
     return 'maintenance'
   }
@@ -93,6 +198,14 @@ function getSlotTone(slot) {
 }
 
 function getSlotLabel(slot) {
+  if (slot.source === 'tutorial_session') {
+    return 'Tutoria'
+  }
+
+  if (slot.state === 'blocked' && slot.status === 'past') {
+    return 'Hora pasada'
+  }
+
   if (slot.state === 'blocked' && slot.status === 'maintenance') {
     return 'Mantenimiento'
   }
@@ -108,23 +221,48 @@ function getSlotLabel(slot) {
   return 'Disponible'
 }
 
+function isCreatableSlot(slot) {
+  return Boolean(slot) && slot.state === 'available'
+}
+
 function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead }) {
   const [labs, setLabs] = useState([])
   const [reservations, setReservations] = useState([])
   const [penalties, setPenalties] = useState([])
   const [slots, setSlots] = useState([])
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
-  const [form, setForm] = useState(defaultForm)
+  const [form, setForm] = useState(() => createDefaultForm())
   const [editingReservation, setEditingReservation] = useState(null)
-  const [editForm, setEditForm] = useState(defaultForm)
+  const [editForm, setEditForm] = useState(() => createDefaultForm())
+  const [editSlots, setEditSlots] = useState([])
+  const [isLoadingEditSlots, setIsLoadingEditSlots] = useState(false)
+  const [editSelectedSlotKey, setEditSelectedSlotKey] = useState('')
   const [focusedReservationId, setFocusedReservationId] = useState('')
+  const [isReservationDetailOpen, setIsReservationDetailOpen] = useState(false)
+  const [focusedReservationDetails, setFocusedReservationDetails] = useState(null)
+  const [isLoadingReservationDetails, setIsLoadingReservationDetails] = useState(false)
   const [reservationToCancel, setReservationToCancel] = useState(null)
   const [selectedSlotKey, setSelectedSlotKey] = useState('')
   const [availabilityRefreshNonce, setAvailabilityRefreshNonce] = useState(0)
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
+  const [focusedTutorial, setFocusedTutorial] = useState(null)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const todayIso = todayLocalDateString()
+  const maxReservationIso = maxReservableDateString()
+  const [clockTick, setClockTick] = useState(Date.now())
+  const nowReference = useMemo(() => new Date(clockTick), [clockTick])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setClockTick(Date.now())
+    }, CLOCK_REFRESH_MS)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [])
 
   const loadData = async () => {
     try {
@@ -190,6 +328,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
         return
       }
       setFocusedReservationId(normalizedId)
+      setIsReservationDetailOpen(true)
       localStorage.removeItem(FOCUSED_RESERVATION_KEY)
     }
 
@@ -284,6 +423,12 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     [selectedSlotKey, slots],
   )
 
+  const selectedSlotIsValid = Boolean(
+    selectedSlot &&
+    isCreatableSlot(selectedSlot) &&
+    !isPastSlotForDate(selectedSlot, form.date, nowReference),
+  )
+
   const activePenalty = useMemo(
     () => penalties.find((penalty) => penalty.is_active) || null,
     [penalties],
@@ -293,25 +438,270 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     selectedLab &&
     selectedLabIsAccessible &&
     !activePenalty &&
-    selectedSlot &&
-    selectedSlot.state === 'available' &&
-    form.purpose.trim(),
+    selectedSlotIsValid &&
+    !isDateBeforeToday(form.date) &&
+    !isDateBeyondReservationLimit(form.date) &&
+    form.purpose.trim().length >= MIN_PURPOSE_LENGTH,
   )
 
+  const createValidationMessage = useMemo(() => {
+    if (!selectedLab) {
+      return 'Debes seleccionar un laboratorio antes de reservar.'
+    }
+    if (isDateBeforeToday(form.date)) {
+      return 'No puedes registrar reservas en fechas anteriores a hoy.'
+    }
+    if (isDateBeyondReservationLimit(form.date)) {
+      return 'Solo puedes registrar reservas con un maximo de un mes de anticipacion.'
+    }
+    if (!selectedLabIsAccessible) {
+      return 'No tienes permisos para reservar este laboratorio.'
+    }
+    if (activePenalty) {
+      return `Tu cuenta esta suspendida temporalmente. Motivo: ${activePenalty.reason}`
+    }
+    if (!selectedSlot || !isCreatableSlot(selectedSlot)) {
+      return 'Debes seleccionar un bloque horario disponible del laboratorio.'
+    }
+    if (isPastSlotForDate(selectedSlot, form.date, nowReference)) {
+      return 'No puedes reservar bloques horarios que ya empezaron o ya transcurrieron.'
+    }
+    if (form.purpose.trim().length < MIN_PURPOSE_LENGTH) {
+      return `El motivo debe tener al menos ${MIN_PURPOSE_LENGTH} caracteres.`
+    }
+    return ''
+  }, [activePenalty, form.date, form.purpose, nowReference, selectedLab, selectedLabIsAccessible, selectedSlot])
+
   const myReservations = useMemo(
-    () => reservations.filter((item) => item.requested_by === (user?.user_id || '')).slice(-8).reverse(),
+    () =>
+      reservations
+        .filter((item) => item.requested_by === (user?.user_id || ''))
+        .sort(compareReservationsByStart),
     [reservations, user],
   )
 
+  const upcomingReservations = useMemo(
+    () => myReservations.filter((item) => !getReservationActionState(item).hasStarted),
+    [myReservations],
+  )
+
+  const reservationHistory = useMemo(
+    () => myReservations.filter((item) => getReservationActionState(item).hasStarted).reverse(),
+    [myReservations],
+  )
+
   const focusedReservation = useMemo(
-    () => myReservations.find((item) => item.id === focusedReservationId) || null,
-    [focusedReservationId, myReservations],
+    () => {
+      if (focusedReservationDetails?.id === focusedReservationId) {
+        return focusedReservationDetails
+      }
+      return myReservations.find((item) => item.id === focusedReservationId) || null
+    },
+    [focusedReservationDetails, focusedReservationId, myReservations],
   )
 
   const unreadNotificationsCount = useMemo(
     () => notifications.filter((notification) => !notification.is_read).length,
     [notifications],
   )
+
+  useEffect(() => {
+    if (!focusedReservationId || !isReservationDetailOpen) {
+      setFocusedReservationDetails(null)
+      setIsLoadingReservationDetails(false)
+      return
+    }
+
+    const localReservation = myReservations.find((item) => item.id === focusedReservationId)
+    if (!localReservation) {
+      setFocusedReservationId('')
+      setFocusedReservationDetails(null)
+      setIsLoadingReservationDetails(false)
+    }
+  }, [focusedReservationId, isReservationDetailOpen, myReservations])
+
+  useEffect(() => {
+    if (!focusedReservationId || !isReservationDetailOpen) {
+      return
+    }
+
+    if (focusedReservationDetails?.id === focusedReservationId) {
+      return
+    }
+
+    let isMounted = true
+    setIsLoadingReservationDetails(true)
+
+    getReservationById(focusedReservationId)
+      .then((reservation) => {
+        if (isMounted) {
+          setFocusedReservationDetails(reservation)
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setError(err.message || 'No se pudo cargar el detalle actualizado de la reserva.')
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingReservationDetails(false)
+        }
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [focusedReservationDetails?.id, focusedReservationId, isReservationDetailOpen])
+
+  const selectedEditLab = useMemo(
+    () => labs.find((lab) => String(lab.id) === String(editForm.laboratory_id)) || null,
+    [editForm.laboratory_id, labs],
+  )
+
+  const isEditSlotSelectable = (slot) => {
+    if (isPastSlotForDate(slot, editForm.date, nowReference)) {
+      return false
+    }
+
+    return (
+      slot.state === 'available' ||
+      (editingReservation && slot.source === 'lab_reservation' && slot.source_id === editingReservation.id)
+    )
+  }
+
+  useEffect(() => {
+    if (!editingReservation) {
+      setEditSlots([])
+      setEditSelectedSlotKey('')
+      setIsLoadingEditSlots(false)
+      return
+    }
+
+    if (!editForm.laboratory_id || !editForm.date || isDateBeforeToday(editForm.date)) {
+      setEditSlots([])
+      setEditSelectedSlotKey('')
+      return
+    }
+
+    let mounted = true
+    setIsLoadingEditSlots(true)
+
+    getLabAvailability(editForm.laboratory_id, editForm.date)
+      .then((payload) => {
+        if (!mounted) {
+          return
+        }
+
+        const nextSlots = Array.isArray(payload?.slots) ? payload.slots : []
+        setEditSlots(nextSlots)
+
+        const currentKey = `${editForm.start_time}-${editForm.end_time}`
+        const matchingSlot = nextSlots.find((slot) => getSlotKey(slot) === currentKey && isEditSlotSelectable(slot))
+        if (matchingSlot) {
+          setEditSelectedSlotKey(getSlotKey(matchingSlot))
+        } else {
+          setEditSelectedSlotKey('')
+          setEditForm((previous) => ({
+            ...previous,
+            start_time: '',
+            end_time: '',
+          }))
+        }
+      })
+      .catch((err) => {
+        if (mounted) {
+          setEditSlots([])
+          setEditSelectedSlotKey('')
+          setError(err.message || 'No se pudieron cargar los bloques validos para editar la reserva.')
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingEditSlots(false)
+        }
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [editingReservation, editForm.date, editForm.end_time, editForm.laboratory_id, editForm.start_time])
+
+  const selectedEditSlot = useMemo(
+    () => editSlots.find((slot) => getSlotKey(slot) === editSelectedSlotKey) || null,
+    [editSelectedSlotKey, editSlots],
+  )
+
+  const editValidationMessage = useMemo(() => {
+    if (!editingReservation) {
+      return ''
+    }
+    if (!selectedEditLab) {
+      return 'Debes seleccionar un laboratorio valido.'
+    }
+    if (!isLabAccessibleToUser(selectedEditLab, user)) {
+      return 'No tienes permisos para mover la reserva a este laboratorio.'
+    }
+    if (isDateBeforeToday(editForm.date)) {
+      return 'No puedes mover una reserva a una fecha anterior a hoy.'
+    }
+    if (isDateBeyondReservationLimit(editForm.date)) {
+      return 'Solo puedes mover reservas dentro del plazo maximo de un mes.'
+    }
+    if (!selectedEditSlot || !isEditSlotSelectable(selectedEditSlot)) {
+      return 'Debes elegir un bloque valido del laboratorio para guardar los cambios.'
+    }
+    if (isPastSlotForDate(selectedEditSlot, editForm.date, nowReference)) {
+      return 'No puedes guardar una reserva en un bloque que ya empezo o ya transcurrio.'
+    }
+    if (editForm.purpose.trim().length < MIN_PURPOSE_LENGTH) {
+      return `El motivo debe tener al menos ${MIN_PURPOSE_LENGTH} caracteres.`
+    }
+    return ''
+  }, [editForm.date, editForm.purpose, editingReservation, nowReference, selectedEditLab, selectedEditSlot, user])
+
+  const handleOpenReservationDetails = async (reservation) => {
+    const nextReservation = reservation || null
+    const reservationId = String(nextReservation?.id || '').trim()
+    if (!reservationId) {
+      return
+    }
+
+    setFocusedReservationId(reservationId)
+    setIsReservationDetailOpen(true)
+    setFocusedReservationDetails(nextReservation)
+    setIsLoadingReservationDetails(true)
+    setError('')
+    setMessage('')
+
+    try {
+      const freshReservation = await getReservationById(reservationId)
+      setFocusedReservationDetails(freshReservation)
+    } catch (err) {
+      setError(err.message || 'No se pudo cargar el detalle actualizado de la reserva.')
+    } finally {
+      setIsLoadingReservationDetails(false)
+    }
+  }
+
+  const handleOpenTutorialDetails = async (sessionId) => {
+    if (!sessionId) {
+      return
+    }
+
+    try {
+      const tutorial = await getTutorialSessionById(sessionId)
+      setFocusedTutorial(tutorial)
+    } catch (err) {
+      setError(err.message || 'No se pudo cargar el detalle de la tutoria.')
+    }
+  }
+
+  const handleCloseReservationDetails = () => {
+    setIsReservationDetailOpen(false)
+    setFocusedReservationDetails(null)
+    setIsLoadingReservationDetails(false)
+  }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -323,13 +713,8 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       return
     }
 
-    if (activePenalty) {
-      setError(`Tu cuenta esta suspendida temporalmente. Motivo: ${activePenalty.reason}`)
-      return
-    }
-
-    if (!selectedSlot || selectedSlot.state !== 'available') {
-      setError('Debes seleccionar un bloque horario disponible antes de confirmar la reserva.')
+    if (createValidationMessage) {
+      setError(createValidationMessage)
       return
     }
 
@@ -346,9 +731,9 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       setMessage('Reserva enviada correctamente. Queda pendiente de aprobacion.')
       setSelectedSlotKey('')
       setForm((prev) => ({
-        ...defaultForm,
-        laboratory_id: prev.laboratory_id || defaultForm.laboratory_id,
-        date: prev.date || defaultForm.date,
+        ...createDefaultForm(),
+        laboratory_id: prev.laboratory_id || '',
+        date: prev.date || todayLocalDateString(),
         start_time: '',
         end_time: '',
       }))
@@ -361,26 +746,64 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
   const openEditModal = (reservation) => {
     setEditingReservation(reservation)
     setFocusedReservationId(reservation.id)
-    setEditForm({
+    setEditSlots([])
+    setEditSelectedSlotKey(`${reservation.start_time || ''}-${reservation.end_time || ''}`)
+    setEditForm(createDefaultForm({
       laboratory_id: String(reservation.laboratory_id || ''),
       date: reservation.date || '',
-      start_time: reservation.start_time || '08:00',
-      end_time: reservation.end_time || '09:00',
+      start_time: reservation.start_time || '',
+      end_time: reservation.end_time || '',
       purpose: reservation.purpose || '',
       notes: reservation.notes || '',
-    })
+    }))
     setError('')
     setMessage('')
   }
 
   const closeEditModal = () => {
     setEditingReservation(null)
-    setEditForm(defaultForm)
+    setEditForm(createDefaultForm())
+    setEditSlots([])
+    setEditSelectedSlotKey('')
     setIsSavingEdit(false)
   }
 
+  const handleEditFromDetail = () => {
+    if (!focusedReservation) {
+      return
+    }
+
+    handleCloseReservationDetails()
+    openEditModal(focusedReservation)
+  }
+
   const handleEditFormChange = (field, value) => {
-    setEditForm((previous) => ({ ...previous, [field]: value }))
+    setEditForm((previous) => ({
+      ...previous,
+      [field]: value,
+      ...(field === 'laboratory_id' || field === 'date'
+        ? {
+            start_time: '',
+            end_time: '',
+          }
+        : {}),
+    }))
+    if (field === 'laboratory_id' || field === 'date') {
+      setEditSelectedSlotKey('')
+    }
+  }
+
+  const handleEditSlotSelect = (slot) => {
+    if (!isEditSlotSelectable(slot)) {
+      return
+    }
+
+    setEditSelectedSlotKey(getSlotKey(slot))
+    setEditForm((previous) => ({
+      ...previous,
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+    }))
   }
 
   const handleEditSubmit = async (event) => {
@@ -394,7 +817,10 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     setIsSavingEdit(true)
 
     try {
-      const selectedEditLab = labs.find((lab) => String(lab.id) === String(editForm.laboratory_id))
+      if (editValidationMessage) {
+        throw new Error(editValidationMessage)
+      }
+
       const updatedReservation = await updateReservation(editingReservation.id, {
         ...editForm,
         area_id: selectedEditLab?.area_id || '',
@@ -406,6 +832,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
           : 'Reserva actualizada correctamente.',
       )
       setFocusedReservationId(updatedReservation.id)
+      setFocusedReservationDetails(updatedReservation)
       closeEditModal()
       await loadData()
     } catch (err) {
@@ -434,7 +861,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       await deleteReservation(reservationToCancel.id)
       setReservationToCancel(null)
       if (focusedReservationId === reservationToCancel.id) {
-        setFocusedReservationId('')
+        handleCloseReservationDetails()
       }
       setMessage(
         wasApproved
@@ -456,6 +883,8 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       setError(err.message || 'No se pudo actualizar la alerta.')
     }
   }
+
+  const tutorialAction = focusedTutorial ? getTutorialPrimaryAction(focusedTutorial, user?.user_id) : null
 
   return (
     <section className="reservations-page" aria-label="Reservar laboratorio">
@@ -491,73 +920,6 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
               Restriccion vigente hasta <strong>{activePenalty.ends_at}</strong>.
               {activePenalty.evidence_report_id ? ` Evidencia: ${activePenalty.evidence_type} #${activePenalty.evidence_report_id}.` : ''}
             </p>
-          </div>
-        </section>
-      ) : null}
-
-      {focusedReservation ? (
-        <section className="reservations-panel reservation-focus-panel">
-          <div className="reservations-panel-header">
-            <h3>Detalle de la reserva seleccionada</h3>
-            <p className="reservations-panel-subtitle">
-              Esta vista se abre al entrar desde una notificacion de confirmacion, rechazo o cambio.
-            </p>
-          </div>
-
-          <div className="reservation-focus-grid">
-            <div className="reservation-focus-card">
-              <span>Laboratorio</span>
-              <strong>{focusedReservation.laboratory_name || labNameById[String(focusedReservation.laboratory_id)] || 'Laboratorio'}</strong>
-            </div>
-            <div className="reservation-focus-card">
-              <span>Fecha</span>
-              <strong>{focusedReservation.date}</strong>
-            </div>
-            <div className="reservation-focus-card">
-              <span>Horario</span>
-              <strong>{focusedReservation.start_time} - {focusedReservation.end_time}</strong>
-            </div>
-            <div className="reservation-focus-card">
-              <span>Estado</span>
-              <strong className={`reservation-focus-status ${focusedReservation.status}`}>
-                {STATUS_LABELS[focusedReservation.status] ?? focusedReservation.status}
-              </strong>
-            </div>
-          </div>
-
-          <div className="reservation-focus-copy">
-            <p><strong>Motivo:</strong> {focusedReservation.purpose || 'Sin motivo registrado'}</p>
-            {focusedReservation.cancel_reason ? (
-              <p><strong>Motivo de rechazo:</strong> {focusedReservation.cancel_reason}</p>
-            ) : null}
-          </div>
-
-          <div className="reservations-actions">
-            {getReservationActionState(focusedReservation).canModify ? (
-              <button
-                type="button"
-                className="reservations-secondary"
-                onClick={() => openEditModal(focusedReservation)}
-              >
-                Modificar reserva
-              </button>
-            ) : null}
-            {getReservationActionState(focusedReservation).canCancel ? (
-              <button
-                type="button"
-                className="reservations-danger"
-                onClick={() => handleRequestCancel(focusedReservation)}
-              >
-                Cancelar reserva
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="reservations-secondary"
-              onClick={() => setFocusedReservationId('')}
-            >
-              Cerrar detalle
-            </button>
           </div>
         </section>
       ) : null}
@@ -732,6 +1094,8 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                 <input
                   type="date"
                   value={form.date}
+                  min={todayIso}
+                  max={maxReservationIso}
                   onChange={(event) => setForm((prev) => ({
                     ...prev,
                     date: event.target.value,
@@ -786,6 +1150,12 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                     <span className="reservation-slot-legend-item blocked-other">
                       <span className="reservation-slot-legend-dot" /> Bloqueado
                     </span>
+                    <span className="reservation-slot-legend-item tutorial">
+                      <span className="reservation-slot-legend-dot" /> Tutoria
+                    </span>
+                    <span className="reservation-slot-legend-item past">
+                      <span className="reservation-slot-legend-dot" /> Hora pasada
+                    </span>
                   </div>
                 </div>
 
@@ -798,14 +1168,19 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                     {slots.map((slot) => {
                       const slotKey = getSlotKey(slot)
                       const isSelected = selectedSlotKey === slotKey
-                      const isAvailable = slot.state === 'available'
+                      const isAvailable = isCreatableSlot(slot) && !isPastSlotForDate(slot, form.date, nowReference)
+                      const isTutorial = slot.source === 'tutorial_session'
                       return (
                         <button
                           key={slotKey}
                           type="button"
                           className={`reservations-slot ${getSlotTone(slot)}${isSelected ? ' is-selected' : ''}`}
-                          disabled={!isAvailable || !selectedLabIsAccessible || Boolean(activePenalty)}
+                          disabled={(!isAvailable && !isTutorial) || (!isTutorial && (!selectedLabIsAccessible || Boolean(activePenalty)))}
                           onClick={() => {
+                            if (isTutorial) {
+                              handleOpenTutorialDetails(slot.source_id)
+                              return
+                            }
                             setSelectedSlotKey(slotKey)
                             setForm((prev) => ({
                               ...prev,
@@ -823,6 +1198,13 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                 )}
               </div>
             ) : null}
+
+            {createValidationMessage ? <p className="reservation-inline-hint">{createValidationMessage}</p> : null}
+            {!createValidationMessage ? (
+              <p className="reservation-inline-hint">
+                Solo puedes reservar bloques futuros y dentro de un plazo maximo de un mes.
+              </p>
+            ) : null}
           </div>
 
           <div className="reservations-form-section">
@@ -832,12 +1214,16 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
               <textarea
                 rows="4"
                 value={form.purpose}
+                maxLength={250}
                 onChange={(event) => setForm((prev) => ({ ...prev, purpose: event.target.value }))}
                 placeholder="Ej. Practica de laboratorio de redes, proyecto de tesis..."
                 disabled={Boolean(activePenalty)}
                 required
               />
             </label>
+            <p className="reservation-inline-hint">
+              Usa un motivo claro y academico. Minimo {MIN_PURPOSE_LENGTH} caracteres, maximo 250.
+            </p>
           </div>
 
           <div className="reservations-actions">
@@ -850,91 +1236,150 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
 
       <section className="reservations-panel">
         <div className="reservations-panel-header">
-          <h3>Mis ultimas reservas</h3>
+          <h3>Mis reservas y cambios</h3>
           <p className="reservations-panel-subtitle">
-            Puedes modificar una reserva hasta 2 horas antes de su inicio. Las reservas ya transcurridas se muestran sin acciones.
+            Las reservas futuras aparecen primero para que puedas modificarlas o cancelarlas cuando aun corresponda.
           </p>
         </div>
         {myReservations.length === 0 ? (
           <p className="reservations-empty">Aun no tienes reservas registradas.</p>
         ) : (
-          <div className="reservation-card-grid">
-            {myReservations.map((item) => {
-              const actionState = getReservationActionState(item)
-              return (
-                <article
-                  key={item.id}
-                  className={`reservation-user-card${focusedReservationId === item.id ? ' is-focused' : ''}`}
-                >
-                  <div className="reservation-user-card-head">
-                    <div>
-                      <span className="reservation-user-card-kicker">Reserva</span>
-                      <h4>{item.laboratory_name || labNameById[String(item.laboratory_id)] || 'Laboratorio'}</h4>
-                    </div>
-                    <span className={`reservations-status ${item.status}`}>{STATUS_LABELS[item.status] ?? item.status}</span>
-                  </div>
+          <>
+            <div className="reservations-panel-header">
+              <h4>Reservas futuras o vigentes</h4>
+              <p className="reservations-panel-subtitle">
+                Desde aqui puedes abrir el detalle, modificar o cancelar mientras la regla horaria lo permita.
+              </p>
+            </div>
 
-                  <div className="reservation-user-card-meta">
-                    <span>{item.date}</span>
-                    <span>{item.start_time} - {item.end_time}</span>
-                    <span>{item.purpose || 'Sin motivo registrado'}</span>
-                  </div>
-
-                  {item.cancel_reason ? (
-                    <p className="reservation-user-card-warning">Motivo de rechazo: {item.cancel_reason}</p>
-                  ) : null}
-
-                  <div className="reservation-user-card-actions">
-                    <button
-                      type="button"
-                      className="reservations-secondary"
-                      onClick={() => setFocusedReservationId(item.id)}
+            {upcomingReservations.length === 0 ? (
+              <p className="reservations-empty">No tienes reservas futuras disponibles para gestionar.</p>
+            ) : (
+              <div className="reservation-card-grid">
+                {upcomingReservations.map((item) => {
+                  const actionState = getReservationActionState(item)
+                  return (
+                    <article
+                      key={item.id}
+                      className={`reservation-user-card${focusedReservationId === item.id ? ' is-focused' : ''}`}
                     >
-                      Ver detalle
-                    </button>
+                      <div className="reservation-user-card-head">
+                        <div>
+                          <span className="reservation-user-card-kicker">Reserva</span>
+                          <h4>{item.laboratory_name || labNameById[String(item.laboratory_id)] || 'Laboratorio'}</h4>
+                        </div>
+                        <span className={`reservations-status ${item.status}`}>{STATUS_LABELS[item.status] ?? item.status}</span>
+                      </div>
 
-                    {actionState.canModify ? (
+                      <div className="reservation-user-card-meta">
+                        <span>{item.date}</span>
+                        <span>{item.start_time} - {item.end_time}</span>
+                        <span>{item.purpose || 'Sin motivo registrado'}</span>
+                      </div>
+
+                      {item.cancel_reason ? (
+                        <p className="reservation-user-card-warning">Motivo de rechazo: {item.cancel_reason}</p>
+                      ) : null}
+
+                      <div className="reservation-user-card-actions">
+                        <button
+                          type="button"
+                          className="reservations-secondary"
+                          onClick={() => handleOpenReservationDetails(item)}
+                        >
+                          Ver detalle
+                        </button>
+
+                        {actionState.canModify ? (
+                          <button
+                            type="button"
+                            className="reservations-secondary"
+                            onClick={() => openEditModal(item)}
+                          >
+                            Modificar
+                          </button>
+                        ) : null}
+
+                        {!actionState.canModify && !actionState.hasStarted && actionState.withinTwoHours ? (
+                          <button type="button" className="reservations-secondary" disabled>
+                            Modificar bloqueado
+                          </button>
+                        ) : null}
+
+                        {actionState.canCancel ? (
+                          <button
+                            type="button"
+                            className="reservations-danger"
+                            onClick={() => handleRequestCancel(item)}
+                          >
+                            Cancelar
+                          </button>
+                        ) : null}
+                      </div>
+
+                      {!actionState.hasStarted && actionState.withinTwoHours ? (
+                        <p className="reservation-inline-hint">
+                          Faltan menos de 2 horas para el inicio, por eso el boton de modificar esta deshabilitado.
+                        </p>
+                      ) : null}
+                    </article>
+                  )
+                })}
+              </div>
+            )}
+
+            <div className="reservations-panel-header reservation-history-header">
+              <h4>Historial reciente</h4>
+              <p className="reservations-panel-subtitle">
+                Las reservas ya transcurridas se muestran como referencia y sin acciones disponibles.
+              </p>
+            </div>
+
+            {reservationHistory.length === 0 ? (
+              <p className="reservations-empty">Aun no tienes reservas transcurridas en el historial.</p>
+            ) : (
+              <div className="reservation-card-grid">
+                {reservationHistory.map((item) => (
+                  <article
+                    key={item.id}
+                    className={`reservation-user-card${focusedReservationId === item.id ? ' is-focused' : ''}`}
+                  >
+                    <div className="reservation-user-card-head">
+                      <div>
+                        <span className="reservation-user-card-kicker">Reserva</span>
+                        <h4>{item.laboratory_name || labNameById[String(item.laboratory_id)] || 'Laboratorio'}</h4>
+                      </div>
+                      <span className={`reservations-status ${item.status}`}>{STATUS_LABELS[item.status] ?? item.status}</span>
+                    </div>
+
+                    <div className="reservation-user-card-meta">
+                      <span>{item.date}</span>
+                      <span>{item.start_time} - {item.end_time}</span>
+                      <span>{item.purpose || 'Sin motivo registrado'}</span>
+                    </div>
+
+                    {item.cancel_reason ? (
+                      <p className="reservation-user-card-warning">Motivo de rechazo: {item.cancel_reason}</p>
+                    ) : null}
+
+                    <div className="reservation-user-card-actions">
                       <button
                         type="button"
                         className="reservations-secondary"
-                        onClick={() => openEditModal(item)}
+                        onClick={() => handleOpenReservationDetails(item)}
                       >
-                        Modificar
+                        Ver detalle
                       </button>
-                    ) : null}
+                    </div>
 
-                    {!actionState.canModify && !actionState.hasStarted && actionState.withinTwoHours ? (
-                      <button type="button" className="reservations-secondary" disabled>
-                        Modificar bloqueado
-                      </button>
-                    ) : null}
-
-                    {actionState.canCancel ? (
-                      <button
-                        type="button"
-                        className="reservations-danger"
-                        onClick={() => handleRequestCancel(item)}
-                      >
-                        Cancelar
-                      </button>
-                    ) : null}
-                  </div>
-
-                  {actionState.hasStarted ? (
                     <p className="reservation-inline-hint">
                       Esta reserva ya transcurrio. Las acciones de modificar y cancelar ya no estan disponibles.
                     </p>
-                  ) : null}
-
-                  {!actionState.hasStarted && actionState.withinTwoHours ? (
-                    <p className="reservation-inline-hint">
-                      Faltan menos de 2 horas para el inicio, por eso el boton de modificar esta deshabilitado.
-                    </p>
-                  ) : null}
-                </article>
-              )
-            })}
-          </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </section>
 
@@ -942,11 +1387,58 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
         reservation={editingReservation}
         labs={labs}
         form={editForm}
+        slots={editSlots}
+        selectedSlotKey={editSelectedSlotKey}
+        isLoadingSlots={isLoadingEditSlots}
+        minDate={todayIso}
+        maxDate={maxReservationIso}
+        validationMessage={editValidationMessage}
+        onSelectSlot={handleEditSlotSelect}
+        getSlotKey={getSlotKey}
+        getSlotTone={getSlotTone}
+        getSlotLabel={getSlotLabel}
+        isSlotSelectable={isEditSlotSelectable}
         onChange={handleEditFormChange}
         onSubmit={handleEditSubmit}
         onClose={closeEditModal}
         isSubmitting={isSavingEdit}
       />
+
+      {isReservationDetailOpen && (focusedReservation || isLoadingReservationDetails) ? (
+        <ReservationDetailModal
+          reservation={focusedReservation}
+          actionState={focusedReservation ? getReservationActionState(focusedReservation) : null}
+          isLoading={isLoadingReservationDetails}
+          laboratoryName={
+            focusedReservation
+              ? (focusedReservation.laboratory_name || labNameById[String(focusedReservation.laboratory_id)] || 'Laboratorio')
+              : 'Laboratorio'
+          }
+          onClose={handleCloseReservationDetails}
+          onEdit={handleEditFromDetail}
+          onCancel={() => {
+            if (focusedReservation) {
+              handleCloseReservationDetails()
+              handleRequestCancel(focusedReservation)
+            }
+          }}
+        />
+      ) : null}
+
+      {focusedTutorial ? (
+        <TutorialSessionDetailModal
+          session={focusedTutorial}
+          title="Tutoria en este bloque"
+          onClose={() => setFocusedTutorial(null)}
+          primaryActionLabel={tutorialAction?.label || ''}
+          primaryActionHint={tutorialAction?.hint || ''}
+          onPrimaryAction={() => {
+            const sessionId = focusedTutorial?.id
+            setFocusedTutorial(null)
+            openTutorialSessionFlow(sessionId, { navigate: true })
+          }}
+        />
+      ) : null}
 
       {reservationToCancel ? (
         <ConfirmModal

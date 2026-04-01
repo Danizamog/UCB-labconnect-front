@@ -5,6 +5,15 @@ import './LoginView.css'
 
 const GOOGLE_SCRIPT_SRC = 'https://accounts.google.com/gsi/client'
 const GOOGLE_PROVIDERS = new Set(['google_oidc', 'google'])
+const ALLOW_GOOGLE_ON_LOCALHOST = String(import.meta.env.VITE_ENABLE_GOOGLE_ON_LOCALHOST || '').trim().toLowerCase() === 'true'
+
+function isLocalOrigin() {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  return ['localhost', '127.0.0.1'].includes(window.location.hostname)
+}
 
 function loadGoogleScript() {
   return new Promise((resolve, reject) => {
@@ -46,6 +55,7 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
   const googleButtonRef = useRef(null)
   const institutionalLoginRef = useRef(onInstitutionalLogin)
   const initializedGoogleClientIdRef = useRef('')
+  const suppressGoogleButton = isLocalOrigin() && !ALLOW_GOOGLE_ON_LOCALHOST
 
   useEffect(() => {
     institutionalLoginRef.current = onInstitutionalLogin
@@ -78,6 +88,7 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
     let isCancelled = false
 
     if (
+      suppressGoogleButton ||
       !institutionalConfig?.enabled ||
       !GOOGLE_PROVIDERS.has(institutionalConfig.provider) ||
       !institutionalConfig.client_id ||
@@ -135,7 +146,7 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
         window.google.accounts.id.cancel()
       }
     }
-  }, [institutionalConfig])
+  }, [institutionalConfig, suppressGoogleButton])
 
   const credentialsTabEnabled = useMemo(() => typeof onLogin === 'function', [onLogin])
 
@@ -209,6 +220,15 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
                 El proveedor institucional <strong>{institutionalConfig.provider}</strong> ya esta configurado en backend.
                 Esta interfaz aun no tiene renderizador visual para ese proveedor.
               </p>
+            ) : suppressGoogleButton ? (
+              <div className="google-local-warning">
+                <p className="google-helper">
+                  El acceso con Google se oculto en este entorno local para evitar errores <strong>403</strong> de origen no autorizado.
+                </p>
+                <p className="google-helper">
+                  Usa la pestana <strong>Credenciales</strong> o autoriza <strong>{typeof window !== 'undefined' ? window.location.origin : 'este origen'}</strong> en Google Cloud y define <code>VITE_ENABLE_GOOGLE_ON_LOCALHOST=true</code>.
+                </p>
+              </div>
             ) : institutionalConfig?.enabled ? (
               <>
                 <div ref={googleButtonRef} className="google-button-host" />

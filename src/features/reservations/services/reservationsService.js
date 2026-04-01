@@ -310,6 +310,15 @@ export async function listReservations(filters = {}) {
     })
 }
 
+export async function getReservationById(reservationId) {
+  if (!reservationId) {
+    throw new Error('No se pudo identificar la reserva seleccionada.')
+  }
+
+  const data = await request(`${reservationsBase}/reservations/${reservationId}`, { cacheTtlMs: 500 })
+  return mapReservation(data || {})
+}
+
 export async function listReservationsPage(filters = {}) {
   const search = new URLSearchParams()
   search.set('pageNumber', String(Math.max(Number(filters.pageNumber || 0), 0)))
