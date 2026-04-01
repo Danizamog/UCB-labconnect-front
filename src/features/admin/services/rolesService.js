@@ -1,20 +1,15 @@
+import { getAuthToken } from '../../../shared/utils/storage'
+
 const API_BASE_URL = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
 const ROLES_ENDPOINT = import.meta.env.VITE_ROLES_ENDPOINT || '/roles'
 const USERS_ENDPOINT = import.meta.env.VITE_ROLE_USERS_ENDPOINT || '/users'
-
-function getStoredToken() {
-  if (typeof window === 'undefined') {
-    return ''
-  }
-  return localStorage.getItem('token') || localStorage.getItem('access_token') || ''
-}
 
 function buildHeaders(token) {
   const headers = {
     'Content-Type': 'application/json',
   }
 
-  const resolvedToken = token || getStoredToken()
+  const resolvedToken = token || getAuthToken()
   if (resolvedToken) {
     headers.Authorization = `Bearer ${resolvedToken}`
   }

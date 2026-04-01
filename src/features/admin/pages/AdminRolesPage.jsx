@@ -270,24 +270,24 @@ function AdminRolesPage({ user, onSessionRefresh }) {
     <section className="roles-page" aria-label="Administración de roles">
       <header className="roles-header">
         <div className="roles-header-content">
-          <div>
-            <h2>Administración de roles</h2>
-            <p>Asigna y actualiza los permisos de acceso para cada usuario.</p>
-          </div>
-          <button
-            type="button"
-            className="roles-reload-button"
-            onClick={loadData}
-            disabled={loading}
-            title="Recargar datos de la base de datos"
-            aria-label="Recargar información de roles y usuarios"
-          >
-            🔄 {loading ? 'Cargando...' : 'Recargar'}
-          </button>
+          <p className="roles-header-kicker">Gestion operativa</p>
+          <h2>Administracion de roles</h2>
+          <p>Asigna y actualiza los permisos de acceso para cada usuario.</p>
         </div>
+        <button
+          type="button"
+          className="roles-reload-button"
+          onClick={loadData}
+          disabled={loading}
+          title="Recargar datos de la base de datos"
+          aria-label="Recargar informacion de roles y usuarios"
+        >
+          {loading ? 'Cargando...' : 'Recargar'}
+        </button>
       </header>
 
-      <div className="roles-tabs" role="tablist" aria-label="Gestión de roles">
+      <div className="roles-body">
+      <div className="roles-tabs" role="tablist" aria-label="Gestion de roles">
         <button
           type="button"
           role="tab"
@@ -668,6 +668,7 @@ function AdminRolesPage({ user, onSessionRefresh }) {
           </div>
         ) : null
       })() : null}
+      </div>
     </section>
   )
 }

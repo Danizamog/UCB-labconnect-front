@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  clearStoredSession,
-  SESSION_CLEARED_EVENT,
-  signIn,
-  signInWithInstitutionalSSO,
-  validateSession,
-} from '../services/authService'
+import { clearStoredSession, signIn, signInWithInstitutionalSSO, validateSession } from '../services/authService'
 
 const SESSION_REFRESH_COOLDOWN_MS = 15000
 
@@ -23,6 +17,11 @@ export function useAuthStore() {
   )
   const refreshInFlightRef = useRef(null)
   const lastRefreshAtRef = useRef(0)
+  const userRef = useRef(user)
+
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
 
   const applyAuthenticatedUser = useCallback((nextUser) => {
     setIsAuthenticated(true)
@@ -62,7 +61,7 @@ export function useAuthStore() {
     }
 
     if (!force && now - lastRefreshAtRef.current < SESSION_REFRESH_COOLDOWN_MS) {
-      return { success: true, skipped: true, user }
+      return { success: true, skipped: true, user: userRef.current }
     }
 
     const refreshPromise = validateSession()
@@ -83,7 +82,7 @@ export function useAuthStore() {
 
     refreshInFlightRef.current = null
     return response
-  }, [applyAuthenticatedUser, clearSession, user])
+  }, [applyAuthenticatedUser, clearSession])
 
   useEffect(() => {
     if (!localStorage.getItem('token') && !localStorage.getItem('access_token')) {
@@ -110,18 +109,6 @@ export function useAuthStore() {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [refreshSession])
-
-  useEffect(() => {
-    const handleSessionCleared = () => {
-      setIsAuthenticated(false)
-      setUser(null)
-    }
-
-    window.addEventListener(SESSION_CLEARED_EVENT, handleSessionCleared)
-    return () => {
-      window.removeEventListener(SESSION_CLEARED_EVENT, handleSessionCleared)
-    }
-  }, [])
 
   const logout = () => {
     clearSession()

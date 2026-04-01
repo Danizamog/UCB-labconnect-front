@@ -1,65 +1,83 @@
 .roles-page {
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding: clamp(16px, 2vw, 24px);
-  background: linear-gradient(135deg, var(--surface-100) 0%, rgba(6, 77, 144, 0.02) 100%);
+  flex: 1;
+  display: grid;
+  gap: 0;
+  align-content: start;
 }
 
 .roles-header {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 24px;
+  padding: clamp(20px, 2.8vw, 32px) clamp(20px, 3vw, 40px);
+  background: linear-gradient(135deg, #0a2540 0%, #0d3260 55%, #0a3d72 100%);
+  color: #fff;
+}
+
+.roles-header-kicker {
+  margin: 0 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(252, 208, 37, 0.8);
 }
 
 .roles-header-content {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .roles-header h2 {
   font-family: var(--font-display);
-  font-size: clamp(1.5rem, 2.5vw, 2rem);
-  color: var(--ink-900);
-  margin: 0;
+  font-size: clamp(1.6rem, 2.8vw, 2.2rem);
+  color: #fff;
+  margin: 0 0 8px;
+  line-height: 1.1;
 }
 
 .roles-header p {
-  margin: 6px 0 0 0;
-  color: var(--ink-700);
+  margin: 0;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.95rem;
 }
 
 .roles-reload-button {
-  border: 1px solid var(--line-300);
-  border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  background: var(--surface-100);
-  color: var(--ucb-blue);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background 0.15s, border-color 0.15s;
   white-space: nowrap;
   flex-shrink: 0;
+  font: inherit;
+  font-size: 0.875rem;
 }
 
 .roles-reload-button:hover:not(:disabled) {
-  background: rgba(6, 77, 144, 0.08);
-  border-color: var(--ucb-blue);
-  box-shadow: 0 2px 8px rgba(6, 77, 144, 0.1);
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.45);
 }
 
 .roles-reload-button:active:not(:disabled) {
-  transform: translateY(0);
+  transform: scale(0.98);
 }
 
 .roles-reload-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.roles-body {
+  padding: clamp(16px, 2.5vw, 28px) clamp(16px, 3vw, 40px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .roles-toolbar {
@@ -791,11 +809,22 @@
   cursor: not-allowed;
 }
 
+/* Header responsive */
+@media (max-width: 860px) {
+  .roles-header {
+    grid-template-columns: 1fr;
+  }
+
+  .roles-reload-button {
+    align-self: flex-start;
+  }
+}
+
 /* Mobile / Small Phones (320px - 479px) */
 @media (max-width: 479px) {
-  .roles-page {
-    padding: clamp(12px, 3vw, 16px);
-    gap: 12px;
+  .roles-body {
+    padding: 14px 16px;
+    gap: 14px;
   }
 
   .roles-header h2 {
@@ -804,16 +833,6 @@
 
   .roles-header p {
     font-size: 0.85rem;
-  }
-
-  .roles-header-content {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .roles-reload-button {
-    width: 100%;
-    text-align: center;
   }
 
   .roles-toolbar {
@@ -979,22 +998,12 @@
 
 /* Tablets / Medium Phones (480px - 767px) */
 @media (min-width: 480px) and (max-width: 767px) {
-  .roles-page {
-    padding: clamp(14px, 2vw, 16px);
-    gap: 14px;
+  .roles-body {
+    padding: 16px 20px;
   }
 
   .roles-header h2 {
     font-size: clamp(1.35rem, 4vw, 1.65rem);
-  }
-
-  .roles-header-content {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .roles-reload-button {
-    width: 100%;
   }
 
   .roles-toolbar {
@@ -1067,15 +1076,6 @@
 
 /* Larger Tablets / Small Desktops (768px - 1023px) */
 @media (min-width: 768px) and (max-width: 1023px) {
-  .roles-page {
-    padding: clamp(16px, 2vw, 20px);
-    gap: 18px;
-  }
-
-  .roles-header-content {
-    align-items: center;
-    justify-content: space-between;
-  }
 
   .roles-form-card {
     padding: 18px;
