@@ -1,0 +1,151 @@
+.reservation-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(10, 20, 34, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.reservation-modal {
+  width: min(720px, 100%);
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(252, 208, 37, 0.16), transparent 24%),
+    #fff;
+  border: 1px solid rgba(10, 53, 89, 0.08);
+  box-shadow: 0 30px 60px rgba(10, 20, 34, 0.25);
+}
+
+.reservation-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.reservation-modal-kicker {
+  margin: 0 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--ucb-blue);
+}
+
+.reservation-modal-header h3 {
+  margin: 0 0 6px;
+  font-size: 1.2rem;
+  color: var(--ink-900);
+}
+
+.reservation-modal-header p {
+  margin: 0;
+  color: var(--ink-700);
+  line-height: 1.6;
+}
+
+.reservation-modal-close {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(10, 53, 89, 0.12);
+  background: rgba(10, 53, 89, 0.06);
+  color: var(--ink-900);
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.reservation-modal-form {
+  display: grid;
+  gap: 14px;
+}
+
+.reservation-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.reservation-modal-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--ink-700);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.reservation-modal-form input,
+.reservation-modal-form select,
+.reservation-modal-form textarea {
+  border: 1.5px solid var(--line-300);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font: inherit;
+  background: #fbfcfd;
+  color: var(--ink-900);
+}
+
+.reservation-modal-form input:focus,
+.reservation-modal-form select:focus,
+.reservation-modal-form textarea:focus {
+  outline: none;
+  border-color: rgba(6, 77, 144, 0.5);
+  box-shadow: 0 0 0 3px rgba(6, 77, 144, 0.08);
+  background: #fff;
+}
+
+.reservation-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.reservation-modal-primary,
+.reservation-modal-secondary {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.reservation-modal-primary {
+  background: linear-gradient(135deg, #0a3559, #1255a0);
+  color: #fff;
+}
+
+.reservation-modal-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.reservation-modal-secondary {
+  background: rgba(10, 53, 89, 0.08);
+  color: var(--ink-900);
+  border: 1px solid rgba(10, 53, 89, 0.12);
+}
+
+@media (max-width: 640px) {
+  .reservation-modal {
+    padding: 18px;
+  }
+
+  .reservation-modal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reservation-modal-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
