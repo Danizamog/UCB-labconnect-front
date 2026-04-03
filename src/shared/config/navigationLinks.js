@@ -4,6 +4,7 @@ export const APP_ROOT_PATH = '/app'
 export const NAVIGATION_LINKS = [
   { id: 'home', label: 'Inicio', icon: 'home', path: APP_ROOT_PATH },
   { id: 'admin_reservas', label: 'Reservas Lab', icon: 'admin_reservas', path: '/app/admin/reservas', requiredAnyPermission: ['*', 'gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'] },
+  { id: 'penalties', label: 'Penalizaciones', icon: 'penalties', path: '/app/admin/penalizaciones', requiredAnyPermission: ['*', 'gestionar_penalizaciones'] },
   { id: 'profiles', label: 'Perfiles', icon: 'profiles', path: '/app/admin/perfiles', requiredAnyPermission: ['*', 'gestionar_roles_permisos', 'reactivar_cuentas'] },
   { id: 'roles', label: 'Roles', icon: 'roles', path: '/app/admin/roles', requiredAnyPermission: ['*', 'gestionar_roles_permisos'] },
   { id: 'areas', label: 'Areas', icon: 'areas', path: '/app/admin/areas', requiredAnyPermission: ['*', 'gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'] },

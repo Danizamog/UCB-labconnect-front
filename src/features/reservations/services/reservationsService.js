@@ -69,6 +69,34 @@ function mapReservation(record) {
   }
 }
 
+function mapPenalty(record) {
+  return {
+    id: record?.id || '',
+    user_id: record?.user_id || '',
+    user_name: record?.user_name || '',
+    user_email: record?.user_email || '',
+    reason: record?.reason || '',
+    evidence_type: record?.evidence_type || 'damage_report',
+    evidence_report_id: record?.evidence_report_id || '',
+    asset_id: record?.asset_id || '',
+    related_reservation_id: record?.related_reservation_id || '',
+    starts_at: record?.starts_at || '',
+    ends_at: record?.ends_at || '',
+    notes: record?.notes || '',
+    status: record?.status || 'scheduled',
+    is_active: Boolean(record?.is_active),
+    email_sent: Boolean(record?.email_sent),
+    created_at: record?.created_at || '',
+    updated_at: record?.updated_at || '',
+    created_by: record?.created_by || '',
+    created_by_name: record?.created_by_name || '',
+    lifted_at: record?.lifted_at || '',
+    lifted_by: record?.lifted_by || '',
+    lifted_by_name: record?.lifted_by_name || '',
+    lift_reason: record?.lift_reason || '',
+  }
+}
+
 export async function listAvailableLabs() {
   const labs = await listAdminLabs()
   return labs.filter((lab) => lab.is_active !== false)
@@ -135,6 +163,50 @@ export async function getLabAvailability(laboratoryId, day) {
 
   const search = new URLSearchParams({ day })
   return request(`${reservationsBase}/availability/labs/${laboratoryId}?${search.toString()}`)
+}
+
+export async function listMyPenalties() {
+  const data = await request(`${reservationsBase}/penalties/mine`)
+  return Array.isArray(data) ? data.map(mapPenalty) : []
+}
+
+export async function listPenalties(filters = {}) {
+  const search = new URLSearchParams()
+  if (filters.active_only) {
+    search.set('active_only', 'true')
+  }
+  const query = search.toString() ? `?${search.toString()}` : ''
+  const data = await request(`${reservationsBase}/penalties${query}`)
+  return Array.isArray(data) ? data.map(mapPenalty) : []
+}
+
+export async function createPenalty(payload) {
+  const record = await request(`${reservationsBase}/penalties`, {
+    method: 'POST',
+    body: JSON.stringify({
+      user_id: String(payload.user_id || '').trim(),
+      user_name: String(payload.user_name || '').trim(),
+      user_email: String(payload.user_email || '').trim().toLowerCase(),
+      reason: String(payload.reason || '').trim(),
+      evidence_type: String(payload.evidence_type || 'damage_report'),
+      evidence_report_id: String(payload.evidence_report_id || '').trim(),
+      asset_id: String(payload.asset_id || '').trim(),
+      starts_at: String(payload.starts_at || '').trim(),
+      ends_at: String(payload.ends_at || '').trim(),
+      notes: String(payload.notes || '').trim(),
+    }),
+  })
+  return mapPenalty(record)
+}
+
+export async function liftPenalty(penaltyId, options = {}) {
+  const data = await request(`${reservationsBase}/penalties/${penaltyId}/lift`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      lift_reason: String(options.lift_reason || '').trim(),
+    }),
+  })
+  return mapPenalty(data?.penalty || {})
 }
 
 export function subscribeReservationsRealtime(onMessage) {

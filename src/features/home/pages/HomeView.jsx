@@ -5,6 +5,7 @@ import AdminLaboratoriosPage from '../../admin/pages/AdminLaboratoriosPage'
 import AdminMaterialesPage from '../../admin/pages/AdminMaterialesPage'
 import AdminProfilesPage from '../../admin/pages/AdminProfilesPage'
 import AdminRolesPage from '../../admin/pages/AdminRolesPage'
+import AdminPenaltiesPage from '../../reservations/pages/AdminPenaltiesPage'
 import AdminReservationsPage from '../../reservations/pages/AdminReservationsPage'
 import UserAvailabilityCalendarPage from '../../reservations/pages/UserAvailabilityCalendarPage'
 import UserReserveLabPage from '../../reservations/pages/UserReserveLabPage'
@@ -25,9 +26,10 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
   const canManageRoles = hasAnyPermission(user, ['gestionar_roles_permisos'])
   const canManageProfiles = hasAnyPermission(user, ['gestionar_roles_permisos', 'reactivar_cuentas'])
   const canManageStructure = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
+  const canManagePenalties = hasAnyPermission(user, ['gestionar_penalizaciones'])
   const canManageEquipos = hasAnyPermission(user, ['gestionar_inventario', 'gestionar_estado_equipos', 'gestionar_mantenimiento'])
   const canManageMateriales = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos'])
-  const hasManagementModules = canManageRoles || canManageProfiles || canManageStructure || canManageEquipos || canManageMateriales
+  const hasManagementModules = canManageRoles || canManageProfiles || canManageStructure || canManagePenalties || canManageEquipos || canManageMateriales
   const activeSection = getSectionIdFromPath(currentPath) || 'home'
 
   useEffect(() => {
@@ -36,6 +38,7 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
     const canAccessCurrentSection =
       activeSection === 'home' ||
       (activeSection === 'admin_reservas' && canManageStructure) ||
+      (activeSection === 'penalties' && canManagePenalties) ||
       (activeSection === 'profiles' && canManageProfiles) ||
       (activeSection === 'roles' && canManageRoles) ||
       (activeSection === 'areas' && canManageStructure) ||
@@ -57,6 +60,7 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
     activeSection,
     canManageEquipos,
     canManageMateriales,
+    canManagePenalties,
     canManageProfiles,
     canManageRoles,
     canManageStructure,
@@ -78,6 +82,7 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
           {canManageProfiles && activeSection === 'profiles' ? <AdminProfilesPage user={user} /> : null}
           {canManageRoles && activeSection === 'roles' ? <AdminRolesPage user={user} onSessionRefresh={onRefreshSession} /> : null}
           {canManageStructure && activeSection === 'admin_reservas' ? <AdminReservationsPage user={user} /> : null}
+          {canManagePenalties && activeSection === 'penalties' ? <AdminPenaltiesPage user={user} /> : null}
           {canManageStructure && activeSection === 'areas' ? <AdminAreasPage user={user} /> : null}
           {canManageStructure && activeSection === 'laboratorios' ? <AdminLaboratoriosPage user={user} /> : null}
           {canManageEquipos && activeSection === 'equipos' ? <AdminEquiposPage user={user} /> : null}

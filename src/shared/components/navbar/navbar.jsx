@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  AlertOctagon,
   FlaskConical,
   House,
   Layers,
@@ -19,6 +20,7 @@ import './navbar.css'
 const iconMap = {
   home: House,
   admin_reservas: Users,
+  penalties: AlertOctagon,
   profiles: UserRound,
   roles: Users,
   areas: Layers,
