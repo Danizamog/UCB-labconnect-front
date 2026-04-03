@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   createReservation,
   listAvailableLabs,
+  listMyPenalties,
   listReservations,
   subscribeReservationsRealtime,
 } from '../services/reservationsService'
@@ -20,18 +21,21 @@ const STATUS_LABELS = { pending: 'Pendiente', approved: 'Aprobada', rejected: 'R
 function UserReserveLabPage({ user }) {
   const [labs, setLabs] = useState([])
   const [reservations, setReservations] = useState([])
+  const [penalties, setPenalties] = useState([])
   const [form, setForm] = useState(defaultForm)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
   const loadData = async () => {
     try {
-      const [labsData, reservationsData] = await Promise.all([
+      const [labsData, reservationsData, penaltiesData] = await Promise.all([
         listAvailableLabs(),
         listReservations(),
+        listMyPenalties(),
       ])
       setLabs(labsData)
       setReservations(reservationsData)
+      setPenalties(penaltiesData)
       if (!form.laboratory_id && labsData.length > 0) {
         setForm((prev) => ({ ...prev, laboratory_id: labsData[0].id }))
       }
@@ -47,6 +51,18 @@ function UserReserveLabPage({ user }) {
     const unsubscribe = subscribeReservationsRealtime((event) => {
       if (event?.topic === 'lab_reservation') {
         loadData()
+        return
+      }
+
+      if (event?.topic === 'user_penalty') {
+        const recipients = Array.isArray(event?.recipients) ? event.recipients : []
+        const isCurrentUserPenalty =
+          event?.record?.user_id === (user?.user_id || '') ||
+          recipients.includes(user?.user_id || '')
+
+        if (isCurrentUserPenalty) {
+          loadData()
+        }
       }
     })
 
@@ -63,6 +79,11 @@ function UserReserveLabPage({ user }) {
     [reservations, user],
   )
 
+  const activePenalty = useMemo(
+    () => penalties.find((penalty) => penalty.is_active) || null,
+    [penalties],
+  )
+
   const labNameById = useMemo(
     () => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])),
     [labs],
@@ -72,6 +93,11 @@ function UserReserveLabPage({ user }) {
     event.preventDefault()
     setError('')
     setMessage('')
+
+    if (activePenalty) {
+      setError(`Tu cuenta tiene una penalizacion activa. Motivo: ${activePenalty.reason}`)
+      return
+    }
 
     try {
       await createReservation(
@@ -104,16 +130,31 @@ function UserReserveLabPage({ user }) {
       {message ? <p className="reservations-message success">{message}</p> : null}
       {error ? <p className="reservations-message error">{error}</p> : null}
 
+      {activePenalty ? (
+        <section className="reservations-panel reservation-suspension-banner" aria-label="Cuenta suspendida">
+          <div className="reservation-suspension-copy">
+            <strong>Cuenta suspendida para nuevas reservas</strong>
+            <p>
+              Tienes una penalizacion activa por danos registrados. Motivo: <strong>{activePenalty.reason}</strong>.
+            </p>
+            <p>
+              Restriccion vigente hasta <strong>{activePenalty.ends_at}</strong>.
+              {activePenalty.evidence_report_id ? ` Evidencia: ${activePenalty.evidence_type} #${activePenalty.evidence_report_id}.` : ''}
+            </p>
+          </div>
+        </section>
+      ) : null}
+
       <section className="reservations-panel">
         <form className="reservations-form" onSubmit={handleSubmit}>
-
           <div className="reservations-form-section">
-            <span className="reservations-form-section-label">1 — Laboratorio</span>
+            <span className="reservations-form-section-label">1 - Laboratorio</span>
             <label>
               <span>Laboratorio</span>
               <select
                 value={form.laboratory_id}
                 onChange={(event) => setForm((prev) => ({ ...prev, laboratory_id: event.target.value }))}
+                disabled={Boolean(activePenalty)}
                 required
               >
                 <option value="">Selecciona un laboratorio</option>
@@ -125,7 +166,7 @@ function UserReserveLabPage({ user }) {
           </div>
 
           <div className="reservations-form-section">
-            <span className="reservations-form-section-label">2 — Fecha y Horario</span>
+            <span className="reservations-form-section-label">2 - Fecha y Horario</span>
             <div className="reservations-form-grid">
               <label>
                 <span>Fecha</span>
@@ -133,6 +174,7 @@ function UserReserveLabPage({ user }) {
                   type="date"
                   value={form.date}
                   onChange={(event) => setForm((prev) => ({ ...prev, date: event.target.value }))}
+                  disabled={Boolean(activePenalty)}
                   required
                 />
               </label>
@@ -142,6 +184,7 @@ function UserReserveLabPage({ user }) {
                   type="time"
                   value={form.start_time}
                   onChange={(event) => setForm((prev) => ({ ...prev, start_time: event.target.value }))}
+                  disabled={Boolean(activePenalty)}
                   required
                 />
               </label>
@@ -151,6 +194,7 @@ function UserReserveLabPage({ user }) {
                   type="time"
                   value={form.end_time}
                   onChange={(event) => setForm((prev) => ({ ...prev, end_time: event.target.value }))}
+                  disabled={Boolean(activePenalty)}
                   required
                 />
               </label>
@@ -158,21 +202,24 @@ function UserReserveLabPage({ user }) {
           </div>
 
           <div className="reservations-form-section">
-            <span className="reservations-form-section-label">3 — Motivo</span>
+            <span className="reservations-form-section-label">3 - Motivo</span>
             <label>
               <span>Motivo de la reserva</span>
               <textarea
                 rows="4"
                 value={form.purpose}
                 onChange={(event) => setForm((prev) => ({ ...prev, purpose: event.target.value }))}
-                placeholder="Ej. Práctica de laboratorio de redes, proyecto de tesis..."
+                placeholder="Ej. Practica de laboratorio de redes, proyecto de tesis..."
+                disabled={Boolean(activePenalty)}
                 required
               />
             </label>
           </div>
 
           <div className="reservations-actions">
-            <button type="submit" className="reservations-primary">Enviar solicitud</button>
+            <button type="submit" className="reservations-primary" disabled={Boolean(activePenalty)}>
+              {activePenalty ? 'Reserva bloqueada' : 'Enviar solicitud'}
+            </button>
           </div>
         </form>
       </section>
