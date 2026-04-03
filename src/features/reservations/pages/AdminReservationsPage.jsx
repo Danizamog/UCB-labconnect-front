@@ -1,13 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   listReservations,
+  markReservationAbsent,
+  markReservationCheckIn,
+  markReservationCheckOut,
   subscribeReservationsRealtime,
   updateReservationStatus,
 } from '../services/reservationsService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import './ReservationsPages.css'
 
-const STATUS_LABELS = { pending: 'Pendiente', approved: 'Aprobada', rejected: 'Rechazada', cancelled: 'Cancelada' }
+const STATUS_LABELS = {
+  pending: 'Pendiente',
+  approved: 'Aprobada',
+  in_progress: 'En curso',
+  completed: 'Completada',
+  absent: 'Ausente',
+  rejected: 'Rechazada',
+  cancelled: 'Cancelada',
+}
 
 function AdminReservationsPage({ user }) {
   const [statusFilter, setStatusFilter] = useState('all')
@@ -46,6 +57,7 @@ function AdminReservationsPage({ user }) {
 
   const pendingCount = reservations.filter((item) => item.status === 'pending').length
   const approvedCount = reservations.filter((item) => item.status === 'approved').length
+  const inProgressCount = reservations.filter((item) => item.status === 'in_progress').length
 
   const handleUpdate = async (reservationId, status) => {
     if (!canManage) return
@@ -57,6 +69,45 @@ function AdminReservationsPage({ user }) {
       await loadData()
     } catch (err) {
       setError(err.message || 'No se pudo actualizar la reserva.')
+    }
+  }
+
+  const handleCheckIn = async (reservationId) => {
+    if (!canManage) return
+    setError('')
+    setMessage('')
+    try {
+      await markReservationCheckIn(reservationId)
+      setMessage('Ingreso registrado correctamente.')
+      await loadData()
+    } catch (err) {
+      setError(err.message || 'No se pudo registrar el ingreso.')
+    }
+  }
+
+  const handleCheckOut = async (reservationId) => {
+    if (!canManage) return
+    setError('')
+    setMessage('')
+    try {
+      await markReservationCheckOut(reservationId)
+      setMessage('Salida registrada correctamente.')
+      await loadData()
+    } catch (err) {
+      setError(err.message || 'No se pudo registrar la salida.')
+    }
+  }
+
+  const handleAbsent = async (reservationId) => {
+    if (!canManage) return
+    setError('')
+    setMessage('')
+    try {
+      await markReservationAbsent(reservationId)
+      setMessage('Reserva marcada como ausente.')
+      await loadData()
+    } catch (err) {
+      setError(err.message || 'No se pudo marcar la reserva como ausente.')
     }
   }
 
@@ -72,6 +123,7 @@ function AdminReservationsPage({ user }) {
           <div><span>Total</span><strong>{reservations.length}</strong></div>
           <div><span>Pendientes</span><strong>{pendingCount}</strong></div>
           <div><span>Aprobadas</span><strong>{approvedCount}</strong></div>
+          <div><span>En curso</span><strong>{inProgressCount}</strong></div>
         </div>
       </header>
 
@@ -86,6 +138,9 @@ function AdminReservationsPage({ user }) {
               <option value="all">Todos</option>
               <option value="pending">Pendientes</option>
               <option value="approved">Aprobadas</option>
+              <option value="in_progress">En curso</option>
+              <option value="completed">Completadas</option>
+              <option value="absent">Ausentes</option>
               <option value="rejected">Rechazadas</option>
               <option value="cancelled">Canceladas</option>
             </select>
@@ -137,6 +192,30 @@ function AdminReservationsPage({ user }) {
                         onClick={() => handleUpdate(item.id, 'rejected')}
                       >
                         Rechazar
+                      </button>
+                      <button
+                        type="button"
+                        className="reservations-primary"
+                        disabled={!canManage || !['approved', 'in_progress'].includes(item.status)}
+                        onClick={() => handleCheckIn(item.id)}
+                      >
+                        Ingreso
+                      </button>
+                      <button
+                        type="button"
+                        className="reservations-primary"
+                        disabled={!canManage || item.status !== 'in_progress'}
+                        onClick={() => handleCheckOut(item.id)}
+                      >
+                        Salida
+                      </button>
+                      <button
+                        type="button"
+                        className="reservations-danger"
+                        disabled={!canManage || item.status !== 'approved'}
+                        onClick={() => handleAbsent(item.id)}
+                      >
+                        Ausente
                       </button>
                     </div>
                   </td>

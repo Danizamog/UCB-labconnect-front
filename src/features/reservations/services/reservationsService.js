@@ -128,6 +128,27 @@ export async function updateReservationStatus(reservationId, status, actor = 'ad
   return mapReservation(record)
 }
 
+export async function markReservationCheckIn(reservationId) {
+  const record = await request(`${reservationsBase}/reservations/${reservationId}/check-in`, {
+    method: 'PATCH',
+  })
+  return mapReservation(record)
+}
+
+export async function markReservationCheckOut(reservationId) {
+  const record = await request(`${reservationsBase}/reservations/${reservationId}/check-out`, {
+    method: 'PATCH',
+  })
+  return mapReservation(record)
+}
+
+export async function markReservationAbsent(reservationId) {
+  const record = await request(`${reservationsBase}/reservations/${reservationId}/absent`, {
+    method: 'PATCH',
+  })
+  return mapReservation(record)
+}
+
 export async function getLabAvailability(laboratoryId, day) {
   if (!laboratoryId || !day) {
     return { slots: [], slot_minutes: 60 }
