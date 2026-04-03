@@ -103,10 +103,15 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
               ) : (
                 <>
                   <div className="home-hero">
-                    <img src={ucbEscudoLogo} alt="UCB Escudo" className="home-hero-logo" />
+                    <a href="https://www.ucb.edu.bo" target="_blank" rel="noopener noreferrer" className="home-hero-link">
+                      <img src={ucbEscudoLogo} alt="UCB Escudo" className="home-hero-logo" />
+                    </a>
                     <div className="home-hero-meta">
                       <h2>Universidad Católica Boliviana San Pablo</h2>
                       <p>Desde 1966 formando profesionales comprometidos con la excelencia académica y la responsabilidad social.</p>
+                      <a href="https://www.ucb.edu.bo" target="_blank" rel="noopener noreferrer" className="home-hero-btn">
+                        Visitar sitio oficial →
+                      </a>
                     </div>
                   </div>
 
@@ -142,6 +147,58 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
                         <strong>Laboratorios de Administración</strong>
                         <p>Sistemas de Información y Negocios</p>
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="home-section">
+                    <h3 className="home-section-title">Acciones Rápidas</h3>
+                    <div className="home-quick-actions">
+                      <button 
+                        className="home-action-btn home-action-reserve"
+                        onClick={() => onNavigate?.('/reserve')}
+                      >
+                        <span className="action-icon">📅</span>
+                        <div className="action-content">
+                          <strong>Reservar Laboratorio</strong>
+                          <p>Accede a la disponibilidad de espacios</p>
+                        </div>
+                      </button>
+                      <button 
+                        className="home-action-btn home-action-calendar"
+                        onClick={() => onNavigate?.('/calendar')}
+                      >
+                        <span className="action-icon">📋</span>
+                        <div className="action-content">
+                          <strong>Mi Calendario</strong>
+                          <p>Consulta tus reservas activas</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="home-section">
+                    <h3 className="home-section-title">Enlaces Útiles</h3>
+                    <div className="home-links-grid">
+                      <a href="https://www.ucb.edu.bo" target="_blank" rel="noopener noreferrer" className="home-link-card">
+                        <span className="link-icon">🏫</span>
+                        <strong>Sitio Web UCB</strong>
+                        <p>Página principal de la Universidad</p>
+                      </a>
+                      <a href="https://www.ucb.edu.bo/carreras" target="_blank" rel="noopener noreferrer" className="home-link-card">
+                        <span className="link-icon">📚</span>
+                        <strong>Programas Académicos</strong>
+                        <p>Conoce nuestras licenciaturas</p>
+                      </a>
+                      <a href="https://www.ucb.edu.bo/contacto" target="_blank" rel="noopener noreferrer" className="home-link-card">
+                        <span className="link-icon">📧</span>
+                        <strong>Contacto</strong>
+                        <p>Datos de comunicación y ubicación</p>
+                      </a>
+                      <a href="https://www.ucb.edu.bo" target="_blank" rel="noopener noreferrer" className="home-link-card">
+                        <span className="link-icon">🌐</span>
+                        <strong>Portal UCB</strong>
+                        <p>Acceso a recursos universitarios</p>
+                      </a>
                     </div>
                   </div>
 
