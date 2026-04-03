@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import {
+  AlertOctagon,
+  BookOpenCheck,
+  CalendarPlus,
   FlaskConical,
   House,
   Layers,
@@ -21,11 +24,14 @@ const iconMap = {
   admin_reservas: Users,
   profiles: UserRound,
   roles: Users,
+  penalties: AlertOctagon,
   areas: Layers,
   laboratorios: FlaskConical,
   equipos: MonitorCog,
   materiales: Package,
   calendar: Layers,
+  tutorials_manage: CalendarPlus,
+  tutorials_public: BookOpenCheck,
   reserve: FlaskConical,
   logout: LogOut,
 }
