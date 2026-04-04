@@ -61,10 +61,20 @@ function AdminReservationsPage({ user }) {
 
   const handleUpdate = async (reservationId, status) => {
     if (!canManage) return
+
+    let cancelReason = ''
+    if (status === 'rejected') {
+      cancelReason = window.prompt('Escribe el motivo de rechazo:')?.trim() || ''
+      if (!cancelReason) {
+        setError('Debes ingresar el motivo de rechazo para rechazar la reserva.')
+        return
+      }
+    }
+
     setError('')
     setMessage('')
     try {
-      await updateReservationStatus(reservationId, status, user?.username || user?.name || 'admin')
+      await updateReservationStatus(reservationId, status, { cancel_reason: cancelReason })
       setMessage('Estado actualizado correctamente.')
       await loadData()
     } catch (err) {
@@ -196,7 +206,7 @@ function AdminReservationsPage({ user }) {
                       <button
                         type="button"
                         className="reservations-primary"
-                        disabled={!canManage || !['approved', 'in_progress'].includes(item.status)}
+                        disabled={!canManage || item.status !== 'approved'}
                         onClick={() => handleCheckIn(item.id)}
                       >
                         Ingreso

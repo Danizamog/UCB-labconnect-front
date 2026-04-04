@@ -1,4 +1,5 @@
 import { listAdminLabs } from '../../admin/services/infrastructureService'
+import { listUserProfiles } from '../../admin/services/profileService'
 import { getAuthToken } from '../../../shared/utils/storage'
 
 const gatewayBase = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
@@ -20,6 +21,30 @@ async function parseJson(response, fallback) {
   return response.json().catch(() => fallback)
 }
 
+function normalizeErrorDetail(detail, fallbackMessage) {
+  if (typeof detail === 'string' && detail.trim()) {
+    return detail
+  }
+
+  if (detail && typeof detail === 'object') {
+    if (typeof detail.message === 'string' && detail.message.trim()) {
+      return detail.message
+    }
+
+    if (detail.data && typeof detail.data === 'object') {
+      const firstEntry = Object.entries(detail.data)[0]
+      if (firstEntry) {
+        const [field, value] = firstEntry
+        if (value && typeof value === 'object' && typeof value.message === 'string' && value.message.trim()) {
+          return `${field}: ${value.message}`
+        }
+      }
+    }
+  }
+
+  return fallbackMessage
+}
+
 async function request(url, options = {}) {
   const response = await fetch(url, {
     ...options,
@@ -31,7 +56,8 @@ async function request(url, options = {}) {
 
   const data = await parseJson(response, null)
   if (!response.ok) {
-    throw new Error(data?.detail || `Error ${response.status}`)
+    const message = normalizeErrorDetail(data?.detail, `Error ${response.status}`)
+    throw new Error(message)
   }
   return data
 }
@@ -43,18 +69,49 @@ function splitDateTime(isoDateTime = '') {
   return { date: datePart, time: hhmm }
 }
 
-function mapReservation(record) {
+function buildLabsMap(labs) {
+  const map = new Map()
+  ;(Array.isArray(labs) ? labs : []).forEach((lab) => {
+    const id = String(lab?.id || '').trim()
+    if (!id) return
+    map.set(id, String(lab?.name || lab?.title || id).trim() || id)
+  })
+  return map
+}
+
+function buildUsersMap(users) {
+  const map = new Map()
+  ;(Array.isArray(users) ? users : []).forEach((user) => {
+    const id = String(user?.id || '').trim()
+    if (!id) return
+    map.set(id, {
+      name: String(user?.name || user?.username || id).trim() || id,
+      email: String(user?.username || '').trim(),
+    })
+  })
+  return map
+}
+
+function mapReservation(record, context = {}) {
+  const labsMap = context.labsMap instanceof Map ? context.labsMap : new Map()
+  const usersMap = context.usersMap instanceof Map ? context.usersMap : new Map()
   const { date: startDate, time: startTime } = splitDateTime(record?.start_at)
   const { date: endDate, time: endTime } = splitDateTime(record?.end_at)
+  const laboratoryId = String(record?.laboratory_id || '').trim()
+  const requesterId = String(record?.requested_by || '').trim()
+  const requester = usersMap.get(requesterId)
+  const resolvedLabName = String(record?.laboratory_name || '').trim() || labsMap.get(laboratoryId) || laboratoryId
+  const resolvedRequesterName = String(record?.requested_by_name || '').trim() || requester?.name || requesterId
+  const resolvedRequesterEmail = String(record?.requested_by_email || '').trim() || requester?.email || ''
 
   return {
     id: record?.id,
-    laboratory_id: record?.laboratory_id || '',
-    laboratory_name: record?.laboratory_name || '',
+    laboratory_id: laboratoryId,
+    laboratory_name: resolvedLabName,
     area_id: record?.area_id || '',
-    requested_by: record?.requested_by || '',
-    requested_by_name: record?.requested_by_name || '',
-    requested_by_email: record?.requested_by_email || '',
+    requested_by: requesterId,
+    requested_by_name: resolvedRequesterName,
+    requested_by_email: resolvedRequesterEmail,
     purpose: record?.purpose || '',
     start_at: record?.start_at || '',
     end_at: record?.end_at || '',
@@ -81,16 +138,25 @@ export async function listReservations(filters = {}) {
   if (filters.status) search.set('status', filters.status)
 
   const query = search.toString() ? `?${search.toString()}` : ''
-  const data = await request(`${reservationsBase}/reservations${query}`)
-  const mapped = Array.isArray(data) ? data.map(mapReservation) : []
+  const [data, labsResult, usersResult] = await Promise.all([
+    request(`${reservationsBase}/reservations${query}`),
+    listAdminLabs().catch(() => []),
+    listUserProfiles().catch(() => []),
+  ])
+
+  const labsMap = buildLabsMap(labsResult)
+  const usersMap = buildUsersMap(usersResult)
+  const mapped = Array.isArray(data)
+    ? data.map((item) => mapReservation(item, { labsMap, usersMap }))
+    : []
 
   return mapped
     .filter((reservation) => (!filters.requested_by || reservation.requested_by === filters.requested_by))
     .sort((a, b) => {
       if (a.date === b.date) {
-        return a.start_time.localeCompare(b.start_time)
+        return b.start_time.localeCompare(a.start_time)
       }
-      return a.date.localeCompare(b.date)
+      return b.date.localeCompare(a.date)
     })
 }
 
@@ -117,12 +183,14 @@ export async function createReservation(payload, user) {
   return mapReservation(record)
 }
 
-export async function updateReservationStatus(reservationId, status, actor = 'admin') {
+export async function updateReservationStatus(reservationId, status, options = {}) {
+  const cancelReason = String(options?.cancel_reason || '').trim()
+
   const record = await request(`${reservationsBase}/reservations/${reservationId}/status`, {
     method: 'PATCH',
     body: JSON.stringify({
       status,
-      notes: actor,
+      cancel_reason: status === 'rejected' ? cancelReason : '',
     }),
   })
   return mapReservation(record)
