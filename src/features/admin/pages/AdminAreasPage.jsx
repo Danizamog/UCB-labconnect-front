@@ -6,6 +6,7 @@ import {
   updateArea,
 } from '../services/infrastructureService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
+import ConfirmModal from '../../../shared/components/ConfirmModal'
 import './AdminAssetsPage.css'
 
 const defaultForm = { name: '', description: '', is_active: true }
@@ -17,6 +18,7 @@ function AdminAreasPage({ user }) {
   const [message, setMessage] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(defaultForm)
+  const [confirmModal, setConfirmModal] = useState(null)
 
   const canManage = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
 
@@ -59,21 +61,34 @@ function AdminAreasPage({ user }) {
     }
   }
 
-  const handleDelete = async (areaId) => {
-    if (!window.confirm('Deseas eliminar esta area?')) return
-    setError('')
-    setMessage('')
-    try {
-      await deleteArea(areaId)
-      setMessage('Area eliminada correctamente.')
-      await loadData()
-    } catch (err) {
-      setError(err.message || 'No se pudo eliminar el area')
-    }
+  const handleDelete = (areaId) => {
+    setConfirmModal({
+      message: 'Esta accion no se puede deshacer.',
+      onConfirm: async () => {
+        setConfirmModal(null)
+        setError('')
+        setMessage('')
+        try {
+          await deleteArea(areaId)
+          setMessage('Area eliminada correctamente.')
+          await loadData()
+        } catch (err) {
+          setError(err.message || 'No se pudo eliminar el area')
+        }
+      },
+    })
   }
 
   return (
     <section className="infra-page" aria-label="Areas academicas">
+      {confirmModal ? (
+        <ConfirmModal
+          title="Eliminar area"
+          message={confirmModal.message}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
+      ) : null}
       <header className="infra-header">
         <div>
           <p className="infra-kicker">Estructura academica</p>
@@ -93,7 +108,7 @@ function AdminAreasPage({ user }) {
         <p className="infra-empty" style={{margin: '24px 40px'}}>Cargando areas...</p>
       ) : (
         <div className="infra-grid">
-          <section className="infra-card">
+          <section className="infra-card infra-card-full">
             <div className="infra-section-head">
               <div>
                 <h3>Areas academicas</h3>
@@ -102,33 +117,39 @@ function AdminAreasPage({ user }) {
             </div>
 
             <form className="infra-form" onSubmit={handleSubmit}>
-              <label>
-                <span>Nombre del area</span>
-                <input
-                  value={form.name}
-                  onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                  required
-                  disabled={!canManage}
-                />
-              </label>
-              <label>
-                <span>Descripcion</span>
-                <textarea
-                  rows="3"
-                  value={form.description}
-                  onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-                  disabled={!canManage}
-                />
-              </label>
-              <label className="infra-checkbox">
-                <input
-                  type="checkbox"
-                  checked={form.is_active}
-                  onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
-                  disabled={!canManage}
-                />
-                <span>Area activa para estudiantes</span>
-              </label>
+              <div className="infra-form-section">
+                <span className="infra-form-section-label">1 — Identificacion</span>
+                <label>
+                  <span>Nombre del area</span>
+                  <input
+                    value={form.name}
+                    onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                    required
+                    disabled={!canManage}
+                  />
+                </label>
+                <label>
+                  <span>Descripcion</span>
+                  <textarea
+                    rows="3"
+                    value={form.description}
+                    onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
+                    disabled={!canManage}
+                  />
+                </label>
+              </div>
+              <div className="infra-form-section">
+                <span className="infra-form-section-label">2 — Configuracion</span>
+                <label className="infra-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={form.is_active}
+                    onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
+                    disabled={!canManage}
+                  />
+                  <span>Area activa para estudiantes</span>
+                </label>
+              </div>
               <div className="infra-actions">
                 <button type="submit" className="infra-primary" disabled={!canManage}>
                   {editingId ? 'Actualizar area' : 'Crear area'}

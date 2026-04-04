@@ -7,6 +7,7 @@ import {
   updateLab,
 } from '../services/infrastructureService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
+import ConfirmModal from '../../../shared/components/ConfirmModal'
 import './AdminAssetsPage.css'
 
 const defaultForm = { name: '', location: '', capacity: 20, description: '', area_id: '', is_active: true }
@@ -19,6 +20,7 @@ function AdminLaboratoriosPage({ user }) {
   const [message, setMessage] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(defaultForm)
+  const [confirmModal, setConfirmModal] = useState(null)
 
   const canManage = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
 
@@ -69,21 +71,34 @@ function AdminLaboratoriosPage({ user }) {
     }
   }
 
-  const handleDelete = async (labId) => {
-    if (!window.confirm('Deseas eliminar este laboratorio?')) return
-    setError('')
-    setMessage('')
-    try {
-      await deleteLab(labId)
-      setMessage('Laboratorio eliminado correctamente.')
-      await loadData()
-    } catch (err) {
-      setError(err.message || 'No se pudo eliminar el laboratorio')
-    }
+  const handleDelete = (labId) => {
+    setConfirmModal({
+      message: 'Esta accion no se puede deshacer.',
+      onConfirm: async () => {
+        setConfirmModal(null)
+        setError('')
+        setMessage('')
+        try {
+          await deleteLab(labId)
+          setMessage('Laboratorio eliminado correctamente.')
+          await loadData()
+        } catch (err) {
+          setError(err.message || 'No se pudo eliminar el laboratorio')
+        }
+      },
+    })
   }
 
   return (
     <section className="infra-page" aria-label="Laboratorios">
+      {confirmModal ? (
+        <ConfirmModal
+          title="Eliminar laboratorio"
+          message={confirmModal.message}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
+      ) : null}
       <header className="infra-header">
         <div>
           <p className="infra-kicker">Estructura academica</p>
@@ -103,7 +118,7 @@ function AdminLaboratoriosPage({ user }) {
         <p className="infra-empty" style={{margin: '24px 40px'}}>Cargando laboratorios...</p>
       ) : (
         <div className="infra-grid">
-          <section className="infra-card">
+          <section className="infra-card infra-card-full">
             <div className="infra-section-head">
               <div>
                 <h3>Laboratorios</h3>
@@ -112,69 +127,80 @@ function AdminLaboratoriosPage({ user }) {
             </div>
 
             <form className="infra-form" onSubmit={handleSubmit}>
-              <div className="infra-form-grid">
+              <div className="infra-form-section">
+                <span className="infra-form-section-label">1 — Identificacion y area</span>
+                <div className="infra-form-grid">
+                  <label>
+                    <span>Nombre</span>
+                    <input
+                      value={form.name}
+                      onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                      required
+                      disabled={!canManage}
+                    />
+                  </label>
+                  <label>
+                    <span>Area</span>
+                    <select
+                      value={form.area_id}
+                      onChange={(event) => setForm((prev) => ({ ...prev, area_id: event.target.value }))}
+                      required
+                      disabled={!canManage}
+                    >
+                      <option value="">Selecciona un area</option>
+                      {areas.map((area) => (
+                        <option key={area.id} value={area.id}>{area.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </div>
+              <div className="infra-form-section">
+                <span className="infra-form-section-label">2 — Ubicacion y capacidad</span>
+                <div className="infra-form-grid">
+                  <label>
+                    <span>Ubicacion</span>
+                    <input
+                      value={form.location}
+                      onChange={(event) => setForm((prev) => ({ ...prev, location: event.target.value }))}
+                      required
+                      disabled={!canManage}
+                    />
+                  </label>
+                  <label>
+                    <span>Capacidad</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={form.capacity}
+                      onChange={(event) => setForm((prev) => ({ ...prev, capacity: event.target.value }))}
+                      required
+                      disabled={!canManage}
+                    />
+                  </label>
+                </div>
                 <label>
-                  <span>Nombre</span>
-                  <input
-                    value={form.name}
-                    onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                    required
-                    disabled={!canManage}
-                  />
-                </label>
-                <label>
-                  <span>Area</span>
-                  <select
-                    value={form.area_id}
-                    onChange={(event) => setForm((prev) => ({ ...prev, area_id: event.target.value }))}
-                    required
-                    disabled={!canManage}
-                  >
-                    <option value="">Selecciona un area</option>
-                    {areas.map((area) => (
-                      <option key={area.id} value={area.id}>{area.name}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>Ubicacion</span>
-                  <input
-                    value={form.location}
-                    onChange={(event) => setForm((prev) => ({ ...prev, location: event.target.value }))}
-                    required
-                    disabled={!canManage}
-                  />
-                </label>
-                <label>
-                  <span>Capacidad</span>
-                  <input
-                    type="number"
-                    min="1"
-                    value={form.capacity}
-                    onChange={(event) => setForm((prev) => ({ ...prev, capacity: event.target.value }))}
-                    required
+                  <span>Descripcion</span>
+                  <textarea
+                    rows="3"
+                    value={form.description}
+                    onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
                     disabled={!canManage}
                   />
                 </label>
               </div>
-              <label>
-                <span>Descripcion</span>
-                <textarea
-                  rows="3"
-                  value={form.description}
-                  onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-                  disabled={!canManage}
-                />
-              </label>
-              <label className="infra-checkbox">
-                <input
-                  type="checkbox"
-                  checked={form.is_active}
-                  onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
-                  disabled={!canManage}
-                />
-                <span>Laboratorio activo para reservas</span>
-              </label>
+              <div className="infra-form-section">
+                <span className="infra-form-section-label">3 — Configuracion</span>
+                <label className="infra-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={form.is_active}
+                    onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
+                    disabled={!canManage}
+                  />
+                  <span>Laboratorio activo para reservas</span>
+                </label>
+              </div>
               <div className="infra-actions">
                 <button type="submit" className="infra-primary" disabled={!canManage}>
                   {editingId ? 'Actualizar laboratorio' : 'Crear laboratorio'}

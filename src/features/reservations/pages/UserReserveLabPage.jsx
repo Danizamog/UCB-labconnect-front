@@ -15,6 +15,8 @@ const defaultForm = {
   purpose: '',
 }
 
+const STATUS_LABELS = { pending: 'Pendiente', approved: 'Aprobada', rejected: 'Rechazada', cancelled: 'Cancelada' }
+
 function UserReserveLabPage({ user }) {
   const [labs, setLabs] = useState([])
   const [reservations, setReservations] = useState([])
@@ -104,7 +106,9 @@ function UserReserveLabPage({ user }) {
 
       <section className="reservations-panel">
         <form className="reservations-form" onSubmit={handleSubmit}>
-          <div className="reservations-form-grid">
+
+          <div className="reservations-form-section">
+            <span className="reservations-form-section-label">1 — Laboratorio</span>
             <label>
               <span>Laboratorio</span>
               <select
@@ -118,44 +122,55 @@ function UserReserveLabPage({ user }) {
                 ))}
               </select>
             </label>
+          </div>
+
+          <div className="reservations-form-section">
+            <span className="reservations-form-section-label">2 — Fecha y Horario</span>
+            <div className="reservations-form-grid">
+              <label>
+                <span>Fecha</span>
+                <input
+                  type="date"
+                  value={form.date}
+                  onChange={(event) => setForm((prev) => ({ ...prev, date: event.target.value }))}
+                  required
+                />
+              </label>
+              <label>
+                <span>Hora de inicio</span>
+                <input
+                  type="time"
+                  value={form.start_time}
+                  onChange={(event) => setForm((prev) => ({ ...prev, start_time: event.target.value }))}
+                  required
+                />
+              </label>
+              <label>
+                <span>Hora de fin</span>
+                <input
+                  type="time"
+                  value={form.end_time}
+                  onChange={(event) => setForm((prev) => ({ ...prev, end_time: event.target.value }))}
+                  required
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="reservations-form-section">
+            <span className="reservations-form-section-label">3 — Motivo</span>
             <label>
-              <span>Fecha</span>
-              <input
-                type="date"
-                value={form.date}
-                onChange={(event) => setForm((prev) => ({ ...prev, date: event.target.value }))}
-                required
-              />
-            </label>
-            <label>
-              <span>Hora inicio</span>
-              <input
-                type="time"
-                value={form.start_time}
-                onChange={(event) => setForm((prev) => ({ ...prev, start_time: event.target.value }))}
-                required
-              />
-            </label>
-            <label>
-              <span>Hora fin</span>
-              <input
-                type="time"
-                value={form.end_time}
-                onChange={(event) => setForm((prev) => ({ ...prev, end_time: event.target.value }))}
+              <span>Motivo de la reserva</span>
+              <textarea
+                rows="4"
+                value={form.purpose}
+                onChange={(event) => setForm((prev) => ({ ...prev, purpose: event.target.value }))}
+                placeholder="Ej. Práctica de laboratorio de redes, proyecto de tesis..."
                 required
               />
             </label>
           </div>
-          <label>
-            <span>Motivo de la reserva</span>
-            <textarea
-              rows="3"
-              value={form.purpose}
-              onChange={(event) => setForm((prev) => ({ ...prev, purpose: event.target.value }))}
-              placeholder="Ej. Practica de laboratorio de redes"
-              required
-            />
-          </label>
+
           <div className="reservations-actions">
             <button type="submit" className="reservations-primary">Enviar solicitud</button>
           </div>
@@ -182,7 +197,7 @@ function UserReserveLabPage({ user }) {
                   <td>{item.laboratory_name || labNameById[String(item.laboratory_id)] || 'Laboratorio'}</td>
                   <td>{item.date}</td>
                   <td>{item.start_time} - {item.end_time}</td>
-                  <td><span className={`reservations-status ${item.status}`}>{item.status}</span></td>
+                  <td><span className={`reservations-status ${item.status}`}>{STATUS_LABELS[item.status] ?? item.status}</span></td>
                 </tr>
               ))}
             </tbody>

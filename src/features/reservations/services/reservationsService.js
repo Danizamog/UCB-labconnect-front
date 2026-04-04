@@ -50,9 +50,11 @@ function mapReservation(record) {
   return {
     id: record?.id,
     laboratory_id: record?.laboratory_id || '',
+    laboratory_name: record?.laboratory_name || '',
     area_id: record?.area_id || '',
     requested_by: record?.requested_by || '',
-    requested_by_name: record?.requested_by || 'Usuario',
+    requested_by_name: record?.requested_by_name || '',
+    requested_by_email: record?.requested_by_email || '',
     purpose: record?.purpose || '',
     start_at: record?.start_at || '',
     end_at: record?.end_at || '',

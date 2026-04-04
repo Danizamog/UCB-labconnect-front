@@ -43,7 +43,7 @@ function AppRoutes({ isAuthenticated, user, onLogin, onInstitutionalLogin, onRef
   }, [])
 
   useEffect(() => {
-    if (!isAuthenticated && (currentPath === '/' || (!currentPath.startsWith('/app') && currentPath !== LOGIN_PATH))) {
+    if (!isAuthenticated && currentPath !== LOGIN_PATH) {
       updateBrowserPath(LOGIN_PATH, { replace: true })
       return
     }
@@ -58,7 +58,6 @@ function AppRoutes({ isAuthenticated, user, onLogin, onInstitutionalLogin, onRef
   }
 
   const handleLogout = () => {
-    updateBrowserPath(LOGIN_PATH, { replace: true })
     onLogout?.()
   }
 

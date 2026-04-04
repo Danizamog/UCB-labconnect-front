@@ -10,6 +10,7 @@ import {
 } from '../services/infrastructureService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import { assetStatusBadgeClass, assetStatusLabel, formatDateTime } from '../../../shared/utils/formatters'
+import ConfirmModal from '../../../shared/components/ConfirmModal'
 import './AdminAssetsPage.css'
 
 const defaultForm = { name: '', category: '', location: '', description: '', serial_number: '', laboratory_id: '', status: 'available' }
@@ -29,6 +30,7 @@ function AdminEquiposPage({ user }) {
   const [message, setMessage] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(defaultForm)
+  const [confirmModal, setConfirmModal] = useState(null)
 
   const canManage = hasAnyPermission(user, ['gestionar_inventario'])
   const canManageStatus = hasAnyPermission(user, ['gestionar_estado_equipos', 'gestionar_mantenimiento'])
@@ -84,17 +86,22 @@ function AdminEquiposPage({ user }) {
     }
   }
 
-  const handleDelete = async (assetId) => {
-    if (!window.confirm('Deseas eliminar este equipo?')) return
-    setError('')
-    setMessage('')
-    try {
-      await deleteAsset(assetId)
-      setMessage('Equipo eliminado correctamente.')
-      await loadData()
-    } catch (err) {
-      setError(err.message || 'No se pudo eliminar el equipo')
-    }
+  const handleDelete = (assetId) => {
+    setConfirmModal({
+      message: 'Esta accion no se puede deshacer.',
+      onConfirm: async () => {
+        setConfirmModal(null)
+        setError('')
+        setMessage('')
+        try {
+          await deleteAsset(assetId)
+          setMessage('Equipo eliminado correctamente.')
+          await loadData()
+        } catch (err) {
+          setError(err.message || 'No se pudo eliminar el equipo')
+        }
+      },
+    })
   }
 
   const handleStatusChange = async (assetId, status) => {
@@ -134,6 +141,14 @@ function AdminEquiposPage({ user }) {
 
   return (
     <section className="infra-page" aria-label="Equipos">
+      {confirmModal ? (
+        <ConfirmModal
+          title="Eliminar equipo"
+          message={confirmModal.message}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
+      ) : null}
       <header className="infra-header">
         <div>
           <p className="infra-kicker">Inventario</p>
@@ -153,7 +168,7 @@ function AdminEquiposPage({ user }) {
         <p className="infra-empty">Cargando equipos...</p>
       ) : (
         <div className="infra-grid">
-          <section className="infra-card">
+          <section className="infra-card infra-card-full">
             <div className="infra-section-head">
               <div>
                 <h3>Equipos</h3>
@@ -163,51 +178,59 @@ function AdminEquiposPage({ user }) {
 
             {canManage ? (
               <form className="infra-form" onSubmit={handleSubmit}>
-                <div className="infra-form-grid">
+                <div className="infra-form-section">
+                  <span className="infra-form-section-label">1 — Datos del equipo</span>
+                  <div className="infra-form-grid">
+                    <label>
+                      <span>Nombre del equipo</span>
+                      <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} required />
+                    </label>
+                    <label>
+                      <span>Categoria</span>
+                      <input value={form.category} onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))} required />
+                    </label>
+                    <label>
+                      <span>Numero de serie</span>
+                      <input value={form.serial_number} onChange={(e) => setForm((prev) => ({ ...prev, serial_number: e.target.value }))} />
+                    </label>
+                    <label>
+                      <span>Ubicacion</span>
+                      <input
+                        value={form.location}
+                        onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
+                        placeholder="Mesa 4, gabinete 2 o estante A"
+                        required
+                      />
+                    </label>
+                  </div>
                   <label>
-                    <span>Nombre del equipo</span>
-                    <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} required />
-                  </label>
-                  <label>
-                    <span>Categoria</span>
-                    <input value={form.category} onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))} required />
-                  </label>
-                  <label>
-                    <span>Numero de serie</span>
-                    <input value={form.serial_number} onChange={(e) => setForm((prev) => ({ ...prev, serial_number: e.target.value }))} />
-                  </label>
-                  <label>
-                    <span>Ubicacion</span>
-                    <input
-                      value={form.location}
-                      onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
-                      placeholder="Mesa 4, gabinete 2 o estante A"
-                      required
-                    />
-                  </label>
-                  <label>
-                    <span>Laboratorio</span>
-                    <select value={form.laboratory_id} onChange={(e) => setForm((prev) => ({ ...prev, laboratory_id: e.target.value }))}>
-                      <option value="">Sin laboratorio fijo</option>
-                      {labs.map((lab) => (
-                        <option key={lab.id} value={lab.id}>{lab.name}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    <span>Estado</span>
-                    <select value={form.status} onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}>
-                      <option value="available">Disponible</option>
-                      <option value="loaned">Prestado</option>
-                      <option value="maintenance">Mantenimiento</option>
-                      <option value="damaged">Danado</option>
-                    </select>
+                    <span>Descripcion</span>
+                    <textarea rows="3" value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} />
                   </label>
                 </div>
-                <label>
-                  <span>Descripcion</span>
-                  <textarea rows="3" value={form.description} onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} />
-                </label>
+                <div className="infra-form-section">
+                  <span className="infra-form-section-label">2 — Asignacion y estado</span>
+                  <div className="infra-form-grid">
+                    <label>
+                      <span>Laboratorio</span>
+                      <select value={form.laboratory_id} onChange={(e) => setForm((prev) => ({ ...prev, laboratory_id: e.target.value }))}>
+                        <option value="">Sin laboratorio fijo</option>
+                        {labs.map((lab) => (
+                          <option key={lab.id} value={lab.id}>{lab.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Estado</span>
+                      <select value={form.status} onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}>
+                        <option value="available">Disponible</option>
+                        <option value="loaned">Prestado</option>
+                        <option value="maintenance">Mantenimiento</option>
+                        <option value="damaged">Danado</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
                 <div className="infra-actions">
                   <button type="submit" className="infra-primary">
                     {editingId ? 'Actualizar equipo' : 'Crear equipo'}
