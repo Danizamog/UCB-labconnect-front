@@ -31,6 +31,7 @@ function AdminEquiposPage({ user }) {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(defaultForm)
   const [confirmModal, setConfirmModal] = useState(null)
+  const [statusDrafts, setStatusDrafts] = useState({})
 
   const canManage = hasAnyPermission(user, ['gestionar_inventario'])
   const canManageStatus = hasAnyPermission(user, ['gestionar_estado_equipos', 'gestionar_mantenimiento'])
@@ -104,18 +105,51 @@ function AdminEquiposPage({ user }) {
     })
   }
 
-  const handleStatusChange = async (assetId, status) => {
+  const getStatusDraft = (asset) => {
+    const existingDraft = statusDrafts[asset.id]
+    if (existingDraft) {
+      return existingDraft
+    }
+    return { status: asset.status, notes: '' }
+  }
+
+  const handleStatusDraftChange = (assetId, field, value) => {
+    setStatusDrafts((prev) => ({
+      ...prev,
+      [assetId]: {
+        status: prev[assetId]?.status ?? assets.find((asset) => asset.id === assetId)?.status ?? 'available',
+        notes: prev[assetId]?.notes ?? '',
+        [field]: value,
+      },
+    }))
+  }
+
+  const handleStatusChange = async (asset) => {
     if (!canManageStatus) return
+
+    const draft = getStatusDraft(asset)
+    const nextStatus = draft.status
+    const notes = (draft.notes || '').trim()
+
+    if ((nextStatus === 'maintenance' || nextStatus === 'damaged') && notes.length < 8) {
+      setError('Para registrar mantenimiento o daño, agrega una observacion de al menos 8 caracteres.')
+      return
+    }
+
     setError('')
     setMessage('')
     try {
-      const updated = await updateAssetStatus(assetId, status)
-      setAssets((prev) => prev.map((a) => (a.id === assetId ? updated : a)))
-      if (selectedAssetHistoryId === assetId) {
-        const history = await listAssetStatusHistory(assetId)
-        setAssetStatusHistory((prev) => ({ ...prev, [assetId]: history }))
+      const updated = await updateAssetStatus(asset.id, nextStatus, notes)
+      setAssets((prev) => prev.map((a) => (a.id === asset.id ? updated : a)))
+      setStatusDrafts((prev) => ({
+        ...prev,
+        [asset.id]: { status: updated.status, notes: '' },
+      }))
+      if (selectedAssetHistoryId === asset.id) {
+        const history = await listAssetStatusHistory(asset.id)
+        setAssetStatusHistory((prev) => ({ ...prev, [asset.id]: history }))
       }
-      setMessage('Estado del equipo actualizado correctamente.')
+      setMessage('Estado del equipo actualizado y registrado en historial.')
     } catch (err) {
       setError(err.message || 'No se pudo actualizar el estado del equipo')
     }
@@ -278,12 +312,32 @@ function AdminEquiposPage({ user }) {
                                 : 'Sin cambios registrados'}
                             </small>
                             {canManageStatus ? (
-                              <select value={asset.status} onChange={(e) => handleStatusChange(asset.id, e.target.value)}>
-                                <option value="available">Disponible</option>
-                                <option value="loaned">Prestado</option>
-                                <option value="maintenance">Mantenimiento</option>
-                                <option value="damaged">Danado</option>
-                              </select>
+                              <div className="infra-status-controls">
+                                <select
+                                  className="infra-status-select"
+                                  value={getStatusDraft(asset).status}
+                                  onChange={(e) => handleStatusDraftChange(asset.id, 'status', e.target.value)}
+                                >
+                                  <option value="available">Disponible</option>
+                                  <option value="loaned">Prestado</option>
+                                  <option value="maintenance">Mantenimiento</option>
+                                  <option value="damaged">Danado</option>
+                                </select>
+                                <textarea
+                                  className="infra-status-notes"
+                                  rows="2"
+                                  value={getStatusDraft(asset).notes}
+                                  onChange={(e) => handleStatusDraftChange(asset.id, 'notes', e.target.value)}
+                                  placeholder="Observacion (obligatoria para mantenimiento o dano)"
+                                />
+                                <button
+                                  type="button"
+                                  className="infra-secondary infra-status-save"
+                                  onClick={() => handleStatusChange(asset)}
+                                >
+                                  Guardar estado
+                                </button>
+                              </div>
                             ) : null}
                           </div>
                         </td>

@@ -100,10 +100,10 @@ export function updateAsset(assetId, payload) {
   })
 }
 
-export function updateAssetStatus(assetId, status) {
+export function updateAssetStatus(assetId, status, notes = '') {
   return request(`${inventoryBase}/assets/${assetId}/status`, {
     method: 'PATCH',
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, notes }),
   })
 }
 
