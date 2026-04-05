@@ -226,6 +226,17 @@ export async function getLabAvailability(laboratoryId, day) {
   return request(`${reservationsBase}/availability/labs/${laboratoryId}?${search.toString()}`)
 }
 
+export async function getLabOccupancy(laboratoryId = null) {
+  const search = new URLSearchParams()
+  if (laboratoryId) {
+    search.set('laboratory_id', laboratoryId)
+  }
+
+  const query = search.toString() ? `?${search.toString()}` : ''
+  const data = await request(`${reservationsBase}/availability/occupancy${query}`)
+  return Array.isArray(data) ? data : []
+}
+
 export function subscribeReservationsRealtime(onMessage) {
   const wsUrl = (import.meta.env.VITE_RESERVATION_WS_URL || 'ws://localhost:8005/v1/ws/reservations').trim()
   const socket = new WebSocket(wsUrl)

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   listReservations,
+  getLabOccupancy,
   markReservationAbsent,
   markReservationCheckIn,
   markReservationCheckOut,
@@ -23,6 +24,7 @@ const STATUS_LABELS = {
 function AdminReservationsPage({ user }) {
   const [statusFilter, setStatusFilter] = useState('all')
   const [reservations, setReservations] = useState([])
+  const [occupancy, setOccupancy] = useState([])
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
@@ -30,8 +32,12 @@ function AdminReservationsPage({ user }) {
 
   const loadData = async () => {
     try {
-      const data = await listReservations()
-      setReservations(data)
+      const [reservationsData, occupancyData] = await Promise.all([
+        listReservations(),
+        getLabOccupancy(),
+      ])
+      setReservations(reservationsData)
+      setOccupancy(occupancyData)
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudo cargar el panel de reservas.')
@@ -39,7 +45,9 @@ function AdminReservationsPage({ user }) {
   }
 
   useEffect(() => {
-    loadData()
+    queueMicrotask(() => {
+      void loadData()
+    })
 
     const unsubscribe = subscribeReservationsRealtime((event) => {
       if (event?.topic === 'lab_reservation') {
@@ -58,6 +66,8 @@ function AdminReservationsPage({ user }) {
   const pendingCount = reservations.filter((item) => item.status === 'pending').length
   const approvedCount = reservations.filter((item) => item.status === 'approved').length
   const inProgressCount = reservations.filter((item) => item.status === 'in_progress').length
+  const totalCapacity = occupancy.reduce((sum, item) => sum + (Number(item.capacity) || 0), 0)
+  const totalOccupancy = occupancy.reduce((sum, item) => sum + (Number(item.current_occupancy) || 0), 0)
 
   const handleUpdate = async (reservationId, status) => {
     if (!canManage) return
@@ -134,8 +144,56 @@ function AdminReservationsPage({ user }) {
           <div><span>Pendientes</span><strong>{pendingCount}</strong></div>
           <div><span>Aprobadas</span><strong>{approvedCount}</strong></div>
           <div><span>En curso</span><strong>{inProgressCount}</strong></div>
+          <div><span>Ocupación</span><strong>{totalOccupancy}/{totalCapacity || '-'}</strong></div>
         </div>
       </header>
+
+      <section className="reservations-panel reservations-occupancy-panel">
+        <div className="reservations-panel-head">
+          <div>
+            <p className="reservations-kicker">Tiempo real</p>
+            <h3>Ocupación actual por laboratorio</h3>
+          </div>
+          <p className="reservations-panel-note">Se actualiza cuando cambian las reservas y al recargar el panel.</p>
+        </div>
+
+        {occupancy.length === 0 ? (
+          <p className="reservations-empty">Todavía no hay datos de ocupación para mostrar.</p>
+        ) : (
+          <div className="reservations-occupancy-grid">
+            {occupancy.map((item) => {
+              const percentage = Math.min(Number(item.occupancy_percentage) || 0, 100)
+              return (
+                <article key={item.laboratory_id} className={`reservations-occupancy-card status-${item.status}`}>
+                  <div className="reservations-occupancy-top">
+                    <div>
+                      <strong>{item.laboratory_name}</strong>
+                      <span>Capacidad: {item.capacity}</span>
+                    </div>
+                    <span className={`reservations-occupancy-badge status-${item.status}`}>
+                      {item.status === 'occupied' ? 'Lleno' : item.status === 'partial' ? 'Parcial' : 'Libre'}
+                    </span>
+                  </div>
+
+                  <div className="reservations-occupancy-figure">
+                    <strong>{item.current_occupancy}</strong>
+                    <span>en curso</span>
+                  </div>
+
+                  <div className="reservations-progress" aria-hidden="true">
+                    <div className="reservations-progress-bar" style={{ width: `${percentage}%` }} />
+                  </div>
+
+                  <div className="reservations-occupancy-footer">
+                    <span>{percentage.toFixed(1)}%</span>
+                    <span>Disponibles: {item.available_slots}</span>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
+      </section>
 
       {message ? <p className="reservations-message success">{message}</p> : null}
       {error ? <p className="reservations-message error">{error}</p> : null}
