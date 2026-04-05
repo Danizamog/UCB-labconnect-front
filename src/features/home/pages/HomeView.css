@@ -5,7 +5,6 @@
   background: #f0f4f8;
 }
 
-/* ── Main content (shifts right by sidebar width) ──────── */
 .home-main {
   flex: 1;
   margin-left: 240px;
@@ -14,6 +13,430 @@
   flex-direction: column;
 }
 
+/* App shell */
+.app-layout {
+  display: flex;
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at top left, rgba(6, 77, 144, 0.12), transparent 34%),
+    radial-gradient(circle at top right, rgba(252, 208, 37, 0.14), transparent 28%),
+    linear-gradient(180deg, #f7fafc 0%, #eef3f8 100%);
+}
+
+.home-main {
+  flex: 1;
+  margin-left: 240px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-window {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+/* Landing container */
+.home-dashboard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.home-admin-hero,
+.home-hero,
+.home-section {
+  position: relative;
+}
+
+.home-admin-hero {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) 1fr;
+  gap: 28px;
+  align-items: center;
+  padding: clamp(28px, 4vw, 46px);
+  color: #fff;
+  background:
+    linear-gradient(135deg, rgba(10, 37, 64, 0.96) 0%, rgba(13, 50, 96, 0.96) 55%, rgba(8, 61, 114, 0.98) 100%),
+    linear-gradient(135deg, #0a2540 0%, #0d3260 55%, #083d72 100%);
+}
+
+.home-brand-logos {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+
+.home-brand-logo {
+  display: block;
+  width: 100%;
+  max-width: 160px;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 26px rgba(0, 0, 0, 0.18));
+}
+
+.home-brand-logo-secondary {
+  max-width: 150px;
+  opacity: 0.96;
+}
+
+.home-hero-copy {
+  display: grid;
+  gap: 14px;
+  max-width: 760px;
+}
+
+.home-eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(252, 208, 37, 0.9);
+}
+
+.home-admin-hero h2,
+.home-hero h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+}
+
+.home-admin-hero h2 {
+  font-size: clamp(2.2rem, 5vw, 4rem);
+}
+
+.home-hero-text,
+.home-hero-meta p,
+.home-section-text,
+.home-lab-card p,
+.home-link-card p,
+.home-spotlight-card p,
+.home-role-note {
+  line-height: 1.65;
+}
+
+.home-hero-text {
+  margin: 0;
+  max-width: 64ch;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 1rem;
+}
+
+.home-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.home-meta-row span,
+.home-brand-badges span,
+.home-spotlight-label,
+.home-link-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.home-meta-row span {
+  color: #eaf3fb;
+  background: rgba(255, 255, 255, 0.11);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+/* User hero */
+.home-hero {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+  gap: clamp(20px, 3vw, 34px);
+  align-items: center;
+  padding: clamp(24px, 3.8vw, 42px);
+  background:
+    linear-gradient(135deg, rgba(10, 37, 64, 0.95) 0%, rgba(15, 76, 129, 0.95) 100%),
+    linear-gradient(135deg, #0f4c81 0%, #154f83 100%);
+  color: #fff;
+}
+
+.home-brand-column {
+  display: grid;
+  gap: 14px;
+}
+
+.home-brand-lockup {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  text-decoration: none;
+}
+
+.home-hero-logo {
+  width: 78px;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.2));
+}
+
+.home-hero-logo-alt {
+  width: 110px;
+}
+
+.home-brand-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.home-brand-badges span {
+  color: #0a2540;
+  background: rgba(252, 208, 37, 0.96);
+}
+
+.home-hero-meta {
+  display: grid;
+  gap: 14px;
+  max-width: 720px;
+}
+
+.home-hero-meta h2 {
+  font-size: clamp(1.9rem, 4vw, 3rem);
+}
+
+.home-hero-meta p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 0.98rem;
+}
+
+.home-hero-btn {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 700;
+  color: #0a2540;
+  background: linear-gradient(135deg, #fcd025 0%, #ffd94a 100%);
+  box-shadow: 0 10px 26px rgba(252, 208, 37, 0.22);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.home-hero-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 32px rgba(252, 208, 37, 0.28);
+}
+
+/* Sections */
+.home-section,
+.home-role-section {
+  padding: clamp(22px, 3vw, 34px) clamp(20px, 3.4vw, 42px);
+  border-bottom: 1px solid rgba(16, 35, 61, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.home-section-title {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--ink-900);
+}
+
+.home-section-text {
+  margin: 0;
+  max-width: 74ch;
+  color: var(--ink-700);
+}
+
+/* Cards */
+.home-links-grid,
+.home-labs-grid,
+.home-spotlight-grid,
+.home-quick-actions {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.home-links-grid {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.home-labs-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.home-spotlight-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.home-quick-actions {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.home-link-card,
+.home-lab-card,
+.home-spotlight-card,
+.home-action-btn {
+  border-radius: 18px;
+  border: 1px solid rgba(16, 35, 61, 0.08);
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(10, 37, 64, 0.06);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.home-link-card:hover,
+.home-lab-card:hover,
+.home-spotlight-card:hover,
+.home-action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 30px rgba(10, 37, 64, 0.1);
+  border-color: rgba(6, 77, 144, 0.18);
+}
+
+.home-link-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px 18px 16px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.home-link-label,
+.home-spotlight-label {
+  width: fit-content;
+  color: var(--ucb-blue);
+  background: rgba(6, 77, 144, 0.08);
+}
+
+.home-link-card strong,
+.home-lab-card strong,
+.home-spotlight-card strong {
+  color: var(--ink-900);
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.home-link-card p,
+.home-lab-card p,
+.home-spotlight-card p {
+  margin: 0;
+  color: var(--ink-700);
+  font-size: 0.92rem;
+}
+
+.home-lab-card {
+  padding: 18px;
+  border-left: 4px solid var(--ucb-gold);
+}
+
+.home-spotlight-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+}
+
+.home-action-btn {
+  padding: 18px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.action-content {
+  display: grid;
+  gap: 6px;
+}
+
+.action-content strong {
+  color: var(--ink-900);
+  font-size: 1rem;
+}
+
+.action-content p {
+  margin: 0;
+  color: var(--ink-700);
+  font-size: 0.92rem;
+}
+
+/* Admin note */
+.home-role-note {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(6, 77, 144, 0.06);
+  border: 1px solid rgba(6, 77, 144, 0.12);
+  color: var(--ink-700);
+}
+
+/* Legacy content removed but sections now occupy the full home page consistently */
+
+@media (max-width: 980px) {
+  .home-main {
+    margin-left: 0;
+    padding-top: 56px;
+  }
+
+  .home-admin-hero,
+  .home-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .home-brand-logos {
+    grid-auto-flow: column;
+    align-items: center;
+    justify-content: start;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .home-brand-logo {
+    max-width: 132px;
+  }
+}
+
+@media (max-width: 640px) {
+  .home-admin-hero,
+  .home-hero,
+  .home-section,
+  .home-role-section {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .home-brand-lockup {
+    justify-content: center;
+  }
+
+  .home-hero-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .home-links-grid,
+  .home-labs-grid,
+  .home-spotlight-grid,
+  .home-quick-actions {
+    grid-template-columns: 1fr;
+  }
+}
 /* ── Content window (fills all available space) ────────── */
 .content-window {
   flex: 1;
