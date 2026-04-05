@@ -1,0 +1,123 @@
+.loan-return-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(10, 22, 40, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.loan-return-modal {
+  width: min(560px, 100%);
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid rgba(10, 53, 89, 0.12);
+  box-shadow: 0 26px 60px rgba(10, 22, 40, 0.28);
+}
+
+.loan-return-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.loan-return-kicker {
+  margin: 0 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ucb-blue);
+}
+
+.loan-return-head h3 {
+  margin: 0 0 6px;
+  color: var(--ink-900);
+  font-size: 1.15rem;
+}
+
+.loan-return-head p {
+  margin: 0;
+  color: var(--ink-700);
+  line-height: 1.5;
+}
+
+.loan-return-close {
+  border: none;
+  background: rgba(10, 53, 89, 0.08);
+  color: var(--ink-900);
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+
+.loan-return-form {
+  display: grid;
+  gap: 14px;
+}
+
+.loan-return-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--ink-700);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.loan-return-form input,
+.loan-return-form select,
+.loan-return-form textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1.5px solid var(--line-300);
+  background: #fafbfc;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--ink-900);
+}
+
+.loan-return-form input:focus,
+.loan-return-form select:focus,
+.loan-return-form textarea:focus {
+  outline: none;
+  border-color: rgba(6, 77, 144, 0.5);
+  box-shadow: 0 0 0 3px rgba(6, 77, 144, 0.08);
+  background: #fff;
+}
+
+.loan-return-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.loan-return-primary,
+.loan-return-secondary {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.loan-return-primary {
+  background: linear-gradient(135deg, #0a3559, #1255a0);
+  color: #fff;
+}
+
+.loan-return-secondary {
+  background: rgba(10, 53, 89, 0.08);
+  color: var(--ink-900);
+}

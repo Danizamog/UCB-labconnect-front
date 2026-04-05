@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { deleteUserProfile, listUserProfiles, updateUserProfile } from '../services/profileService'
+import { listAssetResponsibilityFlags } from '../services/infrastructureService'
 import { assignUserRole, listRoles } from '../services/rolesService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
@@ -14,6 +15,7 @@ const defaultForm = {
 
 function AdminProfilesPage({ user }) {
   const [profiles, setProfiles] = useState([])
+  const [responsibilityFlags, setResponsibilityFlags] = useState([])
   const [roles, setRoles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -25,9 +27,19 @@ function AdminProfilesPage({ user }) {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [profileData, roleData] = await Promise.all([listUserProfiles(), listRoles()])
-      setProfiles(profileData)
-      setRoles(roleData)
+      const [profileResult, roleResult, flagResult] = await Promise.allSettled([
+        listUserProfiles(),
+        listRoles(),
+        listAssetResponsibilityFlags(),
+      ])
+
+      if (profileResult.status !== 'fulfilled' || roleResult.status !== 'fulfilled') {
+        throw new Error('No se pudieron cargar los perfiles')
+      }
+
+      setProfiles(profileResult.value)
+      setRoles(roleResult.value)
+      setResponsibilityFlags(flagResult.status === 'fulfilled' ? flagResult.value : [])
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudieron cargar los perfiles')
@@ -47,8 +59,13 @@ function AdminProfilesPage({ user }) {
       const roleName = p.role || 'Sin rol'
       byRole[roleName] = (byRole[roleName] || 0) + 1
     })
-    return { total: profiles.length, active, byRole }
-  }, [profiles])
+    return { total: profiles.length, active, byRole, flagged: responsibilityFlags.length }
+  }, [profiles, responsibilityFlags])
+
+  const flagsByEmail = useMemo(
+    () => Object.fromEntries(responsibilityFlags.map((flag) => [String(flag.borrower_email || '').toLowerCase(), flag])),
+    [responsibilityFlags],
+  )
 
   const canManage = hasAnyPermission(user, ['gestionar_roles_permisos'])
   const canReactivate = hasAnyPermission(user, ['reactivar_cuentas'])
@@ -138,6 +155,7 @@ function AdminProfilesPage({ user }) {
         <div className="profiles-summary">
           <div><span>Total</span><strong>{summary.total}</strong></div>
           <div><span>Activos</span><strong>{summary.active}</strong></div>
+          <div><span>Con bandera</span><strong>{summary.flagged}</strong></div>
           {Object.entries(summary.byRole).slice(0, 2).map(([roleName, count]) => (
             <div key={roleName}><span>{roleName}</span><strong>{count}</strong></div>
           ))}
@@ -262,6 +280,14 @@ function AdminProfilesPage({ user }) {
                   <div className="profiles-meta">
                     <span>{profile.role || 'Sin rol'}</span>
                   </div>
+
+                  {flagsByEmail[String(profile.username || '').toLowerCase()] ? (
+                    <p className="profiles-flag-banner">
+                      Dano asociado al ultimo prestamo. {flagsByEmail[String(profile.username || '').toLowerCase()].latest_asset_name}
+                      {' · '}
+                      {flagsByEmail[String(profile.username || '').toLowerCase()].latest_ticket_title}
+                    </p>
+                  ) : null}
 
                   <div className="profiles-actions compact">
                     <button
