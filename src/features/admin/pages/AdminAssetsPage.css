@@ -339,7 +339,7 @@
 .infra-status-cell {
   display: grid;
   gap: 6px;
-  min-width: 200px;
+  min-width: 260px;
 }
 
 .infra-status-badge {
@@ -350,6 +350,41 @@
   font-size: 0.78rem;
   font-weight: 700;
   width: fit-content;
+}
+
+.infra-status-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.infra-status-select,
+.infra-status-notes {
+  width: 100%;
+  border-radius: 10px;
+  border: 1.5px solid var(--line-300);
+  background: #fafbfc;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 0.84rem;
+  color: var(--ink-900);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.infra-status-select:focus,
+.infra-status-notes:focus {
+  outline: none;
+  border-color: rgba(6, 77, 144, 0.5);
+  box-shadow: 0 0 0 3px rgba(6, 77, 144, 0.08);
+  background: #fff;
+}
+
+.infra-status-notes {
+  resize: vertical;
+  min-height: 52px;
+}
+
+.infra-status-save {
+  justify-self: start;
 }
 
 .infra-status-badge.available  { background: rgba(22,163,74,0.1);  color: #166534; border: 1px solid rgba(22,163,74,0.18); }
