@@ -89,7 +89,11 @@ export function useAuthStore() {
       return undefined
     }
 
-    refreshSession({ force: true })
+    const refreshInitialSession = async () => {
+      await refreshSession({ force: true })
+    }
+
+    refreshInitialSession()
 
     const handleWindowFocus = () => {
       refreshSession()

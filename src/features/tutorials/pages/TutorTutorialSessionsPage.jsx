@@ -262,7 +262,7 @@ function TutorTutorialSessionsPage() {
     return () => {
       mounted = false
     }
-  }, [availabilityRefreshNonce, form.laboratory_id, form.session_date])
+  }, [availabilityRefreshNonce, form.end_time, form.laboratory_id, form.session_date, form.start_time])
 
   const selectedSlot = useMemo(
     () => slots.find((slot) => getSlotKey(slot) === selectedSlotKey) || null,

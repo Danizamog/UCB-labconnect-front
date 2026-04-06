@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   closeAssetMaintenanceTicket,
   createAsset,
@@ -103,7 +103,7 @@ function AdminEquiposPage({ user }) {
   const canManageStatus = hasAnyPermission(user, ['gestionar_estado_equipos', 'gestionar_mantenimiento'])
   const canManageLoans = hasAnyPermission(user, ['gestionar_prestamos', 'gestionar_inventario', 'gestionar_estado_equipos'])
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const [labsResult, assetsResult, ticketsResult, loansResult, profilesResult] = await Promise.allSettled([
@@ -142,11 +142,11 @@ function AdminEquiposPage({ user }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [canManageLoans])
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [loadData])
 
   const labNameById = useMemo(() => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])), [labs])
   const assetNameById = useMemo(() => Object.fromEntries(assets.map((asset) => [String(asset.id), asset.name])), [assets])

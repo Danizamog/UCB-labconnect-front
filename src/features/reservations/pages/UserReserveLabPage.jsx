@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import TutorialSessionDetailModal from '../../tutorials/pages/TutorialSessionDetailModal'
 import { getTutorialSessionById } from '../../tutorials/services/tutorialSessionsService'
@@ -264,7 +264,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     }
   }, [])
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [labsData, reservationsData, penaltiesData] = await Promise.all([
         listAvailableLabs(user),
@@ -274,14 +274,16 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       setLabs(labsData)
       setReservations(reservationsData)
       setPenalties(penaltiesData)
-      if (!form.laboratory_id && labsData.length > 0) {
-        setForm((prev) => ({ ...prev, laboratory_id: labsData[0].id }))
-      }
+      setForm((prev) => (
+        prev.laboratory_id || labsData.length === 0
+          ? prev
+          : { ...prev, laboratory_id: labsData[0].id }
+      ))
       setError(labsData.length === 0 ? 'No tienes permisos para reservar en los laboratorios disponibles actualmente.' : '')
     } catch (err) {
       setError(err.message || 'No se pudo cargar la informacion para reservar.')
     }
-  }
+  }, [user])
 
   useEffect(() => {
     loadData()
@@ -319,7 +321,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     })
 
     return () => unsubscribe?.()
-  }, [])
+  }, [loadData, user?.user_id])
 
   useEffect(() => {
     const applyFocus = (reservationId) => {
@@ -411,7 +413,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     return () => {
       mounted = false
     }
-  }, [availabilityRefreshNonce, form.date, form.laboratory_id, selectedLabIsAccessible])
+  }, [availabilityRefreshNonce, form.date, form.end_time, form.laboratory_id, form.start_time, selectedLabIsAccessible])
 
   const labNameById = useMemo(
     () => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])),
@@ -559,7 +561,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     [editForm.laboratory_id, labs],
   )
 
-  const isEditSlotSelectable = (slot) => {
+  const isEditSlotSelectable = useCallback((slot) => {
     if (isPastSlotForDate(slot, editForm.date, nowReference)) {
       return false
     }
@@ -568,7 +570,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       slot.state === 'available' ||
       (editingReservation && slot.source === 'lab_reservation' && slot.source_id === editingReservation.id)
     )
-  }
+  }, [editForm.date, editingReservation, nowReference])
 
   useEffect(() => {
     if (!editingReservation) {
@@ -625,7 +627,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     return () => {
       mounted = false
     }
-  }, [editingReservation, editForm.date, editForm.end_time, editForm.laboratory_id, editForm.start_time])
+  }, [editingReservation, editForm.date, editForm.end_time, editForm.laboratory_id, editForm.start_time, isEditSlotSelectable])
 
   const selectedEditSlot = useMemo(
     () => editSlots.find((slot) => getSlotKey(slot) === editSelectedSlotKey) || null,
@@ -658,7 +660,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       return `El motivo debe tener al menos ${MIN_PURPOSE_LENGTH} caracteres.`
     }
     return ''
-  }, [editForm.date, editForm.purpose, editingReservation, nowReference, selectedEditLab, selectedEditSlot, user])
+  }, [editForm.date, editForm.purpose, editingReservation, isEditSlotSelectable, nowReference, selectedEditLab, selectedEditSlot, user])
 
   const handleOpenReservationDetails = async (reservation) => {
     const nextReservation = reservation || null

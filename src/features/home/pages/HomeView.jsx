@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import AdminAreasPage from '../../admin/pages/AdminAreasPage'
 import AdminEquiposPage from '../../admin/pages/AdminEquiposPage'
 import AdminLaboratoriosPage from '../../admin/pages/AdminLaboratoriosPage'
@@ -14,7 +14,6 @@ import TutorTutorialSessionsPage from '../../tutorials/pages/TutorTutorialSessio
 import Navbar from '../../../shared/components/navbar/navbar'
 import NotificationBell from '../../../shared/components/NotificationBell'
 import ucbEscudoLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
-import ucbLapazLogo from '../../../assets/branding/ucb-san-pablo-lapaz.png'
 import {
   APP_ROOT_PATH,
   getSectionIdFromPath,
@@ -57,16 +56,16 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
   const shouldTrackOperationsSnapshot = canManageStructure && activeSection === 'home'
   const unreadNotificationsCount = notifications.filter((notification) => !notification.is_read).length
 
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     try {
       const notificationsData = await listReservationNotifications()
       setNotifications(notificationsData)
     } catch {
       setNotifications([])
     }
-  }
+  }, [])
 
-  const loadOperationsSnapshot = async () => {
+  const loadOperationsSnapshot = useCallback(async () => {
     if (!shouldTrackOperationsSnapshot) {
       setOperationsSnapshot({ current_occupancy: 0, active_sessions: [], lab_breakdown: [] })
       return
@@ -82,7 +81,7 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
     } catch {
       setOperationsSnapshot({ current_occupancy: 0, active_sessions: [], lab_breakdown: [] })
     }
-  }
+  }, [shouldTrackOperationsSnapshot])
 
   useEffect(() => {
     const normalizedPath = normalizePath(currentPath)
@@ -125,12 +124,20 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
   ])
 
   useEffect(() => {
-    loadNotifications()
-  }, [user?.user_id])
+    const loadInitialNotifications = async () => {
+      await loadNotifications()
+    }
+
+    loadInitialNotifications()
+  }, [loadNotifications, user?.user_id])
 
   useEffect(() => {
-    loadOperationsSnapshot()
-  }, [shouldTrackOperationsSnapshot])
+    const loadInitialOperationsSnapshot = async () => {
+      await loadOperationsSnapshot()
+    }
+
+    loadInitialOperationsSnapshot()
+  }, [loadOperationsSnapshot])
 
   useEffect(() => {
     const unsubscribe = subscribeReservationsRealtime((event) => {
@@ -155,7 +162,7 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
     })
 
     return () => unsubscribe?.()
-  }, [canManageStructure, shouldTrackOperationsSnapshot, user?.user_id])
+  }, [canManageStructure, loadNotifications, loadOperationsSnapshot, shouldTrackOperationsSnapshot, user?.user_id])
 
   const handleMarkNotificationAsRead = async (notificationId) => {
     const updatedNotification = await markReservationNotificationAsRead(notificationId)
