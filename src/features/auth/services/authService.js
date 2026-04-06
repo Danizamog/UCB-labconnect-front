@@ -5,6 +5,18 @@ const AUTH_INSTITUTIONAL_ENDPOINT = `${apiBase}/auth/institutional`
 const AUTH_INSTITUTIONAL_CONFIG_ENDPOINT = `${apiBase}/auth/institutional/config`
 const AUTH_VALIDATE_ENDPOINT = `${apiBase}/auth/validate`
 const FRONTEND_GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim()
+const SESSION_VALIDATE_CACHE_TTL_MS = 1000
+let validateSessionInFlight = null
+let lastValidatedToken = ''
+let lastValidateAt = 0
+let lastValidateResponse = null
+
+function resetValidateSessionCache() {
+  validateSessionInFlight = null
+  lastValidatedToken = ''
+  lastValidateAt = 0
+  lastValidateResponse = null
+}
 
 function decodeJwtPayload(token) {
   try {
@@ -45,6 +57,7 @@ function persistAuthResponse(data) {
   if (user) {
     localStorage.setItem('user', JSON.stringify(user))
   }
+  resetValidateSessionCache()
 
   return { success: true, token, user }
 }
@@ -69,6 +82,7 @@ function clearStoredSession() {
   localStorage.removeItem('token')
   localStorage.removeItem('access_token')
   localStorage.removeItem('user')
+  resetValidateSessionCache()
 }
 
 export async function signIn(credentials) {
@@ -202,44 +216,75 @@ export async function validateSession() {
   }
 
   try {
-    const response = await fetch(AUTH_VALIDATE_ENDPOINT, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+    if (
+      lastValidateResponse &&
+      lastValidatedToken === token &&
+      Date.now() - lastValidateAt < SESSION_VALIDATE_CACHE_TTL_MS
+    ) {
+      return typeof globalThis.structuredClone === 'function'
+        ? globalThis.structuredClone(lastValidateResponse)
+        : JSON.parse(JSON.stringify(lastValidateResponse))
+    }
 
-    const data = await response.json().catch(() => ({}))
+    if (validateSessionInFlight && lastValidatedToken === token) {
+      return validateSessionInFlight
+    }
 
-    if (!response.ok) {
-      const shouldLogout = response.status === 401
-      if (shouldLogout) {
-        clearStoredSession()
+    lastValidatedToken = token
+    validateSessionInFlight = (async () => {
+      const response = await fetch(AUTH_VALIDATE_ENDPOINT, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        const shouldLogout = response.status === 401
+        if (shouldLogout) {
+          clearStoredSession()
+        }
+
+        const failure = {
+          success: false,
+          shouldLogout,
+          message: data?.detail || 'No se pudo validar la sesion',
+        }
+
+        lastValidatedToken = token
+        lastValidateAt = Date.now()
+        lastValidateResponse = failure
+        return failure
       }
 
-      return {
-        success: false,
-        shouldLogout,
-        message: data?.detail || 'No se pudo validar la sesion',
+      const user = buildUserFromPayload(data)
+      if (user) {
+        localStorage.setItem('user', JSON.stringify(user))
       }
-    }
 
-    const user = buildUserFromPayload(data)
-    if (user) {
-      localStorage.setItem('user', JSON.stringify(user))
-    }
+      const successResponse = {
+        success: true,
+        token,
+        user,
+        payload: data,
+      }
 
-    return {
-      success: true,
-      token,
-      user,
-      payload: data,
-    }
+      lastValidatedToken = token
+      lastValidateAt = Date.now()
+      lastValidateResponse = successResponse
+      return successResponse
+    })()
+
+    return await validateSessionInFlight
   } catch {
     return {
       success: false,
       shouldLogout: false,
       message: 'No se pudo validar la sesion en este momento',
     }
+  } finally {
+    validateSessionInFlight = null
   }
 }
 
