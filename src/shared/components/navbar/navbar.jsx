@@ -32,7 +32,6 @@ const iconMap = {
   calendar: Layers,
   tutorials_manage: CalendarPlus,
   tutorials_public: BookOpenCheck,
-  reserve_reactivos: Package,
   reserve: FlaskConical,
   logout: LogOut,
 }

@@ -652,8 +652,8 @@ function AdminReservationsPage({ user }) {
                   </div>
                   <div className="reservation-user-card-meta">
                     <span>{getReservationLabLabel(reservation)}</span>
-                    <span>{reservation.date} · {reservation.start_time} - {reservation.end_time}</span>
-                    <span>Ingreso: {reservation.check_in_time || 'No registrado'} · Salida: {reservation.check_out_time || 'No registrada'}</span>
+                    <span>{reservation.date} | {reservation.start_time} - {reservation.end_time}</span>
+                    <span>Ingreso: {reservation.check_in_time || 'No registrado'} | Salida: {reservation.check_out_time || 'No registrada'}</span>
                     <span>Estacion: {reservation.station_label || 'Sin estacion'}</span>
                     <span>{reservation.purpose || 'Sin motivo registrado'}</span>
                   </div>
