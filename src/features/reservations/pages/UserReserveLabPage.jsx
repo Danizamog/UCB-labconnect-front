@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import TutorialSessionDetailModal from '../../tutorials/pages/TutorialSessionDetailModal'
 import { getTutorialSessionById } from '../../tutorials/services/tutorialSessionsService'
@@ -313,7 +313,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
           recipients.includes(user?.user_id || '')
 
         if (isCurrentUserNotification) {
-          setMessage('Tienes una nueva notificacion relacionada con tus reservas.')
+          setMessage('Tienes una nueva notificacion relacionada con tus reservas o tutorias.')
         }
       }
     })
@@ -936,16 +936,23 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
         ) : (
           <div className="reservation-notification-list">
             {notifications.map((notification) => {
-              const isReminder = notification.type === 'reservation_reminder'
+              const isReminder = notification.type === 'reservation_reminder' || notification.type === 'tutorial_reminder'
+              const isTutorialReminder = notification.type === 'tutorial_reminder'
               const isPenaltyNotification = notification.type === 'penalty_applied' || notification.type === 'penalty_lifted'
-              const showSchedule = notification.change_kinds.includes('schedule')
-              const showLocation = notification.change_kinds.includes('location')
+              const isTutorialUpdate = notification.type === 'tutorial_session_updated'
+              const isTutorialCancelled = notification.type === 'tutorial_session_cancelled'
+              const showSchedule = !isTutorialUpdate && notification.change_kinds.includes('schedule')
+              const showLocation = !isTutorialUpdate && notification.change_kinds.includes('location')
+              const showTutorialSchedule = isTutorialUpdate && notification.change_kinds.includes('schedule')
+              const showTutorialLocation = isTutorialUpdate && notification.change_kinds.includes('location')
+              const showTutorialTutor = isTutorialUpdate && notification.change_kinds.includes('tutor')
               const oldLabName = labNameById[String(notification.old_laboratory_id)] || notification.old_laboratory_id || 'Sin laboratorio'
               const newLabName = labNameById[String(notification.new_laboratory_id)] || notification.new_laboratory_id || 'Sin laboratorio'
               const reminderLabName =
                 labNameById[String(notification.reminder_laboratory_id)] ||
                 notification.reminder_laboratory_id ||
                 'Sin laboratorio'
+              const reminderLocation = notification.reminder_location || reminderLabName
               const reminderToneClass = notification.reminder_kind === '30m' ? ' is-reminder-urgent' : ' is-reminder'
 
               return (
@@ -971,13 +978,19 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                       <div className="reservation-notification-change">
                         <span>Comienza</span>
                         <strong className="reservation-notification-new">
-                          {notification.reminder_date} · {notification.reminder_time}
+                          {notification.reminder_date} | {notification.reminder_time}
                         </strong>
                       </div>
                       <div className="reservation-notification-change">
-                        <span>Laboratorio</span>
-                        <strong>{reminderLabName}</strong>
+                        <span>{isTutorialReminder ? 'Ubicacion' : 'Laboratorio'}</span>
+                        <strong>{isTutorialReminder ? reminderLocation : reminderLabName}</strong>
                       </div>
+                      {isTutorialReminder ? (
+                        <div className="reservation-notification-change">
+                          <span>Tutor</span>
+                          <strong>{notification.reminder_tutor_name || 'Tutor asignado'}</strong>
+                        </div>
+                      ) : null}
                       <div className="reservation-notification-change">
                         <span>Ventana</span>
                         <strong>{notification.reminder_kind === '30m' ? 'Faltan 30 minutos' : 'Faltan 24 horas'}</strong>
@@ -1002,13 +1015,72 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                         </div>
                       ) : null}
                     </div>
+                  ) : isTutorialUpdate || isTutorialCancelled ? (
+                    <div className="reservation-notification-diff">
+                      {showTutorialSchedule || isTutorialCancelled ? (
+                        <div className="reservation-notification-change">
+                          <span>{showTutorialSchedule ? 'Horario anterior' : 'Horario'}</span>
+                          <strong className={showTutorialSchedule ? 'reservation-notification-old' : undefined}>
+                            {[
+                              notification.old_tutorial_date || notification.tutorial_date,
+                              showTutorialSchedule
+                                ? notification.old_tutorial_time_range
+                                : `${notification.tutorial_start_time} - ${notification.tutorial_end_time}`,
+                            ]
+                              .filter(Boolean)
+                              .join(' | ')}
+                          </strong>
+                        </div>
+                      ) : null}
+
+                      {showTutorialSchedule ? (
+                        <div className="reservation-notification-change">
+                          <span>Horario nuevo</span>
+                          <strong className="reservation-notification-new">
+                            {[notification.new_tutorial_date, notification.new_tutorial_time_range].filter(Boolean).join(' | ')}
+                          </strong>
+                        </div>
+                      ) : null}
+
+                      {showTutorialLocation || isTutorialCancelled ? (
+                        <div className="reservation-notification-change">
+                          <span>{showTutorialLocation ? 'Laboratorio anterior' : 'Laboratorio'}</span>
+                          <strong className={showTutorialLocation ? 'reservation-notification-old' : undefined}>
+                            {showTutorialLocation ? notification.old_tutorial_location : notification.tutorial_location}
+                          </strong>
+                        </div>
+                      ) : null}
+
+                      {showTutorialLocation ? (
+                        <div className="reservation-notification-change">
+                          <span>Laboratorio nuevo</span>
+                          <strong className="reservation-notification-new">{notification.new_tutorial_location}</strong>
+                        </div>
+                      ) : null}
+
+                      {showTutorialTutor || isTutorialCancelled ? (
+                        <div className="reservation-notification-change">
+                          <span>{showTutorialTutor ? 'Tutor anterior' : 'Tutor'}</span>
+                          <strong className={showTutorialTutor ? 'reservation-notification-old' : undefined}>
+                            {showTutorialTutor ? notification.old_tutor_name : notification.tutor_name}
+                          </strong>
+                        </div>
+                      ) : null}
+
+                      {showTutorialTutor ? (
+                        <div className="reservation-notification-change">
+                          <span>Tutor nuevo</span>
+                          <strong className="reservation-notification-new">{notification.new_tutor_name}</strong>
+                        </div>
+                      ) : null}
+                    </div>
                   ) : (
                     <div className="reservation-notification-diff">
                       {showSchedule ? (
                         <div className="reservation-notification-change">
                           <span>Horario anterior</span>
                           <strong className="reservation-notification-old">
-                            {notification.old_date} · {notification.old_time_range}
+                            {notification.old_date} | {notification.old_time_range}
                           </strong>
                         </div>
                       ) : null}
@@ -1017,7 +1089,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                         <div className="reservation-notification-change">
                           <span>Horario nuevo</span>
                           <strong className="reservation-notification-new">
-                            {notification.new_date} · {notification.new_time_range}
+                            {notification.new_date} | {notification.new_time_range}
                           </strong>
                         </div>
                       ) : null}
@@ -1458,3 +1530,4 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
 }
 
 export default UserReserveLabPage
+
