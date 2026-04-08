@@ -183,10 +183,10 @@ export function updateAsset(assetId, payload) {
   })
 }
 
-export function updateAssetStatus(assetId, status, notes = '') {
+export function updateAssetStatus(assetId, status) {
   return request(`${inventoryBase}/assets/${assetId}/status`, {
     method: 'PATCH',
-    body: JSON.stringify({ status, notes }),
+    body: JSON.stringify({ status }),
   }).then((data) => {
     clearInfrastructureCache()
     return data

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getTutorialSessionById } from '../../tutorials/services/tutorialSessionsService'
 import TutorialSessionDetailModal from '../../tutorials/pages/TutorialSessionDetailModal'
 import { openTutorialSessionFlow } from '../../tutorials/utils/focusTutorialNavigation'
@@ -134,22 +134,23 @@ function UserAvailabilityCalendarPage({ user }) {
   const [error, setError] = useState('')
   const [focusedTutorial, setFocusedTutorial] = useState(null)
 
-  const loadLabs = async () => {
+  const loadLabs = useCallback(async () => {
     try {
       const labsData = await listAvailableLabs(user)
       setLabs(labsData)
-      if (!selectedLab && labsData.length > 0) {
-        setSelectedLab(String(labsData[0].id || ''))
-      }
+      setSelectedLab((previous) => previous || String(labsData[0]?.id || ''))
       setError(labsData.length === 0 ? 'No tienes permisos para reservar en los laboratorios disponibles actualmente.' : '')
     } catch (err) {
       setError(err.message || 'No se pudo cargar la disponibilidad.')
     }
-  }
+  }, [user])
 
   useEffect(() => {
-    loadLabs()
-  }, [])
+    const timer = window.setTimeout(() => {
+      loadLabs()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadLabs])
 
   useEffect(() => {
     let mounted = true
