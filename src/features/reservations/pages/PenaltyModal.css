@@ -1,3 +1,287 @@
+.penalty-backdrop {
+  align-items: start;
+  overflow-y: auto;
+}
+
 .penalty-modal {
-  max-width: 920px;
+  width: min(1040px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  gap: 20px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(244, 197, 66, 0.22), transparent 28%),
+    radial-gradient(circle at 100% 0%, rgba(10, 53, 89, 0.16), transparent 24%),
+    linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+}
+
+.penalty-modal-hero {
+  padding: 4px 4px 0;
+}
+
+.penalty-modal-form {
+  gap: 18px;
+}
+
+.penalty-modal-warning,
+.penalty-modal-ready {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.penalty-modal-warning {
+  color: #8b1e1e;
+  background: rgba(185, 28, 28, 0.08);
+  border: 1px solid rgba(185, 28, 28, 0.18);
+}
+
+.penalty-modal-ready {
+  color: #0a3559;
+  background: rgba(10, 53, 89, 0.06);
+  border: 1px solid rgba(10, 53, 89, 0.12);
+}
+
+.penalty-form-section {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(10, 53, 89, 0.1);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 12px 30px rgba(10, 53, 89, 0.06);
+}
+
+.penalty-section-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.penalty-section-heading > span {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  flex: 0 0 auto;
+  background: linear-gradient(135deg, #0a3559, #155e9f);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 900;
+  box-shadow: 0 10px 20px rgba(10, 53, 89, 0.18);
+}
+
+.penalty-section-heading h4 {
+  margin: 0 0 4px;
+  color: var(--ink-900);
+  font-size: 1rem;
+}
+
+.penalty-section-heading p {
+  margin: 0;
+  color: var(--ink-700);
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
+.penalty-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.penalty-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--ink-700);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.penalty-field.is-wide {
+  grid-column: 1 / -1;
+}
+
+.penalty-field small,
+.penalty-evidence-card small {
+  color: var(--ink-700);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.penalty-field input,
+.penalty-field select,
+.penalty-field textarea {
+  border: 1.5px solid rgba(10, 53, 89, 0.16);
+  border-radius: 14px;
+  padding: 12px 13px;
+  font: inherit;
+  background: #fff;
+  color: var(--ink-900);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.penalty-field textarea {
+  resize: vertical;
+}
+
+.penalty-field input:focus,
+.penalty-field select:focus,
+.penalty-field textarea:focus {
+  outline: none;
+  border-color: rgba(6, 77, 144, 0.6);
+  box-shadow: 0 0 0 4px rgba(6, 77, 144, 0.1);
+  background: #fff;
+}
+
+.penalty-field-error {
+  color: #9f1239 !important;
+  font-weight: 800 !important;
+}
+
+.penalty-selected-user,
+.penalty-evidence-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(10, 53, 89, 0.08), rgba(244, 197, 66, 0.12));
+  border: 1px solid rgba(10, 53, 89, 0.12);
+}
+
+.penalty-selected-user div,
+.penalty-evidence-card {
+  min-width: 0;
+}
+
+.penalty-selected-user strong,
+.penalty-evidence-card strong {
+  display: block;
+  color: var(--ink-900);
+  font-size: 0.98rem;
+}
+
+.penalty-selected-user span {
+  color: var(--ink-700);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.penalty-selected-user > span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #0a3559;
+}
+
+.penalty-duration-pills {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.penalty-duration-pills button {
+  border: 1px solid rgba(10, 53, 89, 0.14);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(10, 53, 89, 0.06);
+  color: #0a3559;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.penalty-duration-pills button:hover {
+  background: rgba(244, 197, 66, 0.18);
+  border-color: rgba(244, 197, 66, 0.55);
+}
+
+.penalty-modal-actions {
+  position: sticky;
+  bottom: -1px;
+  padding-top: 12px;
+  background: linear-gradient(180deg, rgba(248, 251, 255, 0), #f8fbff 36%);
+}
+
+@media (max-width: 820px) {
+  .penalty-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .penalty-selected-user,
+  .penalty-evidence-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  .penalty-modal {
+    max-height: calc(100vh - 24px);
+  }
+
+  .penalty-form-section {
+    padding: 14px;
+  }
+}
+
+/* Polished penalty workflow */
+.penalty-backdrop {
+  background:
+    radial-gradient(circle at 50% 10%, rgba(244, 197, 66, 0.16), transparent 30%),
+    rgba(7, 19, 34, 0.62);
+  backdrop-filter: blur(8px);
+}
+
+.penalty-modal {
+  border-radius: 32px;
+  box-shadow: 0 42px 84px rgba(7, 19, 34, 0.32);
+}
+
+.penalty-form-section {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 251, 255, 0.88));
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.penalty-form-section:hover {
+  transform: translateY(-2px);
+  border-color: rgba(6, 63, 119, 0.18);
+  box-shadow: 0 22px 46px rgba(13, 34, 61, 0.12);
+}
+
+.penalty-section-heading > span {
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.42), transparent 34%),
+    linear-gradient(135deg, #063f77, #1260aa);
+}
+
+.penalty-field input,
+.penalty-field select,
+.penalty-field textarea {
+  min-height: 44px;
+  border-radius: 16px;
+}
+
+.penalty-selected-user,
+.penalty-evidence-card {
+  box-shadow: 0 16px 30px rgba(13, 34, 61, 0.08);
+}
+
+.penalty-duration-pills button {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+
+.penalty-duration-pills button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 24px rgba(13, 34, 61, 0.12);
 }
