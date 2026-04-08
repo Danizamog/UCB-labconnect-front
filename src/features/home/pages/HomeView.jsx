@@ -9,6 +9,7 @@ import AdminPenaltiesPage from '../../reservations/pages/AdminPenaltiesPage'
 import AdminReservationsPage from '../../reservations/pages/AdminReservationsPage'
 import UserAvailabilityCalendarPage from '../../reservations/pages/UserAvailabilityCalendarPage'
 import UserReserveLabPage from '../../reservations/pages/UserReserveLabPage'
+import UserReserveSuppliesPage from '../../reservations/pages/UserReserveSuppliesPage'
 import StudentTutorialSessionsPage from '../../tutorials/pages/StudentTutorialSessionsPage'
 import TutorTutorialSessionsPage from '../../tutorials/pages/TutorTutorialSessionsPage'
 import Navbar from '../../../shared/components/navbar/navbar'
@@ -164,6 +165,7 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
       (activeSection === 'equipos' && canManageEquipos) ||
       (activeSection === 'materiales' && canManageMateriales) ||
       (activeSection === 'calendar' && !isAdmin) ||
+      (activeSection === 'reserve_reactivos' && !isAdmin) ||
       (activeSection === 'tutorials_public' && !isAdmin) ||
       (activeSection === 'reserve' && !isAdmin)
 
@@ -310,6 +312,7 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
           {canManageEquipos && activeSection === 'equipos' ? <AdminEquiposPage user={user} /> : null}
           {canManageMateriales && activeSection === 'materiales' ? <AdminMaterialesPage user={user} /> : null}
           {!isAdmin && activeSection === 'calendar' ? <UserAvailabilityCalendarPage user={user} /> : null}
+          {!isAdmin && activeSection === 'reserve_reactivos' ? <UserReserveSuppliesPage user={user} /> : null}
           {!isAdmin && activeSection === 'tutorials_public' ? <StudentTutorialSessionsPage user={user} /> : null}
           {!isAdmin && activeSection === 'reserve' ? (
             <UserReserveLabPage

@@ -285,6 +285,21 @@ function mapPenalty(record) {
   }
 }
 
+function mapSupplyReservation(record) {
+  return {
+    id: String(record?.id || ''),
+    stock_item_id: String(record?.stock_item_id || ''),
+    stock_item_name: String(record?.stock_item_name || ''),
+    quantity: Number(record?.quantity || 0),
+    status: String(record?.status || 'pending'),
+    requested_by: String(record?.requested_by || ''),
+    requested_for: String(record?.requested_for || ''),
+    notes: String(record?.notes || ''),
+    created: String(record?.created || ''),
+    updated: String(record?.updated || ''),
+  }
+}
+
 export async function listAvailableLabs(user = null) {
   const labs = await listAdminLabs()
   return labs.filter((lab) => isLabAccessibleToUser(lab, user))
@@ -523,6 +538,54 @@ export async function liftPenalty(penaltyId, options = {}) {
   })
   clearReservationsCache()
   return mapPenalty(data?.penalty || {})
+}
+
+export async function listSupplyReservations(filters = {}, user = null) {
+  const search = new URLSearchParams()
+  if (filters.status) {
+    search.set('status', String(filters.status).trim())
+  }
+
+  const query = search.toString() ? `?${search.toString()}` : ''
+  const data = await request(`${reservationsBase}/supply-reservations${query}`, { cacheTtlMs: 1500 })
+  const mapped = Array.isArray(data) ? data.map(mapSupplyReservation) : []
+
+  if (!user) {
+    return mapped
+  }
+
+  const identityCandidates = [
+    String(user?.username || '').trim().toLowerCase(),
+    String(user?.name || '').trim().toLowerCase(),
+    String(user?.user_id || '').trim().toLowerCase(),
+  ].filter(Boolean)
+
+  if (identityCandidates.length === 0) {
+    return mapped
+  }
+
+  return mapped.filter((reservation) => identityCandidates.includes(String(reservation.requested_by || '').trim().toLowerCase()))
+}
+
+export async function createSupplyReservation(payload) {
+  const normalized = {
+    stock_item_id: String(payload.stock_item_id || '').trim(),
+    quantity: Number(payload.quantity || 0),
+    requested_for: String(payload.requested_for || '').trim(),
+    notes: String(payload.notes || '').trim(),
+  }
+
+  if (!normalized.stock_item_id || normalized.quantity <= 0) {
+    throw new Error('Debes seleccionar un reactivo y una cantidad valida.')
+  }
+
+  const record = await request(`${reservationsBase}/supply-reservations`, {
+    method: 'POST',
+    body: JSON.stringify(normalized),
+  })
+
+  clearReservationsCache()
+  return mapSupplyReservation(record)
 }
 
 export function subscribeReservationsRealtime(onMessage) {
