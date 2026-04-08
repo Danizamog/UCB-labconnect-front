@@ -322,6 +322,17 @@
   font-weight: 600;
 }
 
+.profiles-flag-banner {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(185, 28, 28, 0.08);
+  color: #991b1b !important;
+  font-size: 0.82rem !important;
+  line-height: 1.55;
+  border: 1px solid rgba(185, 28, 28, 0.12);
+}
+
 /* ── Form sections ─────────────────────────────────────── */
 .profiles-form-section {
   display: grid;

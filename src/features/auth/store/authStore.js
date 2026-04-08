@@ -17,6 +17,11 @@ export function useAuthStore() {
   )
   const refreshInFlightRef = useRef(null)
   const lastRefreshAtRef = useRef(0)
+  const userRef = useRef(user)
+
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
 
   const applyAuthenticatedUser = useCallback((nextUser) => {
     setIsAuthenticated(true)
@@ -56,7 +61,7 @@ export function useAuthStore() {
     }
 
     if (!force && now - lastRefreshAtRef.current < SESSION_REFRESH_COOLDOWN_MS) {
-      return { success: true, skipped: true, user }
+      return { success: true, skipped: true, user: userRef.current }
     }
 
     const refreshPromise = validateSession()
@@ -77,14 +82,18 @@ export function useAuthStore() {
 
     refreshInFlightRef.current = null
     return response
-  }, [applyAuthenticatedUser, clearSession, user])
+  }, [applyAuthenticatedUser, clearSession])
 
   useEffect(() => {
     if (!localStorage.getItem('token') && !localStorage.getItem('access_token')) {
       return undefined
     }
 
-    refreshSession({ force: true })
+    const refreshInitialSession = async () => {
+      await refreshSession({ force: true })
+    }
+
+    refreshInitialSession()
 
     const handleWindowFocus = () => {
       refreshSession()

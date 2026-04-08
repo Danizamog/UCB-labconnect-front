@@ -4,16 +4,54 @@ const reservationsBase = `${apiBase}/v1`
 const inventoryBase = `${apiBase}/inventory`
 
 import { getAuthToken } from '../../../shared/utils/storage'
+const requestCache = new Map()
+const inFlightRequests = new Map()
 
 async function parseJson(response, fallback) {
   return response.json().catch(() => fallback)
 }
 
+function cloneCachedValue(value) {
+  if (typeof globalThis.structuredClone === 'function') {
+    return globalThis.structuredClone(value)
+  }
+
+  return JSON.parse(JSON.stringify(value))
+}
+
+function buildRequestCacheKey(url, options = {}) {
+  const method = String(options.method || 'GET').toUpperCase()
+  return `${method}:${url}`
+}
+
+function clearInfrastructureCache() {
+  requestCache.clear()
+  inFlightRequests.clear()
+}
+
 async function request(url, options = {}) {
+  const { cacheTtlMs = 0, skipCache = false, ...fetchOptions } = options
+  const method = String(fetchOptions.method || 'GET').toUpperCase()
+  const canCache = method === 'GET' && cacheTtlMs > 0 && !skipCache
+  const cacheKey = buildRequestCacheKey(url, fetchOptions)
+
+  if (canCache) {
+    const cachedEntry = requestCache.get(cacheKey)
+    if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+      return cloneCachedValue(cachedEntry.data)
+    }
+
+    const existingRequest = inFlightRequests.get(cacheKey)
+    if (existingRequest) {
+      return cloneCachedValue(await existingRequest)
+    }
+  }
+
+  const fetchPromise = (async () => {
   const token = getAuthToken()
   const headers = {
-    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-    ...(options.headers || {}),
+    ...(fetchOptions.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(fetchOptions.headers || {}),
   }
 
   if (token) {
@@ -21,7 +59,7 @@ async function request(url, options = {}) {
   }
 
   const response = await fetch(url, {
-    ...options,
+    ...fetchOptions,
     headers,
   })
 
@@ -31,17 +69,41 @@ async function request(url, options = {}) {
     throw new Error(data?.detail || `Error ${response.status}`)
   }
 
+    if (canCache) {
+      requestCache.set(cacheKey, {
+        data,
+        expiresAt: Date.now() + cacheTtlMs,
+      })
+    }
+
   return data
+  })()
+
+  if (canCache) {
+    inFlightRequests.set(cacheKey, fetchPromise)
+  }
+
+  try {
+    const result = await fetchPromise
+    return canCache ? cloneCachedValue(result) : result
+  } finally {
+    if (canCache) {
+      inFlightRequests.delete(cacheKey)
+    }
+  }
 }
 
 export function listAdminAreas() {
-  return request(`${reservationsBase}/areas/all`)
+  return request(`${reservationsBase}/areas/all`, { cacheTtlMs: 60000 })
 }
 
 export function createArea(payload) {
   return request(`${reservationsBase}/areas`, {
     method: 'POST',
     body: JSON.stringify(payload),
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
   })
 }
 
@@ -49,23 +111,32 @@ export function updateArea(areaId, payload) {
   return request(`${reservationsBase}/areas/${areaId}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
   })
 }
 
 export function deleteArea(areaId) {
   return request(`${reservationsBase}/areas/${areaId}`, {
     method: 'DELETE',
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
   })
 }
 
 export function listAdminLabs() {
-  return request(`${reservationsBase}/labs/all`)
+  return request(`${reservationsBase}/labs/all`, { cacheTtlMs: 60000 })
 }
 
 export function createLab(payload) {
   return request(`${reservationsBase}/labs`, {
     method: 'POST',
     body: JSON.stringify(payload),
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
   })
 }
 
@@ -73,23 +144,32 @@ export function updateLab(labId, payload) {
   return request(`${reservationsBase}/labs/${labId}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
   })
 }
 
 export function deleteLab(labId) {
   return request(`${reservationsBase}/labs/${labId}`, {
     method: 'DELETE',
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
   })
 }
 
 export function listAssets() {
-  return request(`${inventoryBase}/assets`)
+  return request(`${inventoryBase}/assets`, { cacheTtlMs: 5000 })
 }
 
 export function createAsset(payload) {
   return request(`${inventoryBase}/assets`, {
     method: 'POST',
     body: JSON.stringify(payload),
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
   })
 }
 
@@ -97,6 +177,9 @@ export function updateAsset(assetId, payload) {
   return request(`${inventoryBase}/assets/${assetId}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
   })
 }
 
@@ -104,27 +187,103 @@ export function updateAssetStatus(assetId, status) {
   return request(`${inventoryBase}/assets/${assetId}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
   })
 }
 
 export function listAssetStatusHistory(assetId) {
-  return request(`${inventoryBase}/assets/${assetId}/status-history`)
+  return request(`${inventoryBase}/asset-maintenance/assets/${assetId}/history`, { cacheTtlMs: 5000 })
+}
+
+export function listAssetMaintenanceTickets(filters = {}) {
+  const query = buildQuery(filters)
+  return request(`${inventoryBase}/asset-maintenance${query}`, { cacheTtlMs: 5000 })
+}
+
+export function createAssetMaintenanceTicket(assetId, payload) {
+  return request(`${inventoryBase}/asset-maintenance/assets/${assetId}/tickets`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
+  })
+}
+
+export function closeAssetMaintenanceTicket(ticketId, payload) {
+  return request(`${inventoryBase}/asset-maintenance/tickets/${ticketId}/close`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
+  })
+}
+
+export function listAssetResponsibilityFlags() {
+  return request(`${inventoryBase}/asset-maintenance/user-flags`, { cacheTtlMs: 5000 })
+}
+
+function mapLoanRecord(record) {
+  return {
+    id: record?.id || '',
+    asset_id: record?.asset_id || '',
+    asset_name: record?.asset_name || '',
+    asset_serial_number: record?.asset_serial_number || '',
+    laboratory_id: record?.laboratory_id || '',
+    laboratory_name: record?.laboratory_name || '',
+    borrower_id: record?.borrower_id || '',
+    borrower_name: record?.borrower_name || '',
+    borrower_email: record?.borrower_email || '',
+    borrower_role: record?.borrower_role || '',
+    purpose: record?.purpose || '',
+    notes: record?.notes || '',
+    status: record?.status || 'active',
+    loaned_by: record?.loaned_by || '',
+    returned_by: record?.returned_by || '',
+    loaned_at: record?.loaned_at || '',
+    due_at: record?.due_at || '',
+    returned_at: record?.returned_at || '',
+    return_condition: record?.return_condition || 'ok',
+    return_notes: record?.return_notes || '',
+    incident_notes: record?.incident_notes || '',
+    created: record?.created || '',
+    updated: record?.updated || '',
+  }
+}
+
+function mapLoanDashboard(record) {
+  return {
+    total_records: Number(record?.total_records || 0),
+    active_count: Number(record?.active_count || 0),
+    returned_count: Number(record?.returned_count || 0),
+    damaged_returns_count: Number(record?.damaged_returns_count || 0),
+    active_loans: Array.isArray(record?.active_loans) ? record.active_loans.map(mapLoanRecord) : [],
+  }
 }
 
 export function deleteAsset(assetId) {
   return request(`${inventoryBase}/assets/${assetId}`, {
     method: 'DELETE',
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
   })
 }
 
 export function listMaterials() {
-  return request(`${inventoryBase}/stock-items`)
+  return request(`${inventoryBase}/stock-items`, { cacheTtlMs: 5000 })
 }
 
 export function createMaterial(payload) {
   return request(`${inventoryBase}/stock-items`, {
     method: 'POST',
     body: JSON.stringify(payload),
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
   })
 }
 
@@ -132,6 +291,9 @@ export function updateMaterial(materialId, payload) {
   return request(`${inventoryBase}/stock-items/${materialId}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
   })
 }
 
@@ -139,6 +301,9 @@ export function updateMaterialQuantity(materialId, quantityAvailable) {
   return request(`${inventoryBase}/stock-items/${materialId}/quantity`, {
     method: 'PATCH',
     body: JSON.stringify({ quantity_available: quantityAvailable }),
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
   })
 }
 
@@ -148,19 +313,25 @@ export function listMaterialMovements(materialId = null, limit = 40) {
     search.set('stock_item_id', materialId)
   }
   search.set('limit', limit)
-  return request(`${inventoryBase}/stock-items/movements?${search.toString()}`)
+  return request(`${inventoryBase}/stock-items/movements?${search.toString()}`, { cacheTtlMs: 5000 })
 }
 
 export function createMaterialMovement(materialId, payload) {
   return request(`${inventoryBase}/stock-items/${materialId}/movements`, {
     method: 'POST',
     body: JSON.stringify(payload),
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
   })
 }
 
 export function deleteMaterial(materialId) {
   return request(`${inventoryBase}/stock-items/${materialId}`, {
     method: 'DELETE',
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
   })
 }
 
@@ -177,22 +348,31 @@ function buildQuery(params = {}) {
   return queryString ? `?${queryString}` : ''
 }
 
-export function listLoansDashboard() {
-  return request(`${inventoryBase}/loans/dashboard`)
+export async function listLoansDashboard() {
+  const data = await request(`${inventoryBase}/loans/dashboard`, { cacheTtlMs: 3000 })
+  return mapLoanDashboard(data || {})
 }
 
-export function listLoanRecords(filters = {}) {
-  return request(`${inventoryBase}/loans/${buildQuery(filters)}`)
+export async function listLoanRecords(filters = {}) {
+  const data = await request(`${inventoryBase}/loans/${buildQuery(filters)}`, { cacheTtlMs: 3000 })
+  return Array.isArray(data) ? data.map(mapLoanRecord) : []
 }
 
-export function createLoanRecord(payload) {
-  return request(`${inventoryBase}/loans`, {
+export async function listAssetLoanHistory(assetId) {
+  const data = await request(`${inventoryBase}/loans/assets/${assetId}/history`, { cacheTtlMs: 3000 })
+  return Array.isArray(data) ? data.map(mapLoanRecord) : []
+}
+
+export async function createLoanRecord(payload) {
+  const data = await request(`${inventoryBase}/loans`, {
     method: 'POST',
     body: JSON.stringify(payload),
   })
+  clearInfrastructureCache()
+  return mapLoanRecord(data || {})
 }
 
-export function returnLoanRecord(loanId, payload) {
+export async function returnLoanRecord(loanId, payload) {
   const normalizedPayload = typeof payload === 'string'
     ? { return_notes: payload || null }
     : {
@@ -201,8 +381,10 @@ export function returnLoanRecord(loanId, payload) {
         incident_notes: payload?.incident_notes || null,
       }
 
-  return request(`${inventoryBase}/loans/${loanId}/return`, {
+  const data = await request(`${inventoryBase}/loans/${loanId}/return`, {
     method: 'PATCH',
     body: JSON.stringify(normalizedPayload),
   })
+  clearInfrastructureCache()
+  return mapLoanRecord(data || {})
 }
