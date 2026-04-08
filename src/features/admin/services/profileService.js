@@ -89,7 +89,7 @@ async function request(url, options = {}) {
 }
 
 export function listUserProfiles() {
-  return request(`${profilesBase}/`, { cacheTtlMs: 60000 })
+  return request(`${profilesBase}/`, { skipCache: true })
 }
 
 export function createUserProfile(payload) {
