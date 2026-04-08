@@ -98,6 +98,7 @@ function AdminEquiposPage({ user }) {
   const [returnModalLoan, setReturnModalLoan] = useState(null)
   const [confirmModal, setConfirmModal] = useState(null)
   const [userDirectoryMessage, setUserDirectoryMessage] = useState('')
+  const [statusDrafts, setStatusDrafts] = useState({})
 
   const canManage = hasAnyPermission(user, ['gestionar_inventario'])
   const canManageStatus = hasAnyPermission(user, ['gestionar_estado_equipos', 'gestionar_mantenimiento'])
@@ -307,15 +308,50 @@ function AdminEquiposPage({ user }) {
     })
   }
 
-  const handleStatusChange = async (assetId, status) => {
+  const getStatusDraft = (asset) => {
+    const existingDraft = statusDrafts[asset.id]
+    if (existingDraft) {
+      return existingDraft
+    }
+    return { status: asset.status, notes: '' }
+  }
+
+  const handleStatusDraftChange = (assetId, field, value) => {
+    setStatusDrafts((prev) => ({
+      ...prev,
+      [assetId]: {
+        status: prev[assetId]?.status ?? assets.find((asset) => asset.id === assetId)?.status ?? 'available',
+        notes: prev[assetId]?.notes ?? '',
+        [field]: value,
+      },
+    }))
+  }
+
+  const handleStatusChange = async (asset) => {
     if (!canManageStatus) return
+
+    const draft = getStatusDraft(asset)
+    const nextStatus = draft.status
+    const notes = (draft.notes || '').trim()
+
+    if ((nextStatus === 'maintenance' || nextStatus === 'damaged') && notes.length < 8) {
+      setError('Para registrar mantenimiento o daño, agrega una observacion de al menos 8 caracteres.')
+      return
+    }
+
     setError('')
     setMessage('')
     try {
-      const updated = await updateAssetStatus(assetId, status)
-      setAssets((previous) => previous.map((asset) => (asset.id === assetId ? updated : asset)))
-      if (selectedAssetHistoryId === assetId) await loadAssetDetailHistory(assetId)
-      setMessage('Estado del equipo actualizado correctamente.')
+      const updated = await updateAssetStatus(asset.id, nextStatus, notes)
+      setAssets((prev) => prev.map((a) => (a.id === asset.id ? updated : a)))
+      setStatusDrafts((prev) => ({
+        ...prev,
+        [asset.id]: { status: updated.status, notes: '' },
+      }))
+      
+      if (selectedAssetHistoryId === asset.id) await loadAssetDetailHistory(asset.id)
+      
+      setMessage('Estado del equipo actualizado y registrado en historial.')
     } catch (err) {
       setError(err.message || 'No se pudo actualizar el estado del equipo')
     }
@@ -675,69 +711,44 @@ function AdminEquiposPage({ user }) {
                         <span>Equipo</span>
                         <select value={loanForm.asset_id} onChange={(event) => setLoanForm((previous) => ({ ...previous, asset_id: event.target.value }))} required>
                           <option value="">Selecciona un equipo</option>
-                          {assets.map((asset) => (
-                            <option key={asset.id} value={asset.id}>{asset.name} {asset.serial_number ? `· ${asset.serial_number}` : ''} · {assetStatusLabel(asset.status)}</option>
+                          {assets.filter(a => a.status === 'available' || a.id === loanForm.asset_id).map((asset) => (
+                            <option key={asset.id} value={asset.id}>{asset.name} ({asset.serial_number || 'Sin serie'})</option>
                           ))}
                         </select>
                       </label>
                       <label>
-                        <span>Estado actual</span>
-                        <input value={selectedLoanAsset ? assetStatusLabel(selectedLoanAsset.status) : 'Sin seleccionar'} readOnly />
+                        <span>Proposito del prestamo</span>
+                        <input value={loanForm.purpose} onChange={(event) => setLoanForm((previous) => ({ ...previous, purpose: event.target.value }))} placeholder="Clase, laboratorio, proyecto..." />
                       </label>
                     </div>
                     <label>
-                      <span>Motivo del prestamo</span>
-                      <textarea rows="3" value={loanForm.purpose} onChange={(event) => setLoanForm((previous) => ({ ...previous, purpose: event.target.value }))} placeholder="Ej. Practica de electronica, apoyo en laboratorio, demostracion docente" />
+                      <span>Notas adicionales</span>
+                      <textarea rows="2" value={loanForm.notes} onChange={(event) => setLoanForm((previous) => ({ ...previous, notes: event.target.value }))} placeholder="Cables extra, condiciones especificas..." />
                     </label>
-                    <label>
-                      <span>Observaciones de salida</span>
-                      <textarea rows="3" value={loanForm.notes} onChange={(event) => setLoanForm((previous) => ({ ...previous, notes: event.target.value }))} placeholder="Accesorios incluidos, condiciones iniciales o notas de entrega" />
-                    </label>
-                    {selectedLoanAsset && selectedLoanAsset.status !== 'available' ? <p className="infra-inline-error">Este equipo no esta disponible para prestamo. Estado actual: {assetStatusLabel(selectedLoanAsset.status)}.</p> : null}
                   </div>
 
                   <div className="infra-actions">
-                    <button type="submit" className="infra-primary" disabled={!canManageLoans || savingLoan}>{savingLoan ? 'Registrando...' : 'Registrar prestamo'}</button>
+                    <button type="submit" className="infra-primary" disabled={!canManageLoans || savingLoan}>{savingLoan ? 'Registrando...' : 'Registrar salida'}</button>
                     <button type="button" className="infra-secondary" onClick={resetLoanForm}>Limpiar</button>
                   </div>
                 </form>
               </section>
 
-              <section className="infra-loan-panel">
+              <section className="infra-loan-active">
                 <div className="infra-section-head">
-                  <div>
-                    <h3>Prestamos activos</h3>
-                    <p>Devuelve aqui los equipos prestados o revisa quien tiene cada recurso en este momento.</p>
-                  </div>
-                  <div className="infra-chip-list">
-                    <span className="infra-chip">Activos {loanDashboard.active_count}</span>
-                    <span className="infra-chip">Historial {loanDashboard.total_records}</span>
-                  </div>
+                  <h4>Prestamos activos ({loanDashboard.active_count})</h4>
                 </div>
-
                 {loanDashboard.active_loans.length === 0 ? (
-                  <p className="infra-empty">No hay prestamos activos en este momento.</p>
+                  <p className="infra-empty">No hay prestamos activos.</p>
                 ) : (
                   <div className="infra-list">
                     {loanDashboard.active_loans.map((loan) => (
-                      <article key={loan.id} className="infra-ticket-card">
-                        <div className="infra-ticket-head">
-                          <div>
-                            <strong>{loan.asset_name}</strong>
-                            <p>{loan.borrower_name || loan.borrower_id}</p>
-                          </div>
-                          <div className="infra-chip-list">
-                            <span className="infra-chip">{formatStatus(loan.status)}</span>
-                            {loan.asset_serial_number ? <span className="infra-chip">{loan.asset_serial_number}</span> : null}
-                          </div>
+                      <article key={loan.id} className="infra-loan-card">
+                        <div className="infra-loan-info">
+                          <strong>{loan.asset_name}</strong>
+                          <span>{loan.borrower_name} ({loan.borrower_id})</span>
+                          <small>Prestado el: {formatDateTime(loan.loaned_at)}</small>
                         </div>
-                        <div className="infra-ticket-meta">
-                          <span><strong>Salida:</strong> {formatDateTime(loan.loaned_at)}</span>
-                          <span><strong>Registrado por:</strong> {loan.loaned_by || 'Sistema'}</span>
-                          <span><strong>Correo:</strong> {loan.borrower_email || 'Sin correo'}</span>
-                          <span><strong>Motivo:</strong> {loan.purpose || 'Sin motivo registrado'}</span>
-                        </div>
-                        {loan.notes ? <p className="infra-ticket-copy">{loan.notes}</p> : null}
                         <div className="infra-actions">
                           <button type="button" className="infra-primary" onClick={() => handleOpenReturnModal(loan)}>Registrar devolucion</button>
                         </div>
@@ -752,197 +763,157 @@ function AdminEquiposPage({ user }) {
           <section className="infra-card infra-card-full">
             <div className="infra-section-head">
               <div>
-                <h3>Equipos</h3>
-                <p>Busca por codigo o serie, revisa el estado actual y abre el detalle de mantenimiento y prestamos.</p>
+                <h3>Inventario detallado</h3>
+                <p>Filtra y administra todos los equipos registrados en el sistema.</p>
               </div>
+              <input
+                type="search"
+                placeholder="Buscar equipo..."
+                value={assetSearch}
+                onChange={(event) => setAssetSearch(event.target.value)}
+                className="infra-search-input"
+              />
             </div>
 
-            <div className="infra-form-grid">
-              <label>
-                <span>Buscar equipo por codigo, serie o nombre</span>
-                <input value={assetSearch} onChange={(event) => setAssetSearch(event.target.value)} placeholder="Ej. OSC-01, SN-2004, osciloscopio" />
-              </label>
-            </div>
-
-            <div className="infra-table-wrap">
+            <div className="infra-table-wrapper">
               <table className="infra-table">
                 <thead>
                   <tr>
                     <th>Equipo</th>
-                    <th>Categoria</th>
-                    <th>Ubicacion</th>
                     <th>Laboratorio</th>
+                    <th>Ubicacion</th>
                     <th>Estado</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAssets.map((asset) => (
-                    <Fragment key={asset.id}>
-                      <tr>
-                        <td>
-                          <strong>{asset.name}</strong>
-                          {asset.serial_number ? <small>Serie {asset.serial_number}</small> : null}
-                        </td>
-                        <td>{asset.category}</td>
-                        <td>{asset.location || 'Sin ubicacion'}</td>
-                        <td>{asset.laboratory_id ? labNameById[String(asset.laboratory_id)] || `Lab ${asset.laboratory_id}` : 'General'}</td>
-                        <td>
-                          <div className="infra-status-cell">
-                            <span className={`infra-status-badge ${assetStatusBadgeClass(asset.status)}`}>{assetStatusLabel(asset.status)}</span>
-                            <small>{asset.status_updated_by ? `Ultimo cambio: ${asset.status_updated_by} · ${formatDateTime(asset.status_updated_at)}` : 'Sin cambios registrados'}</small>
+                  {filteredAssets.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="infra-empty">No se encontraron equipos.</td>
+                    </tr>
+                  ) : (
+                    filteredAssets.map((asset) => (
+                      <Fragment key={asset.id}>
+                        <tr>
+                          <td>
+                            <strong>{asset.name}</strong>
+                            <br />
+                            <small className="infra-text-muted">{asset.category} {asset.serial_number ? `· SN: ${asset.serial_number}` : ''}</small>
+                          </td>
+                          <td>{asset.laboratory_name || labNameById[asset.laboratory_id] || 'N/A'}</td>
+                          <td>{asset.location}</td>
+                          <td>
                             {canManageStatus ? (
-                              <select value={asset.status} onChange={(event) => handleStatusChange(asset.id, event.target.value)}>
-                                <option value="available">Disponible</option>
-                                <option value="loaned">Prestado</option>
-                                <option value="maintenance">Mantenimiento</option>
-                                <option value="damaged">Danado</option>
-                              </select>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td>
-                          <div className="infra-actions compact">
-                            <button type="button" className="infra-secondary" onClick={() => handleToggleHistory(asset.id)}>{selectedAssetHistoryId === asset.id ? 'Ocultar historial' : 'Ver historial'}</button>
-                            {canManageLoans ? (
-                              <button
-                                type="button"
-                                className="infra-secondary"
-                                onClick={() => {
-                                  setLoanForm((previous) => ({ ...previous, asset_id: asset.id }))
-                                  setMessage(`Equipo ${asset.name} listo para registrar un nuevo prestamo.`)
-                                  setError('')
-                                }}
-                              >
-                                Registrar prestamo
-                              </button>
-                            ) : null}
-                            {canManageStatus ? <button type="button" className="infra-secondary" onClick={() => setTicketForm((previous) => ({ ...previous, asset_id: asset.id }))}>Reportar ticket</button> : null}
-                            {canManage ? (
-                              <>
-                                <button
-                                  type="button"
-                                  className="infra-secondary"
-                                  onClick={() => {
-                                    setEditingId(asset.id)
-                                    setForm({
-                                      name: asset.name,
-                                      category: asset.category,
-                                      location: asset.location || '',
-                                      description: asset.description || '',
-                                      serial_number: asset.serial_number || '',
-                                      laboratory_id: asset.laboratory_id ? String(asset.laboratory_id) : '',
-                                      status: asset.status,
-                                    })
-                                  }}
+                              <div className="infra-status-editor">
+                                <select
+                                  className={`infra-badge ${assetStatusBadgeClass(getStatusDraft(asset).status)}`}
+                                  value={getStatusDraft(asset).status}
+                                  onChange={(event) => handleStatusDraftChange(asset.id, 'status', event.target.value)}
                                 >
-                                  Editar
-                                </button>
-                                <button type="button" className="infra-danger" onClick={() => handleDelete(asset.id)}>Eliminar</button>
-                              </>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                      {selectedAssetHistoryId === asset.id ? (
-                        <tr className="infra-history-row">
-                          <td colSpan="6">
-                            <div className="infra-history-panel">
-                              <div className="infra-history-head">
-                                <strong>Historial tecnico y de prestamos</strong>
-                                <span>{assetHistoryLoadingId === asset.id ? 'Cargando...' : `${(assetStatusHistory[asset.id] || []).length} tickets · ${(assetLoanHistory[asset.id] || []).length} prestamos`}</span>
+                                  <option value="available">Disponible</option>
+                                  <option value="loaned" disabled>Prestado</option>
+                                  <option value="maintenance">Mantenimiento</option>
+                                  <option value="damaged">Danado</option>
+                                </select>
+                                {getStatusDraft(asset).status !== asset.status ? (
+                                  <div className="infra-status-draft">
+                                    {(getStatusDraft(asset).status === 'maintenance' || getStatusDraft(asset).status === 'damaged') && (
+                                      <input
+                                        type="text"
+                                        placeholder="Motivo (min 8 car.)"
+                                        value={getStatusDraft(asset).notes}
+                                        onChange={(e) => handleStatusDraftChange(asset.id, 'notes', e.target.value)}
+                                      />
+                                    )}
+                                    <button type="button" className="infra-btn-icon" onClick={() => handleStatusChange(asset)}>Guardar</button>
+                                  </div>
+                                ) : null}
                               </div>
-                              {assetHistoryLoadingId === asset.id ? (
-                                <p className="infra-empty">Cargando historial...</p>
-                              ) : (
-                                <div className="infra-detail-grid">
-                                  <section className="infra-subsection">
-                                    <div className="infra-subsection-head">
-                                      <h4>Mantenimiento y danos</h4>
-                                      <p>Listado cronologico de reparaciones y tickets del equipo.</p>
-                                    </div>
-                                    {(assetStatusHistory[asset.id] || []).length === 0 ? (
-                                      <p className="infra-empty">Aun no hay reparaciones ni mantenimientos registrados para este equipo.</p>
-                                    ) : (
-                                      <div className="infra-history-list">
-                                        {(assetStatusHistory[asset.id] || []).map((entry) => (
-                                          <article key={entry.id} className="infra-history-item">
-                                            <div>
-                                              <span className={`infra-status-badge ${entry.status === 'closed' ? 'available' : 'maintenance'}`}>{maintenanceTypeLabel(entry.ticket_type)} · {entry.status === 'closed' ? 'Cerrado' : 'Activo'}</span>
-                                              <small>{formatDateTime(entry.reported_at)}</small>
-                                            </div>
-                                            <div>
-                                              <strong>{entry.title}</strong>
-                                              <small>{entry.description}</small>
-                                              <small>Estado: {assetStatusLabel(entry.asset_status_before || 'available')} {' -> '} {assetStatusLabel(entry.asset_status_after_open || 'maintenance')}</small>
-                                              {entry.resolved_at ? <small>Resuelto: {formatDateTime(entry.resolved_at)} por {entry.resolved_by || 'Sistema'}</small> : null}
-                                              {entry.resolution_notes ? <small>Resolucion: {entry.resolution_notes}</small> : null}
-                                              {entry.is_responsibility_flagged ? <small className="infra-negative">Ultimo prestamo asociado: {entry.responsible_borrower_name || entry.responsible_borrower_email || 'Responsable no identificado'}</small> : null}
-                                            </div>
-                                          </article>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </section>
-
-                                  <section className="infra-subsection">
-                                    <div className="infra-subsection-head">
-                                      <h4>Historial de prestamos</h4>
-                                      <p>Usuarios que utilizaron este activo, fechas de salida y condiciones de devolucion.</p>
-                                    </div>
-                                    {(assetLoanHistory[asset.id] || []).length === 0 ? (
-                                      <p className="infra-empty">Este equipo aun no registra prestamos historicos.</p>
-                                    ) : (
-                                      <div className="infra-history-table-wrap">
-                                        <table className="infra-table">
-                                          <thead>
-                                            <tr>
-                                              <th>Usuario</th>
-                                              <th>Salida</th>
-                                              <th>Devolucion</th>
-                                              <th>Estado</th>
-                                              <th>Detalle</th>
-                                            </tr>
-                                          </thead>
-                                          <tbody>
-                                            {(assetLoanHistory[asset.id] || []).map((loan) => (
-                                              <tr key={loan.id}>
-                                                <td>
-                                                  <strong>{loan.borrower_name || loan.borrower_id}</strong>
-                                                  <small>{loan.borrower_email || loan.borrower_id}</small>
-                                                </td>
-                                                <td>
-                                                  {formatDateTime(loan.loaned_at)}
-                                                  <small>Registrado por {loan.loaned_by || 'Sistema'}</small>
-                                                </td>
-                                                <td>
-                                                  {loan.returned_at ? formatDateTime(loan.returned_at) : 'Pendiente'}
-                                                  <small>{loan.returned_by ? `Recibido por ${loan.returned_by}` : 'Sin cierre'}</small>
-                                                </td>
-                                                <td>
-                                                  <span className={`infra-status-badge ${loan.status === 'returned' ? 'available' : 'loaned'}`}>{formatStatus(loan.status)}</span>
-                                                  {loan.status === 'returned' ? <small>{returnConditionLabel(loan.return_condition)}</small> : null}
-                                                </td>
-                                                <td>
-                                                  <small>{loan.purpose || 'Sin motivo registrado'}</small>
-                                                  {loan.return_notes ? <small>Observacion: {loan.return_notes}</small> : null}
-                                                  {loan.incident_notes ? <small className="infra-negative">Dano: {loan.incident_notes}</small> : null}
-                                                </td>
-                                              </tr>
-                                            ))}
-                                          </tbody>
-                                        </table>
-                                      </div>
-                                    )}
-                                  </section>
-                                </div>
-                              )}
+                            ) : (
+                              <span className={`infra-badge ${assetStatusBadgeClass(asset.status)}`}>{assetStatusLabel(asset.status)}</span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="infra-actions-row">
+                              <button type="button" className="infra-btn-text" onClick={() => handleToggleHistory(asset.id)}>
+                                {selectedAssetHistoryId === asset.id ? 'Ocultar historial' : 'Ver historial'}
+                              </button>
+                              {canManage ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="infra-btn-text"
+                                    onClick={() => {
+                                      setEditingId(asset.id)
+                                      setForm({
+                                        name: asset.name,
+                                        category: asset.category,
+                                        location: asset.location,
+                                        description: asset.description || '',
+                                        serial_number: asset.serial_number || '',
+                                        laboratory_id: asset.laboratory_id || '',
+                                        status: asset.status,
+                                      })
+                                      window.scrollTo({ top: 0, behavior: 'smooth' })
+                                    }}
+                                  >
+                                    Editar
+                                  </button>
+                                  <button type="button" className="infra-btn-text infra-negative" onClick={() => handleDelete(asset.id)}>Eliminar</button>
+                                </>
+                              ) : null}
                             </div>
                           </td>
                         </tr>
-                      ) : null}
-                    </Fragment>
-                  ))}
+                        {selectedAssetHistoryId === asset.id ? (
+                          <tr className="infra-history-row">
+                            <td colSpan="5">
+                              <div className="infra-history-panel">
+                                {assetHistoryLoadingId === asset.id ? (
+                                  <p>Cargando historial...</p>
+                                ) : (
+                                  <div className="infra-history-grid">
+                                    <div>
+                                      <h5>Historial de estados y mantenimiento</h5>
+                                      {!assetStatusHistory[asset.id]?.length ? (
+                                        <p className="infra-empty-small">No hay registros de estado.</p>
+                                      ) : (
+                                        <ul className="infra-timeline">
+                                          {assetStatusHistory[asset.id].map((record) => (
+                                            <li key={record.id}>
+                                              <span className={`infra-badge ${assetStatusBadgeClass(record.status)}`}>{assetStatusLabel(record.status)}</span>
+                                              <small>{formatDateTime(record.changed_at)} por {record.changed_by_name || 'Sistema'}</small>
+                                              {record.notes ? <p>Nota: {record.notes}</p> : null}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <h5>Historial de prestamos</h5>
+                                      {!assetLoanHistory[asset.id]?.length ? (
+                                        <p className="infra-empty-small">No hay registros de prestamo.</p>
+                                      ) : (
+                                        <ul className="infra-timeline">
+                                          {assetLoanHistory[asset.id].map((record) => (
+                                            <li key={record.id}>
+                                              <strong>{record.borrower_name}</strong> ({record.status})
+                                              <small>{formatDateTime(record.loaned_at)} {record.returned_at ? `- Devuelto: ${formatDateTime(record.returned_at)}` : ''}</small>
+                                              {record.incident_notes ? <p className="infra-negative">Incidente: {record.incident_notes}</p> : null}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
