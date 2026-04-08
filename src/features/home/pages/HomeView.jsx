@@ -1,4 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  ArrowRight,
+  BookOpen,
+  Building2,
+  CalendarDays,
+  Cpu,
+  FlaskConical,
+  GraduationCap,
+  Microscope,
+  Settings,
+  ShieldCheck,
+  Wrench,
+} from 'lucide-react'
 import AdminAreasPage from '../../admin/pages/AdminAreasPage'
 import AdminEquiposPage from '../../admin/pages/AdminEquiposPage'
 import AdminLaboratoriosPage from '../../admin/pages/AdminLaboratoriosPage'
@@ -9,13 +22,11 @@ import AdminPenaltiesPage from '../../reservations/pages/AdminPenaltiesPage'
 import AdminReservationsPage from '../../reservations/pages/AdminReservationsPage'
 import UserAvailabilityCalendarPage from '../../reservations/pages/UserAvailabilityCalendarPage'
 import UserReserveLabPage from '../../reservations/pages/UserReserveLabPage'
-import UserReserveSuppliesPage from '../../reservations/pages/UserReserveSuppliesPage'
 import StudentTutorialSessionsPage from '../../tutorials/pages/StudentTutorialSessionsPage'
 import TutorTutorialSessionsPage from '../../tutorials/pages/TutorTutorialSessionsPage'
 import Navbar from '../../../shared/components/navbar/navbar'
 import NotificationBell from '../../../shared/components/NotificationBell'
 import ucbEscudoLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
-import ucbLapazLogo from '../../../assets/branding/ucb-san-pablo-lapaz.png'
 import {
   APP_ROOT_PATH,
   getSectionIdFromPath,
@@ -44,7 +55,6 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
     active_sessions: [],
     lab_breakdown: [],
   })
-
   const isAdmin = user?.role === 'admin'
   const canManageRoles = hasAnyPermission(user, ['gestionar_roles_permisos'])
   const canManageProfiles = hasAnyPermission(user, ['gestionar_roles_permisos', 'reactivar_cuentas'])
@@ -56,20 +66,19 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
   const hasManagementModules =
     canManageRoles || canManageProfiles || canManageStructure || canManagePenalties || canManageEquipos || canManageMateriales || canManageTutorials
   const activeSection = getSectionIdFromPath(currentPath) || 'home'
-
   const shouldTrackOperationsSnapshot = canManageStructure && activeSection === 'home'
   const unreadNotificationsCount = notifications.filter((notification) => !notification.is_read).length
 
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async (options = {}) => {
     try {
-      const notificationsData = await listReservationNotifications()
+      const notificationsData = await listReservationNotifications(options)
       setNotifications(notificationsData)
     } catch {
       setNotifications([])
     }
-  }
+  }, [])
 
-  const loadOperationsSnapshot = async () => {
+  const loadOperationsSnapshot = useCallback(async () => {
     if (!shouldTrackOperationsSnapshot) {
       setOperationsSnapshot({ current_occupancy: 0, active_sessions: [], lab_breakdown: [] })
       return
@@ -85,70 +94,7 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
     } catch {
       setOperationsSnapshot({ current_occupancy: 0, active_sessions: [], lab_breakdown: [] })
     }
-  }
-
-  const institutionalLinks = [
-    {
-      title: 'Portal UCB',
-      description: 'Sitio institucional con información oficial de la universidad.',
-      href: 'https://www.ucb.edu.bo',
-      label: 'ucb.edu.bo',
-    },
-    {
-      title: 'SIAAN',
-      description: 'Acceso al sistema académico nacional para gestiones estudiantiles.',
-      href: 'https://academico.ucb.edu.bo/AcademicoNacional/inicio',
-      label: 'academico.ucb.edu.bo',
-    },
-    {
-      title: 'LMS UCB',
-      description: 'Ingreso al campus virtual para clases, recursos y seguimiento académico.',
-      href: 'https://lms.ucb.edu.bo/my/',
-      label: 'lms.ucb.edu.bo',
-    },
-    {
-      title: 'Contacto UCB',
-      description: 'Canales de comunicación y referencia institucional.',
-      href: 'https://www.ucb.edu.bo/contacto',
-      label: 'ucb.edu.bo/contacto',
-    },
-  ]
-
-  const quickAccessCards = isAdmin
-    ? [
-        {
-          title: 'Gestionar roles',
-          description: 'Configura permisos y accesos del sistema.',
-          action: () => onNavigate?.('/roles'),
-        },
-        {
-          title: 'Gestionar estructura',
-          description: 'Administra reservas, áreas y laboratorios.',
-          action: () => onNavigate?.('/admin_reservas'),
-        },
-        {
-          title: 'Gestionar inventario',
-          description: 'Revisa equipos, materiales y mantenimiento.',
-          action: () => onNavigate?.('/equipos'),
-        },
-      ]
-    : [
-        {
-          title: 'Reservar laboratorio',
-          description: 'Consulta espacios disponibles y solicita una reserva.',
-          action: () => onNavigate?.('/reserve'),
-        },
-        {
-          title: 'Mi calendario',
-          description: 'Revisa tus reservas activas y próximas actividades.',
-          action: () => onNavigate?.('/calendar'),
-        },
-        {
-          title: 'LMS y SIAAN',
-          description: 'Accede a las plataformas académicas de la UCB.',
-          action: () => window.open('https://lms.ucb.edu.bo/my/', '_blank', 'noopener,noreferrer'),
-        },
-      ]
+  }, [shouldTrackOperationsSnapshot])
 
   useEffect(() => {
     const normalizedPath = normalizePath(currentPath)
@@ -165,7 +111,6 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
       (activeSection === 'equipos' && canManageEquipos) ||
       (activeSection === 'materiales' && canManageMateriales) ||
       (activeSection === 'calendar' && !isAdmin) ||
-      (activeSection === 'reserve_reactivos' && !isAdmin) ||
       (activeSection === 'tutorials_public' && !isAdmin) ||
       (activeSection === 'reserve' && !isAdmin)
 
@@ -192,12 +137,18 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
   ])
 
   useEffect(() => {
-    loadNotifications()
-  }, [user?.user_id])
+    const timer = window.setTimeout(() => {
+      loadNotifications()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadNotifications, user?.user_id])
 
   useEffect(() => {
-    loadOperationsSnapshot()
-  }, [shouldTrackOperationsSnapshot])
+    const timer = window.setTimeout(() => {
+      loadOperationsSnapshot()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadOperationsSnapshot])
 
   useEffect(() => {
     const unsubscribe = subscribeReservationsRealtime((event) => {
@@ -212,7 +163,7 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
           ))
 
         if (isCurrentUserNotification) {
-          loadNotifications()
+          loadNotifications({ skipCache: true })
         }
       }
 
@@ -222,7 +173,7 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
     })
 
     return () => unsubscribe?.()
-  }, [canManageStructure, shouldTrackOperationsSnapshot, user?.user_id])
+  }, [canManageStructure, loadNotifications, loadOperationsSnapshot, shouldTrackOperationsSnapshot, user?.user_id])
 
   const handleMarkNotificationAsRead = async (notificationId) => {
     const updatedNotification = await markReservationNotificationAsRead(notificationId)
@@ -312,7 +263,6 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
           {canManageEquipos && activeSection === 'equipos' ? <AdminEquiposPage user={user} /> : null}
           {canManageMateriales && activeSection === 'materiales' ? <AdminMaterialesPage user={user} /> : null}
           {!isAdmin && activeSection === 'calendar' ? <UserAvailabilityCalendarPage user={user} /> : null}
-          {!isAdmin && activeSection === 'reserve_reactivos' ? <UserReserveSuppliesPage user={user} /> : null}
           {!isAdmin && activeSection === 'tutorials_public' ? <StudentTutorialSessionsPage user={user} /> : null}
           {!isAdmin && activeSection === 'reserve' ? (
             <UserReserveLabPage
@@ -323,25 +273,16 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
           ) : null}
 
           {activeSection === 'home' ? (
-            <section className="home-dashboard" aria-label="Panel de inicio">
+            <section className={isAdmin ? 'home-placeholder' : 'home-dashboard'} aria-label="Panel de inicio">
               {isAdmin ? (
-                <div className="home-admin-hero">
-                  <div className="home-brand-logos" aria-hidden="true">
-                    <img src={ucbEscudoLogo} alt="" className="home-brand-logo home-brand-logo-primary" />
-                    <img src={ucbLapazLogo} alt="" className="home-brand-logo home-brand-logo-secondary" />
+                <>
+                  <div className="home-placeholder-icon">
+                    <img src={ucbEscudoLogo} alt="UCB Escudo" width="80" height="80" />
                   </div>
-                  <div className="home-hero-copy">
-                    <p className="home-eyebrow">Universidad Católica Boliviana San Pablo</p>
-                    <h2>LabConnect</h2>
-                    <p className="home-hero-text">
-                      Centro de control para la gestión institucional de laboratorios, reservas, inventario y perfiles de acceso.
-                    </p>
-                    <div className="home-meta-row">
-                      <span>Administración centralizada</span>
-                      <span>Acceso por permisos</span>
-                      <span>Experiencia UCB</span>
-                    </div>
-                  </div>
+                  <h2>LabConnect</h2>
+                  <p className="home-placeholder-subtitle">
+                    Panel de administración — Universidad Católica Boliviana San Pablo
+                  </p>
                   {canManageStructure ? (
                     <div className="home-admin-overview">
                       <div className="home-admin-card-grid">
@@ -376,109 +317,197 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
                       )}
                     </div>
                   ) : null}
-                </div>
+                  <p className="home-placeholder-hint">
+                    Usa la barra lateral para navegar entre <strong>Perfiles</strong>, <strong>Roles</strong>, <strong>Áreas</strong>, <strong>Laboratorios</strong>, <strong>Equipos</strong> y <strong>Materiales</strong>.
+                  </p>
+                </>
               ) : (
-                <div className="home-hero">
-                  <div className="home-brand-column">
-                    <a href="https://www.ucb.edu.bo" target="_blank" rel="noopener noreferrer" className="home-brand-lockup">
-                      <img src={ucbEscudoLogo} alt="Escudo de la Universidad Católica Boliviana San Pablo" className="home-hero-logo" />
-                      <img src={ucbLapazLogo} alt="Sede La Paz de la Universidad Católica Boliviana San Pablo" className="home-hero-logo home-hero-logo-alt" />
-                    </a>
-                    <div className="home-brand-badges">
-                      <span>UCB San Pablo</span>
-                      <span>Servicios académicos e institucionales</span>
+                <>
+                  <div className="home-showcase">
+                    <section className="home-modern-hero">
+                      <div className="home-modern-hero-copy">
+                        <div className="home-modern-brand">
+                          <img src={ucbEscudoLogo} alt="UCB Escudo" />
+                          <div>
+                            <span>UCB San Pablo - La Paz</span>
+                            <strong>LabConnect</strong>
+                          </div>
+                        </div>
+                        <p className="home-modern-kicker">Gestion academica de laboratorios</p>
+                        <h1>Reserva, aprende y usa laboratorios con claridad.</h1>
+                        <p className="home-modern-tagline">
+                          Una experiencia institucional para consultar disponibilidad, reservar espacios,
+                          revisar tutorias y estar al dia con tus notificaciones academicas.
+                        </p>
+                        <div className="home-modern-actions">
+                          <button type="button" className="home-modern-primary" onClick={() => onNavigate?.('/app/reservas/nueva')}>
+                            Nueva reserva <ArrowRight size={18} />
+                          </button>
+                          <button type="button" className="home-modern-secondary" onClick={() => onNavigate?.('/app/reservas/calendario')}>
+                            Ver calendario
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="home-modern-hero-panel" aria-label="Resumen de accesos principales">
+                        <article>
+                          <CalendarDays size={24} />
+                          <span>Reservas</span>
+                          <strong>Por bloques</strong>
+                          <p>Elige laboratorio, fecha y horario disponible.</p>
+                        </article>
+                        <article>
+                          <BookOpen size={24} />
+                          <span>Tutorias</span>
+                          <strong>Apoyo academico</strong>
+                          <p>Encuentra sesiones publicadas por docentes.</p>
+                        </article>
+                        <article>
+                          <ShieldCheck size={24} />
+                          <span>Alertas</span>
+                          <strong>{unreadNotificationsCount}</strong>
+                          <p>Notificaciones pendientes en tu cuenta.</p>
+                        </article>
+                      </div>
+                    </section>
+
+                    <section className="home-modern-section">
+                      <div className="home-modern-section-head">
+                        <p className="home-modern-kicker">Que es LabConnect</p>
+                        <h2>Todo lo que necesitas antes de entrar al laboratorio.</h2>
+                      </div>
+                      <div className="home-feature-grid">
+                        <article className="home-feature-card">
+                          <span><FlaskConical size={28} /></span>
+                          <h3>Reserva de laboratorios</h3>
+                          <p>Solicita espacios para practicas y proyectos con disponibilidad visible.</p>
+                        </article>
+                        <article className="home-feature-card">
+                          <span><Cpu size={28} /></span>
+                          <h3>Inventario academico</h3>
+                          <p>Consulta equipos, materiales y recursos asociados a tus practicas.</p>
+                        </article>
+                        <article className="home-feature-card">
+                          <span><ShieldCheck size={28} /></span>
+                          <h3>Control seguro</h3>
+                          <p>Seguimiento de accesos, estados y reglas para cuidar los espacios.</p>
+                        </article>
+                        <article className="home-feature-card">
+                          <span><Wrench size={28} /></span>
+                          <h3>Trazabilidad</h3>
+                          <p>Prestamos, mantenimiento y reportes quedan registrados para auditoria.</p>
+                        </article>
+                      </div>
+                    </section>
+
+                    <section className="home-modern-section">
+                      <div className="home-modern-section-head">
+                        <p className="home-modern-kicker">Nuestros laboratorios</p>
+                        <h2>Espacios modernos y organizados por area academica.</h2>
+                      </div>
+                      <div className="home-modern-labs">
+                        <article>
+                          <span><Microscope size={24} /></span>
+                          <h3>Ciencias</h3>
+                          <p>Fisica, Quimica y Biologia</p>
+                        </article>
+                        <article>
+                          <span><Cpu size={24} /></span>
+                          <h3>Ingenieria</h3>
+                          <p>Sistemas, Mecanica y Electronica</p>
+                        </article>
+                        <article>
+                          <span><Building2 size={24} /></span>
+                          <h3>Administracion</h3>
+                          <p>Sistemas de informacion, negocios y simulacion</p>
+                        </article>
+                      </div>
+                    </section>
+
+                    <section className="home-role-panel">
+                      <div>
+                        <p className="home-modern-kicker">Gestion por rol</p>
+                        <h2>Tu panel esta adaptado a tu perfil.</h2>
+                        <p>
+                          Accede rapido a las acciones principales segun seas estudiante, docente o usuario con permisos de gestion.
+                        </p>
+                      </div>
+                      <div className="home-role-grid">
+                        <button type="button" onClick={() => onNavigate?.('/app/reservas/calendario')}>
+                          <GraduationCap size={22} />
+                          <strong>Estudiante</strong>
+                          <span>Ver disponibilidad y tutorias.</span>
+                        </button>
+                        <button type="button" onClick={() => onNavigate?.('/app/reservas/nueva')}>
+                          <CalendarDays size={22} />
+                          <strong>Docente</strong>
+                          <span>Planificar practicas y reservas.</span>
+                        </button>
+                        <button type="button" onClick={() => onNavigate?.('/app/tutorias')}>
+                          <Settings size={22} />
+                          <strong>Soporte academico</strong>
+                          <span>Revisar tutorias publicadas.</span>
+                        </button>
+                      </div>
+                    </section>
+
+                    {hasManagementModules ? (
+                      <p className="home-role-note home-role-note-modern">
+                        Tu rol actual tambien incluye accesos de gestion. Usa la barra lateral para entrar a los modulos habilitados segun tus permisos.
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="home-hero">
+                    <img src={ucbEscudoLogo} alt="UCB Escudo" className="home-hero-logo" />
+                    <div className="home-hero-meta">
+                      <h2>Universidad Católica Boliviana San Pablo</h2>
+                      <p>Desde 1966 formando profesionales comprometidos con la excelencia académica y la responsabilidad social.</p>
                     </div>
                   </div>
-                  <div className="home-hero-meta">
-                    <p className="home-eyebrow">Portal académico y de servicios</p>
-                    <h2>Un acceso único a la vida universitaria de la UCB</h2>
-                    <p>
-                      Consulta recursos institucionales, plataformas académicas y servicios de laboratorio desde una portada coherente con la identidad de la UCB.
+
+                  <div className="home-section">
+                    <h3 className="home-section-title">¿Qué es LabConnect?</h3>
+                    <p className="home-section-text">
+                      LabConnect es la plataforma integral de gestión de laboratorios de la UCB San Pablo.
+                      Conecta docentes, estudiantes y personal administrativo en un ecosistema colaborativo que facilita:
                     </p>
-                    <a href="https://www.ucb.edu.bo" target="_blank" rel="noopener noreferrer" className="home-hero-btn">
-                      Visitar sitio oficial
-                    </a>
+                    <ul className="home-features">
+                      <li><strong>Reserva de laboratorios</strong> para prácticas y proyectos académicos</li>
+                      <li><strong>Gestión de inventario</strong> de equipos y materiales disponibles</li>
+                      <li><strong>Control de acceso</strong> seguro a espacios especializados</li>
+                      <li><strong>Seguimiento de préstamos</strong> y mantenimiento preventivo</li>
+                    </ul>
                   </div>
-                </div>
-              )}
 
-              <div className="home-section">
-                <h3 className="home-section-title">Accesos institucionales</h3>
-                <p className="home-section-text">
-                  Todo lo necesario para la actividad académica y administrativa de la UCB en un solo lugar.
-                </p>
-                <div className="home-links-grid">
-                  {institutionalLinks.map((link) => (
-                    <a key={link.title} href={link.href} target="_blank" rel="noopener noreferrer" className="home-link-card">
-                      <span className="home-link-label">{link.label}</span>
-                      <strong>{link.title}</strong>
-                      <p>{link.description}</p>
-                    </a>
-                  ))}
-                </div>
-              </div>
-
-              <div className="home-section">
-                <h3 className="home-section-title">Qué resuelve LabConnect</h3>
-                <div className="home-labs-grid">
-                  <div className="home-lab-card">
-                    <strong>Reservas académicas</strong>
-                    <p>Gestión de laboratorios para prácticas, clases y proyectos.</p>
-                  </div>
-                  <div className="home-lab-card">
-                    <strong>Inventario y materiales</strong>
-                    <p>Control de equipos, stock y recursos disponibles.</p>
-                  </div>
-                  <div className="home-lab-card">
-                    <strong>Accesos y perfiles</strong>
-                    <p>Permisos organizados por rol para mantener orden y seguridad.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="home-section">
-                <h3 className="home-section-title">Acceso rápido</h3>
-                <div className="home-quick-actions">
-                  {quickAccessCards.map((card) => (
-                    <button key={card.title} type="button" className="home-action-btn" onClick={card.action}>
-                      <div className="action-content">
-                        <strong>{card.title}</strong>
-                        <p>{card.description}</p>
+                  <div className="home-section">
+                    <h3 className="home-section-title">Nuestros Laboratorios</h3>
+                    <p className="home-section-text">
+                      Contamos con espacios modernos y completamente equipados para diferentes disciplinas:
+                    </p>
+                    <div className="home-labs-grid">
+                      <div className="home-lab-card">
+                        <strong>Laboratorios de Ciencias</strong>
+                        <p>Física, Química y Biología</p>
                       </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
+                      <div className="home-lab-card">
+                        <strong>Laboratorios de Ingeniería</strong>
+                        <p>Sistemas, Mecánica y Electrónica</p>
+                      </div>
+                      <div className="home-lab-card">
+                        <strong>Laboratorios de Administración</strong>
+                        <p>Sistemas de Información y Negocios</p>
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="home-section">
-                <h3 className="home-section-title">UCB en un vistazo</h3>
-                <div className="home-spotlight-grid">
-                  <div className="home-spotlight-card">
-                    <span className="home-spotlight-label">Sede</span>
-                    <strong>La Paz</strong>
-                    <p>Identidad visual y acceso institucional de la Universidad Católica Boliviana San Pablo.</p>
-                  </div>
-                  <div className="home-spotlight-card">
-                    <span className="home-spotlight-label">Plataforma</span>
-                    <strong>SIAAN</strong>
-                    <p>Ingreso directo a los trámites y consultas académicas del sistema nacional.</p>
-                  </div>
-                  <div className="home-spotlight-card">
-                    <span className="home-spotlight-label">Campus virtual</span>
-                    <strong>LMS UCB</strong>
-                    <p>Acceso al entorno de aprendizaje y seguimiento de asignaturas.</p>
-                  </div>
-                </div>
-              </div>
-
-              {hasManagementModules ? (
-                <div className="home-section home-role-section">
-                  <h3 className="home-section-title">Accesos de gestión</h3>
-                  <p className="home-role-note">
-                    Tu rol actual también incluye funciones de administración. Las opciones habilitadas en la barra lateral están disponibles según tus permisos.
-                  </p>
-                </div>
-              ) : null}
+                  {hasManagementModules ? (
+                    <p className="home-role-note">
+                      Tu rol actual también incluye accesos de gestión. Puedes usar las pestañas habilitadas según tus permisos.
+                    </p>
+                  ) : null}
+                </>
+              )}
             </section>
           ) : null}
         </section>
