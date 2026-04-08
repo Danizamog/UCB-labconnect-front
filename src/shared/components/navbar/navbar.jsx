@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   AlertOctagon,
   BookOpenCheck,
@@ -8,7 +8,9 @@ import {
   Layers,
   LogOut,
   Menu,
+  Search,
   MonitorCog,
+  Map,
   Package,
   Users,
   UserRound,
@@ -34,11 +36,109 @@ const iconMap = {
   tutorials_public: BookOpenCheck,
   reserve_reactivos: Package,
   reserve: FlaskConical,
+  mapa: Map,
   logout: LogOut,
+}
+
+const NAV_GROUP_ORDER = ['General', 'Gestion academica', 'Gestion operativa', 'Estudiantes']
+
+const NAV_SEARCH_META = {
+  home: { group: 'General', aliases: ['inicio', 'panel', 'principal'] },
+  mapa: { group: 'General', aliases: ['mapa', 'campus', 'ubicacion'] },
+  admin_reservas: { group: 'Gestion operativa', aliases: ['reservas', 'admin', 'laboratorio'] },
+  tutorials_manage: { group: 'Gestion academica', aliases: ['tutorias', 'publicar', 'sesiones'] },
+  profiles: { group: 'Gestion academica', aliases: ['perfiles', 'usuarios', 'cuentas'] },
+  roles: { group: 'Gestion academica', aliases: ['roles', 'permisos', 'accesos'] },
+  penalties: { group: 'Gestion operativa', aliases: ['penalizaciones', 'sanciones'] },
+  areas: { group: 'Gestion operativa', aliases: ['areas', 'bloques'] },
+  laboratorios: { group: 'Gestion operativa', aliases: ['laboratorios', 'espacios'] },
+  equipos: { group: 'Gestion operativa', aliases: ['equipos', 'inventario', 'mantenimiento'] },
+  materiales: { group: 'Gestion operativa', aliases: ['materiales', 'reactivos', 'stock'] },
+  calendar: { group: 'Estudiantes', aliases: ['calendario', 'disponibilidad', 'horarios'] },
+  tutorials_public: { group: 'Estudiantes', aliases: ['tutorias', 'inscripcion'] },
+  reserve_reactivos: { group: 'Estudiantes', aliases: ['reactivos', 'reservar', 'materiales'] },
+  reserve: { group: 'Estudiantes', aliases: ['reservar', 'laboratorio', 'nueva reserva'] },
+}
+
+const NAV_SUBSECTIONS_META = {
+  home: [
+    { id: 'accesos-institucionales', label: 'Accesos institucionales', aliases: ['portal ucb', 'siaan', 'lms'] },
+    { id: 'acceso-rapido', label: 'Acceso rapido', aliases: ['atajos', 'quick access'] },
+    { id: 'ucb-vistazo', label: 'UCB en un vistazo', aliases: ['resumen', 'informacion'] },
+  ],
+  profiles: [
+    { id: 'directorio-institucional', label: 'Directorio institucional', aliases: ['usuarios', 'perfiles'] },
+    { id: 'editar-perfil', label: 'Editar perfil', aliases: ['actualizar perfil'] },
+  ],
+  roles: [
+    { id: 'crear-editar-rol', label: 'Crear o editar rol', aliases: ['roles', 'formulario rol'] },
+    { id: 'seleccionar-permisos', label: 'Seleccionar permisos', aliases: ['permisos', 'accesos'] },
+  ],
+  penalties: [
+    { id: 'acciones-rapidas', label: 'Acciones rapidas', aliases: ['sanciones', 'penalizaciones'] },
+    { id: 'historial-disciplinario', label: 'Historial disciplinario', aliases: ['historial', 'infracciones'] },
+  ],
+  areas: [
+    { id: 'areas-academicas', label: 'Areas academicas', aliases: ['areas'] },
+    { id: 'identificacion', label: 'Identificacion', aliases: ['datos del area'] },
+    { id: 'configuracion', label: 'Configuracion', aliases: ['estado', 'ajustes'] },
+  ],
+  laboratorios: [
+    { id: 'identificacion-area', label: 'Identificacion y area', aliases: ['datos laboratorio'] },
+    { id: 'ubicacion-capacidad', label: 'Ubicacion y capacidad', aliases: ['aforo', 'ubicacion'] },
+    { id: 'configuracion-lab', label: 'Configuracion', aliases: ['ajustes laboratorio'] },
+  ],
+  equipos: [
+    { id: 'catalogo-equipos', label: 'Catalogo de equipos', aliases: ['inventario equipos'] },
+    { id: 'mantenimiento-dano', label: 'Registrar mantenimiento o dano', aliases: ['ticket', 'incidencia tecnica'] },
+    { id: 'tickets-activos', label: 'Tickets activos', aliases: ['soporte', 'incidencias'] },
+    { id: 'prestamos-equipos', label: 'Prestamos de equipos', aliases: ['devoluciones', 'salidas'] },
+    { id: 'inventario-detallado', label: 'Inventario detallado', aliases: ['lista equipos', 'estado equipos'] },
+  ],
+  materiales: [
+    { id: 'materiales-reactivos', label: 'Materiales y reactivos', aliases: ['catalogo materiales'] },
+    { id: 'movimientos-stock', label: 'Movimientos de stock', aliases: ['entradas', 'salidas'] },
+    { id: 'historial-reciente', label: 'Historial reciente', aliases: ['historial stock'] },
+    { id: 'lista-materiales', label: 'Lista de materiales', aliases: ['inventario materiales'] },
+  ],
+  tutorials_manage: [
+    { id: 'nuevo-bloque', label: 'Nuevo bloque', aliases: ['publicar tutoria'] },
+    { id: 'mis-tutorias-publicadas', label: 'Mis tutorias publicadas', aliases: ['tutorias'] },
+  ],
+  tutorials_public: [
+    { id: 'tutorias-disponibles', label: 'Tutorias disponibles', aliases: ['sesiones', 'inscripcion'] },
+    { id: 'tutoria-destacada', label: 'Tutoria destacada', aliases: ['destacada'] },
+  ],
+  reserve_reactivos: [
+    { id: 'nueva-solicitud', label: 'Nueva solicitud', aliases: ['reservar reactivos'] },
+    { id: 'mis-solicitudes', label: 'Mis solicitudes', aliases: ['historial solicitudes'] },
+  ],
+  reserve: [
+    { id: 'reserva-lab-horas', label: 'Reserva por horas', aliases: ['reservar laboratorio'] },
+    { id: 'ultimas-reservas', label: 'Mis ultimas reservas', aliases: ['historial reservas'] },
+  ],
+  calendar: [
+    { id: 'calendario-disponibilidad', label: 'Calendario de disponibilidad', aliases: ['horarios'] },
+  ],
+  admin_reservas: [
+    { id: 'reservas-laboratorios', label: 'Reservas de laboratorios', aliases: ['administrar reservas'] },
+  ],
+  mapa: [
+    { id: 'molde-3d', label: 'Molde 3D de bloques', aliases: ['mapa 3d', 'bloques'] },
+  ],
+}
+
+function normalizeSearchText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
 }
 
 function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const isAdmin = user?.role === 'admin'
 
   const visibleLinks = NAVIGATION_LINKS.filter((link) => {
@@ -49,6 +149,69 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
 
   const navLinks = visibleLinks.filter((link) => !link.action)
   const logoutLink = visibleLinks.find((link) => link.action === 'logout') || null
+  const normalizedQuery = normalizeSearchText(searchQuery)
+
+  const filteredNavLinks = useMemo(() => {
+    if (!normalizedQuery) {
+      return navLinks
+    }
+
+    return navLinks.filter((link) => {
+      const aliases = NAV_SEARCH_META[link.id]?.aliases || []
+      const searchableText = [link.label, link.id, link.path, ...aliases]
+        .map((value) => normalizeSearchText(value))
+        .join(' ')
+      return searchableText.includes(normalizedQuery)
+    })
+  }, [navLinks, normalizedQuery])
+
+  const filteredSubsectionLinks = useMemo(() => {
+    if (!normalizedQuery) {
+      return []
+    }
+
+    return navLinks.flatMap((sectionLink) => {
+      const subsectionList = NAV_SUBSECTIONS_META[sectionLink.id] || []
+      return subsectionList
+        .filter((subsection) => {
+          const searchableText = [
+            subsection.label,
+            subsection.id,
+            sectionLink.label,
+            sectionLink.id,
+            ...(subsection.aliases || []),
+          ]
+            .map((value) => normalizeSearchText(value))
+            .join(' ')
+          return searchableText.includes(normalizedQuery)
+        })
+        .map((subsection) => ({
+          id: `${sectionLink.id}:${subsection.id}`,
+          label: subsection.label,
+          sectionLabel: sectionLink.label,
+          path: sectionLink.path,
+          sectionId: sectionLink.id,
+          icon: sectionLink.icon,
+        }))
+    })
+  }, [navLinks, normalizedQuery])
+
+  const groupedNavLinks = useMemo(() => {
+    const groups = NAV_GROUP_ORDER.map((groupName) => ({ groupName, links: [] }))
+    const fallbackGroup = { groupName: 'Otros', links: [] }
+
+    filteredNavLinks.forEach((link) => {
+      const currentGroup = NAV_SEARCH_META[link.id]?.group || 'Otros'
+      const targetGroup = groups.find((group) => group.groupName === currentGroup) || fallbackGroup
+      targetGroup.links.push(link)
+    })
+
+    if (fallbackGroup.links.length > 0) {
+      groups.push(fallbackGroup)
+    }
+
+    return groups.filter((group) => group.links.length > 0)
+  }, [filteredNavLinks])
 
   const handleNavigate = (path) => {
     setIsOpen(false)
@@ -95,22 +258,69 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
           </div>
         </div>
 
+        <div className="sidebar-search-wrap">
+          <label className="sidebar-search" htmlFor="sidebar-search-input">
+            <Search size={15} aria-hidden="true" />
+            <input
+              id="sidebar-search-input"
+              type="search"
+              placeholder="Buscar sección o función..."
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+          </label>
+          {normalizedQuery ? (
+            <p className="sidebar-search-hint">
+              {filteredNavLinks.length + filteredSubsectionLinks.length} resultado{filteredNavLinks.length + filteredSubsectionLinks.length === 1 ? '' : 's'}
+            </p>
+          ) : null}
+        </div>
+
         <nav className="sidebar-nav">
-          {navLinks.map((link) => {
-            const Icon = iconMap[link.icon]
-            return (
-              <a
-                key={link.id}
-                href={link.path}
-                className={`sidebar-link ${activeSection === link.id ? 'sidebar-link--active' : ''}`}
-                aria-current={activeSection === link.id ? 'page' : undefined}
-                onClick={(e) => { e.preventDefault(); handleNavigate(link.path) }}
-              >
-                {Icon ? <Icon size={18} aria-hidden="true" /> : null}
-                <span>{link.label}</span>
-              </a>
-            )
-          })}
+          {groupedNavLinks.map((group) => (
+            <div key={group.groupName} className="sidebar-group">
+              <p className="sidebar-group-title">{group.groupName}</p>
+              {group.links.map((link) => {
+                const Icon = iconMap[link.icon]
+                return (
+                  <a
+                    key={link.id}
+                    href={link.path}
+                    className={`sidebar-link ${activeSection === link.id ? 'sidebar-link--active' : ''}`}
+                    aria-current={activeSection === link.id ? 'page' : undefined}
+                    onClick={(e) => { e.preventDefault(); handleNavigate(link.path) }}
+                  >
+                    {Icon ? <Icon size={18} aria-hidden="true" /> : null}
+                    <span>{link.label}</span>
+                  </a>
+                )
+              })}
+            </div>
+          ))}
+          {filteredSubsectionLinks.length > 0 ? (
+            <div className="sidebar-group">
+              <p className="sidebar-group-title">Subsecciones</p>
+              {filteredSubsectionLinks.map((subsection) => {
+                const Icon = iconMap[subsection.icon]
+                return (
+                  <a
+                    key={subsection.id}
+                    href={subsection.path}
+                    className={`sidebar-link sidebar-link--subsection ${activeSection === subsection.sectionId ? 'sidebar-link--active' : ''}`}
+                    aria-current={activeSection === subsection.sectionId ? 'page' : undefined}
+                    title={`${subsection.label} · ${subsection.sectionLabel}`}
+                    onClick={(e) => { e.preventDefault(); handleNavigate(subsection.path) }}
+                  >
+                    {Icon ? <Icon size={16} aria-hidden="true" /> : null}
+                    <span className="sidebar-subsection-line">{subsection.label} · {subsection.sectionLabel}</span>
+                  </a>
+                )
+              })}
+            </div>
+          ) : null}
+          {groupedNavLinks.length === 0 && filteredSubsectionLinks.length === 0 ? (
+            <p className="sidebar-empty-results">No se encontraron coincidencias para "{searchQuery}".</p>
+          ) : null}
         </nav>
 
         <div className="sidebar-footer">
