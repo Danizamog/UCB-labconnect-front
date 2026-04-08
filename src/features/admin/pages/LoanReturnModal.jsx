@@ -14,11 +14,11 @@ function LoanReturnModal({ loan, onCancel, onSubmit, submitting = false }) {
             <h3>{loan.asset_name}</h3>
             <p>
               {loan.borrower_name || loan.borrower_id}
-              {loan.asset_serial_number ? ` · Serie ${loan.asset_serial_number}` : ''}
+              {loan.asset_serial_number ? ` - Serie ${loan.asset_serial_number}` : ''}
             </p>
           </div>
           <button type="button" className="loan-return-close" onClick={onCancel} aria-label="Cerrar">
-            ×
+            x
           </button>
         </div>
 
@@ -26,8 +26,8 @@ function LoanReturnModal({ loan, onCancel, onSubmit, submitting = false }) {
           <label>
             <span>Estado de devolucion</span>
             <select name="return_condition" defaultValue="ok" disabled={submitting}>
-              <option value="ok">Devuelto sin daños</option>
-              <option value="damaged">Devuelto con daños</option>
+              <option value="ok">Devuelto sin danos</option>
+              <option value="damaged">Devuelto con danos</option>
             </select>
           </label>
 
@@ -42,11 +42,11 @@ function LoanReturnModal({ loan, onCancel, onSubmit, submitting = false }) {
           </label>
 
           <label>
-            <span>Descripcion del problema si hubo daños</span>
+            <span>Descripcion del problema si hubo danos</span>
             <textarea
               name="incident_notes"
               rows="4"
-              placeholder="Obligatorio si marcas la opcion Devuelto con daños."
+              placeholder="Obligatorio si marcas la opcion Devuelto con danos."
               disabled={submitting}
             />
           </label>

@@ -374,3 +374,73 @@
     max-height: none;
   }
 }
+
+/* Polished profile management layer */
+.profiles-header {
+  position: relative;
+  overflow: hidden;
+  margin: clamp(16px, 2vw, 24px) clamp(16px, 2.4vw, 32px) 0;
+  border-radius: 30px;
+  box-shadow: 0 28px 60px rgba(13, 34, 61, 0.2);
+  background:
+    radial-gradient(circle at 90% 10%, rgba(244, 197, 66, 0.24), transparent 28%),
+    linear-gradient(135deg, #09233f 0%, #063f77 56%, #125fa8 100%);
+}
+
+.profiles-header::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.09), transparent 34%);
+}
+
+.profiles-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+.profiles-summary div {
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+}
+
+.profiles-card,
+.profiles-form-section,
+.profiles-item {
+  border-color: rgba(216, 226, 238, 0.9);
+}
+
+.profiles-card {
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(10px);
+}
+
+.profiles-form input,
+.profiles-form select {
+  min-height: 44px;
+  border-radius: 14px;
+}
+
+.profiles-item,
+.profiles-primary,
+.profiles-secondary,
+.profiles-danger {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+
+.profiles-item:hover,
+.profiles-primary:hover,
+.profiles-secondary:hover,
+.profiles-danger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 30px rgba(13, 34, 61, 0.12);
+}
+
+.profiles-item.editing {
+  border-color: rgba(216, 155, 0, 0.55);
+  background:
+    linear-gradient(135deg, rgba(244, 197, 66, 0.12), rgba(255, 255, 255, 0.88));
+}
