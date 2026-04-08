@@ -354,7 +354,7 @@
 
 .roles-modal-confirm {
   width: min(420px, 100%);
-  max-height: auto;
+  max-height: none;
 }
 
 .roles-modal-content {
@@ -1196,4 +1196,88 @@
   .roles-badges-container {
     max-width: 100%;
   }
+}
+
+/* Polished role management layer */
+.roles-header {
+  position: relative;
+  overflow: hidden;
+  margin: clamp(16px, 2vw, 24px) clamp(16px, 2.4vw, 32px) 0;
+  border-radius: 30px;
+  box-shadow: 0 28px 60px rgba(13, 34, 61, 0.2);
+  background:
+    radial-gradient(circle at 90% 10%, rgba(244, 197, 66, 0.24), transparent 28%),
+    linear-gradient(135deg, #09233f 0%, #063f77 56%, #125fa8 100%);
+}
+
+.roles-header::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.09), transparent 34%);
+}
+
+.roles-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+.roles-body {
+  padding-top: clamp(20px, 2.5vw, 34px);
+}
+
+.roles-form-card,
+.roles-table-wrap,
+.roles-modal,
+.roles-permission-item,
+.roles-permissions-display {
+  border-color: rgba(216, 226, 238, 0.9);
+  box-shadow: var(--shadow-card);
+}
+
+.roles-form-card,
+.roles-table-wrap {
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+}
+
+.roles-input,
+.roles-select {
+  min-height: 44px;
+  border-radius: 14px;
+}
+
+.roles-save-button,
+.roles-tab-button,
+.roles-action-button,
+.roles-primary-button,
+.roles-ghost-button,
+.roles-danger-button,
+.roles-permission-item {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+
+.roles-save-button:hover:not(:disabled),
+.roles-tab-button:hover,
+.roles-action-button:hover:not(:disabled),
+.roles-primary-button:hover,
+.roles-ghost-button:hover,
+.roles-danger-button:hover:not(:disabled),
+.roles-permission-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 30px rgba(13, 34, 61, 0.12);
+}
+
+.roles-modal-backdrop {
+  background: rgba(7, 19, 34, 0.58);
+  backdrop-filter: blur(8px);
+}
+
+.roles-modal {
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(244, 197, 66, 0.18), transparent 30%),
+    #fff;
 }

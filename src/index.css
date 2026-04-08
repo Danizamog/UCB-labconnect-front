@@ -1,23 +1,30 @@
-@import url('https://fonts.googleapis.com/css2?family=Abel&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=Source+Sans+3:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --ucb-blue: #064d90;
-  --ucb-gold: #fcd025;
-  --ink-900: #10233d;
-  --ink-700: #355170;
+  --ucb-blue: #063f77;
+  --ucb-blue-700: #0a3559;
+  --ucb-blue-500: #1260aa;
+  --ucb-gold: #f4c542;
+  --ucb-gold-strong: #d89b00;
+  --ink-900: #0d223d;
+  --ink-800: #19324f;
+  --ink-700: #3d5676;
   --surface-100: #ffffff;
-  --surface-200: #f3f6fa;
+  --surface-200: #f5f8fc;
+  --surface-300: #edf3f8;
   --line-300: #d8e2ee;
 
   --radius-sm: 10px;
   --radius-md: 16px;
   --radius-lg: 22px;
 
-  --shadow-soft: 0 16px 34px rgba(6, 77, 144, 0.12);
-  --shadow-subtle: 0 8px 20px rgba(16, 35, 61, 0.06);
+  --shadow-soft: 0 22px 52px rgba(6, 48, 89, 0.14);
+  --shadow-subtle: 0 10px 26px rgba(13, 34, 61, 0.08);
+  --shadow-card: 0 18px 42px rgba(13, 34, 61, 0.09);
 
-  --font-body: 'Inter', 'Segoe UI', Roboto, sans-serif;
-  --font-display: 'Abel', 'Inter', 'Segoe UI', sans-serif;
+  --font-body: 'Source Sans 3', 'Segoe UI', sans-serif;
+  --font-display: 'Barlow Condensed', 'Source Sans 3', sans-serif;
+  --font-ui: 'Inter', 'Source Sans 3', sans-serif;
 }
 
 * {
@@ -34,7 +41,10 @@ body {
   margin: 0;
   font-family: var(--font-body);
   color: var(--ink-900);
-  background: #f0f4f8;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(244, 197, 66, 0.18), transparent 28%),
+    radial-gradient(circle at 86% 0%, rgba(6, 63, 119, 0.12), transparent 26%),
+    linear-gradient(135deg, #eef4f9 0%, #f8fbff 52%, #eef5fb 100%);
   font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -51,4 +61,382 @@ p {
 
 a {
   color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-body);
+}
+
+button {
+  letter-spacing: 0.01em;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(244, 197, 66, 0.8);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgba(244, 197, 66, 0.45);
+  color: var(--ink-900);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(216, 226, 238, 0.45);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(6, 63, 119, 0.28);
+  border: 2px solid rgba(245, 248, 252, 0.8);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 63, 119, 0.42);
+}
+
+/* Global premium UI layer for LabConnect screens */
+.content-window > :is(.infra-page, .profiles-page, .roles-page, .reservations-page, .tutorials-page) {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at 88% 4%, rgba(244, 197, 66, 0.16), transparent 30%),
+    radial-gradient(circle at 8% 12%, rgba(6, 63, 119, 0.1), transparent 28%),
+    linear-gradient(135deg, #f6f9fd 0%, #eef5fb 100%);
+  font-family: var(--font-ui);
+}
+
+.infra-header,
+.profiles-header,
+.roles-header,
+.reservations-header,
+.tutorials-header {
+  position: relative;
+  overflow: hidden;
+  margin: clamp(14px, 2vw, 24px);
+  border-radius: clamp(28px, 3vw, 38px);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  background:
+    radial-gradient(circle at 88% 4%, rgba(255, 188, 110, 0.28), transparent 28%),
+    radial-gradient(circle at 0% 100%, rgba(255, 255, 255, 0.08), transparent 34%),
+    linear-gradient(105deg, #082436 0%, #0d3d61 52%, #1b5f87 100%);
+  box-shadow: 0 28px 62px rgba(6, 28, 48, 0.2);
+}
+
+.infra-header::before,
+.profiles-header::before,
+.roles-header::before,
+.reservations-header::before,
+.tutorials-header::before {
+  content: '';
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  top: -120px;
+  right: -80px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  pointer-events: none;
+}
+
+.infra-header::after,
+.profiles-header::after,
+.roles-header::after,
+.reservations-header::after,
+.tutorials-header::after {
+  content: '';
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  bottom: -90px;
+  left: -56px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+  pointer-events: none;
+}
+
+.infra-header > *,
+.profiles-header > *,
+.roles-header > *,
+.reservations-header > *,
+.tutorials-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+.infra-kicker,
+.profiles-kicker,
+.roles-header-kicker,
+.reservations-kicker,
+.tutorials-kicker {
+  color: #ffbc6e;
+  font-family: var(--font-ui);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.infra-header h2,
+.profiles-header h2,
+.roles-header h2,
+.reservations-header h2,
+.tutorials-header h2 {
+  font-family: var(--font-ui);
+  font-weight: 800;
+  letter-spacing: -0.05em;
+}
+
+.infra-summary div,
+.profiles-summary div,
+.reservations-summary div,
+.tutorials-summary div {
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(12px);
+}
+
+.infra-grid,
+.profiles-grid,
+.roles-body,
+.reservations-page,
+.tutorials-page {
+  gap: clamp(18px, 2.6vw, 30px);
+}
+
+.infra-card,
+.profiles-card,
+.roles-form-card,
+.roles-permissions-panel,
+.roles-matrix-container,
+.reservations-panel,
+.tutorials-panel,
+.home-modern-section,
+.home-role-panel {
+  border-radius: clamp(24px, 2.4vw, 34px);
+  border: 1px solid rgba(226, 237, 242, 0.96);
+  background:
+    radial-gradient(circle at 94% 0%, rgba(244, 197, 66, 0.1), transparent 28%),
+    rgba(255, 255, 255, 0.92);
+  box-shadow: 0 22px 48px rgba(13, 34, 61, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.infra-card,
+.profiles-card,
+.roles-form-card,
+.reservations-panel,
+.tutorials-panel,
+.home-feature-card,
+.home-modern-labs article {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.infra-card:hover,
+.profiles-card:hover,
+.roles-form-card:hover,
+.reservations-panel:hover,
+.tutorials-panel:hover {
+  border-color: rgba(31, 99, 146, 0.22);
+  box-shadow: 0 30px 62px rgba(13, 34, 61, 0.13);
+}
+
+.infra-form input,
+.infra-form select,
+.infra-form textarea,
+.profiles-form input,
+.profiles-form select,
+.roles-input,
+.reservations-controls input,
+.reservations-controls select,
+.reservations-form input,
+.reservations-form select,
+.reservations-form textarea,
+.reservation-modal-form input,
+.reservation-modal-form select,
+.reservation-modal-form textarea,
+.tutorials-form input,
+.tutorials-form select,
+.tutorials-form textarea,
+.login-form input {
+  min-height: 46px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(216, 226, 238, 0.98);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.infra-form input:focus,
+.infra-form select:focus,
+.infra-form textarea:focus,
+.profiles-form input:focus,
+.profiles-form select:focus,
+.roles-input:focus,
+.reservations-controls input:focus,
+.reservations-controls select:focus,
+.reservations-form input:focus,
+.reservations-form select:focus,
+.reservations-form textarea:focus,
+.reservation-modal-form input:focus,
+.reservation-modal-form select:focus,
+.reservation-modal-form textarea:focus,
+.tutorials-form input:focus,
+.tutorials-form select:focus,
+.tutorials-form textarea:focus,
+.login-form input:focus {
+  border-color: rgba(31, 99, 146, 0.58);
+  box-shadow:
+    0 0 0 4px rgba(31, 99, 146, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  background: #fff;
+}
+
+.infra-primary,
+.profiles-primary,
+.roles-save-button,
+.reservations-primary,
+.reservation-modal-primary,
+.tutorials-primary,
+.login-button,
+.home-modern-primary {
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0a2b3e 0%, #1b4f6e 100%);
+  box-shadow: 0 14px 28px rgba(13, 61, 97, 0.2);
+}
+
+.infra-secondary,
+.profiles-secondary,
+.roles-tab-button,
+.reservations-secondary,
+.reservation-modal-secondary,
+.tutorials-secondary,
+.home-modern-secondary {
+  border-radius: 999px;
+}
+
+.infra-danger,
+.profiles-danger,
+.reservations-danger,
+.tutorials-danger {
+  border-radius: 999px;
+}
+
+.infra-primary:hover,
+.profiles-primary:hover,
+.roles-save-button:hover:not(:disabled),
+.reservations-primary:hover,
+.reservation-modal-primary:hover,
+.tutorials-primary:hover,
+.login-button:hover,
+.infra-secondary:hover,
+.profiles-secondary:hover,
+.reservations-secondary:hover,
+.reservation-modal-secondary:hover,
+.tutorials-secondary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 36px rgba(13, 34, 61, 0.16);
+}
+
+.infra-table-wrap,
+.profiles-list,
+.roles-matrix-container,
+.reservations-table,
+.tutorials-grid {
+  border-radius: 22px;
+}
+
+.infra-table th,
+.reservations-table th {
+  background:
+    linear-gradient(180deg, rgba(10, 43, 62, 0.08), rgba(10, 43, 62, 0.03));
+  color: #0e3b4f;
+}
+
+.reservation-modal,
+.tutorial-detail-modal,
+.penalty-modal,
+.confirm-modal,
+.infra-workflow-modal,
+.loan-return-modal {
+  border-radius: clamp(26px, 3vw, 40px);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  background:
+    radial-gradient(circle at 92% 0%, rgba(244, 197, 66, 0.2), transparent 30%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 44px 92px rgba(7, 19, 34, 0.34);
+}
+
+.reservation-modal-backdrop,
+.tutorial-detail-backdrop,
+.penalty-backdrop,
+.confirm-modal-backdrop,
+.infra-workflow-backdrop,
+.loan-return-backdrop {
+  background:
+    radial-gradient(circle at 50% 12%, rgba(244, 197, 66, 0.16), transparent 30%),
+    rgba(7, 19, 34, 0.66);
+  backdrop-filter: blur(12px);
+}
+
+.reservations-slot,
+.tutorial-slot,
+.cal-day,
+.profiles-item,
+.roles-role-card,
+.tutorial-card,
+.reservation-user-card,
+.penalty-card,
+.infra-action-card {
+  border-radius: 22px;
+}
+
+.reservations-slot.tutorial,
+.tutorial-slot.tutorial {
+  border-left-color: #0a2b3e;
+  background:
+    linear-gradient(90deg, rgba(10, 43, 62, 0.16), rgba(31, 99, 146, 0.06));
+  color: #0a2b3e;
+}
+
+@media (max-width: 760px) {
+  .infra-header,
+  .profiles-header,
+  .roles-header,
+  .reservations-header,
+  .tutorials-header {
+    margin: 12px;
+    border-radius: 26px;
+  }
+
+  .infra-grid,
+  .profiles-grid,
+  .roles-body {
+    padding: 14px;
+  }
+
+  .infra-summary,
+  .profiles-summary,
+  .reservations-summary,
+  .tutorials-summary {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .infra-summary div,
+  .profiles-summary div,
+  .reservations-summary div,
+  .tutorials-summary div {
+    flex: 1 1 130px;
+  }
 }
