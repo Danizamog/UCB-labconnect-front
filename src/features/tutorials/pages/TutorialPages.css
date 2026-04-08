@@ -565,6 +565,13 @@
   box-shadow: 0 18px 34px rgba(6, 77, 144, 0.1);
 }
 
+.tutorial-card.is-enrolled {
+  border-color: rgba(252, 208, 37, 0.32);
+  background:
+    radial-gradient(circle at top right, rgba(252, 208, 37, 0.16), transparent 24%),
+    linear-gradient(180deg, #ffffff 0%, rgba(252, 208, 37, 0.04) 100%);
+}
+
 .tutorial-card-head {
   display: flex;
   align-items: flex-start;
@@ -623,6 +630,25 @@
 .tutorial-enrolled-list strong {
   color: var(--ink-900);
   font-size: 0.82rem;
+}
+
+.tutorial-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(21, 128, 61, 0.08);
+  color: #166534;
+  border: 1px solid rgba(22, 163, 74, 0.16);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.tutorial-status-pill.active {
+  background: rgba(10, 53, 89, 0.08);
+  color: #0a3559;
+  border-color: rgba(10, 53, 89, 0.14);
 }
 
 .tutorial-focus-grid {
@@ -874,4 +900,118 @@
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* Polished tutorial experience */
+.tutorials-page {
+  background:
+    radial-gradient(circle at 86% 2%, rgba(244, 197, 66, 0.17), transparent 28%),
+    radial-gradient(circle at 4% 10%, rgba(6, 63, 119, 0.11), transparent 25%),
+    linear-gradient(135deg, #f7fafc 0%, #edf5fb 100%);
+}
+
+.tutorials-header {
+  padding: clamp(20px, 2vw, 28px);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(244, 197, 66, 0.2), transparent 26%),
+    rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(216, 226, 238, 0.9);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(12px);
+}
+
+.tutorials-summary div {
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, #fff 0%, rgba(6, 63, 119, 0.04) 100%);
+  box-shadow: 0 16px 30px rgba(13, 34, 61, 0.08);
+}
+
+.tutorials-panel {
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(10px);
+}
+
+.tutorials-form input,
+.tutorials-form select,
+.tutorials-form textarea {
+  min-height: 44px;
+  border-radius: 14px;
+}
+
+.tutorial-slot,
+.tutorial-card,
+.tutorial-focus-card,
+.tutorial-detail-card,
+.tutorial-detail-story-card {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.tutorial-slot:not(:disabled):hover,
+.tutorial-card:hover,
+.tutorial-focus-card:hover,
+.tutorial-detail-card:hover,
+.tutorial-detail-story-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 22px 42px rgba(13, 34, 61, 0.12);
+}
+
+.tutorial-slot.tutorial {
+  border-left-color: #123d75;
+  background:
+    linear-gradient(90deg, rgba(18, 61, 117, 0.13), rgba(18, 61, 117, 0.04));
+  color: #123d75;
+}
+
+.tutorial-detail-backdrop {
+  background: rgba(7, 19, 34, 0.58);
+  backdrop-filter: blur(8px);
+}
+
+.tutorial-detail-modal {
+  border-radius: 30px;
+  padding: clamp(22px, 3vw, 34px);
+  background:
+    radial-gradient(circle at 90% 0%, rgba(244, 197, 66, 0.2), transparent 28%),
+    linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+  box-shadow: 0 36px 72px rgba(7, 19, 34, 0.28);
+}
+
+.tutorial-detail-close {
+  border-radius: 16px;
+  transition: transform 0.16s ease, background 0.16s ease;
+}
+
+.tutorial-detail-close:hover {
+  transform: rotate(3deg) scale(1.05);
+  background: rgba(244, 197, 66, 0.22);
+}
+
+.tutorial-detail-hero,
+.tutorial-focus-hero {
+  border-radius: 28px;
+  box-shadow: 0 28px 60px rgba(13, 34, 61, 0.18);
+}
+
+.tutorial-detail-badge,
+.tutorial-badge,
+.tutorial-focus-chip {
+  letter-spacing: 0.08em;
+}
+
+.tutorials-primary,
+.tutorials-secondary,
+.tutorials-danger {
+  box-shadow: 0 12px 24px rgba(13, 34, 61, 0.08);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+}
+
+.tutorials-primary:hover,
+.tutorials-secondary:hover,
+.tutorials-danger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 30px rgba(13, 34, 61, 0.12);
 }
