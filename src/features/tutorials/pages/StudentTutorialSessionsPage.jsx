@@ -1,42 +1,65 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  cancelTutorialEnrollment,
   enrollInTutorialSession,
+  listMyEnrolledTutorialSessions,
   listPublicTutorialSessions,
   subscribeTutorialSessionsRealtime,
 } from '../services/tutorialSessionsService'
 import { FOCUSED_TUTORIAL_KEY, OPEN_TUTORIAL_EVENT } from '../utils/focusTutorialNavigation'
 import './TutorialPages.css'
 
-function getEnrollmentState(session, userId) {
+const CLOCK_REFRESH_MS = 30 * 1000
+
+function parseSessionDate(value) {
+  const parsed = new Date(value || '')
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function getEnrollmentState(session, userId, referenceNow = new Date()) {
   const normalizedUserId = String(userId || '')
   const isOwnSession = session.tutor_id === normalizedUserId
   const isEnrolled = session.enrolled_students.some((student) => student.student_id === normalizedUserId)
   const isFull = session.seats_left <= 0
+  const sessionStart = parseSessionDate(session?.start_at)
+  const sessionEnd = parseSessionDate(session?.end_at)
+  const hasStarted = Boolean(sessionStart) && sessionStart.getTime() <= referenceNow.getTime()
+  const hasEnded = Boolean(sessionEnd) && sessionEnd.getTime() <= referenceNow.getTime()
 
   return {
     isOwnSession,
     isEnrolled,
     isFull,
-    canEnroll: !isOwnSession && !isEnrolled && !isFull,
+    hasStarted,
+    hasEnded,
+    canEnroll: !isOwnSession && !isEnrolled && !isFull && !hasStarted && !hasEnded,
+    canCancel: isEnrolled && !hasStarted && !hasEnded,
   }
 }
 
 function StudentTutorialSessionsPage({ user }) {
   const [sessions, setSessions] = useState([])
+  const [mySessions, setMySessions] = useState([])
   const [focusedSessionId, setFocusedSessionId] = useState('')
   const [enrollingId, setEnrollingId] = useState('')
+  const [cancellingId, setCancellingId] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [clockTick, setClockTick] = useState(() => Date.now())
 
-  const loadSessions = async () => {
+  const loadSessions = useCallback(async () => {
     try {
-      const data = await listPublicTutorialSessions()
-      setSessions(data)
+      const [publicSessions, enrolledSessions] = await Promise.all([
+        listPublicTutorialSessions(),
+        listMyEnrolledTutorialSessions(),
+      ])
+      setSessions(publicSessions)
+      setMySessions(enrolledSessions)
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudo cargar la cartelera de tutorias.')
     }
-  }
+  }, [])
 
   useEffect(() => {
     loadSessions()
@@ -59,7 +82,15 @@ function StudentTutorialSessionsPage({ user }) {
     })
 
     return () => unsubscribe?.()
-  }, [user?.user_id])
+  }, [loadSessions, user?.user_id])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setClockTick(Date.now())
+    }, CLOCK_REFRESH_MS)
+
+    return () => window.clearInterval(intervalId)
+  }, [])
 
   useEffect(() => {
     const applyFocus = (sessionId) => {
@@ -87,9 +118,17 @@ function StudentTutorialSessionsPage({ user }) {
     }
   }, [])
 
+  const allKnownSessions = useMemo(() => {
+    const sessionMap = new Map()
+    ;[...mySessions, ...sessions].forEach((session) => {
+      sessionMap.set(session.id, session)
+    })
+    return Array.from(sessionMap.values())
+  }, [mySessions, sessions])
+
   const focusedSession = useMemo(
-    () => sessions.find((session) => session.id === focusedSessionId) || null,
-    [focusedSessionId, sessions],
+    () => allKnownSessions.find((session) => session.id === focusedSessionId) || null,
+    [allKnownSessions, focusedSessionId],
   )
 
   const availableSessions = useMemo(
@@ -97,9 +136,11 @@ function StudentTutorialSessionsPage({ user }) {
     [sessions],
   )
 
+  const nowReference = useMemo(() => new Date(clockTick), [clockTick])
+
   const focusedState = useMemo(
-    () => (focusedSession ? getEnrollmentState(focusedSession, user?.user_id) : null),
-    [focusedSession, user?.user_id],
+    () => (focusedSession ? getEnrollmentState(focusedSession, user?.user_id, nowReference) : null),
+    [focusedSession, nowReference, user?.user_id],
   )
 
   const handleEnroll = async (session) => {
@@ -119,6 +160,22 @@ function StudentTutorialSessionsPage({ user }) {
     }
   }
 
+  const handleCancelEnrollment = async (session) => {
+    setCancellingId(session.id)
+    setError('')
+    setMessage('')
+
+    try {
+      await cancelTutorialEnrollment(session.id)
+      setMessage('Tu asistencia fue cancelada y el cupo se libero automaticamente para otros estudiantes.')
+      await loadSessions()
+    } catch (err) {
+      setError(err.message || 'No se pudo cancelar la asistencia a la tutoria.')
+    } finally {
+      setCancellingId('')
+    }
+  }
+
   return (
     <section className="tutorials-page tutorials-page-student" aria-label="Tutorias disponibles">
       <header className="tutorials-header">
@@ -129,6 +186,7 @@ function StudentTutorialSessionsPage({ user }) {
         </div>
         <div className="tutorials-summary">
           <div><span>Disponibles</span><strong>{availableSessions.length}</strong></div>
+          <div><span>Mis tutorias</span><strong>{mySessions.length}</strong></div>
         </div>
       </header>
 
@@ -140,7 +198,7 @@ function StudentTutorialSessionsPage({ user }) {
           <div className="tutorials-panel-header">
             <h3>Tutoria destacada</h3>
             <p className="tutorials-panel-subtitle">
-              Aqui se enfoca la sesion seleccionada desde el calendario, las notificaciones o la cartelera de tutorias.
+              Aqui se enfoca la sesion seleccionada desde el calendario, las notificaciones o tu panel de tutorias.
             </p>
           </div>
 
@@ -163,7 +221,7 @@ function StudentTutorialSessionsPage({ user }) {
             </div>
             <div className="tutorial-focus-card">
               <span>Horario</span>
-              <strong>{focusedSession.session_date} · {focusedSession.start_time} - {focusedSession.end_time}</strong>
+              <strong>{focusedSession.session_date} | {focusedSession.start_time} - {focusedSession.end_time}</strong>
             </div>
             <div className="tutorial-focus-card">
               <span>Cupos</span>
@@ -185,9 +243,22 @@ function StudentTutorialSessionsPage({ user }) {
               <button type="button" className="tutorials-secondary" disabled>
                 Es tu tutoria
               </button>
+            ) : focusedState?.canCancel ? (
+              <button
+                type="button"
+                className="tutorials-danger"
+                disabled={cancellingId === focusedSession.id}
+                onClick={() => handleCancelEnrollment(focusedSession)}
+              >
+                {cancellingId === focusedSession.id ? 'Cancelando...' : 'Cancelar asistencia'}
+              </button>
             ) : focusedState?.isEnrolled ? (
               <button type="button" className="tutorials-secondary" disabled>
-                Ya inscrito
+                {focusedState.hasStarted ? 'Tutoria en curso' : 'Ya inscrito'}
+              </button>
+            ) : focusedState?.hasStarted ? (
+              <button type="button" className="tutorials-secondary" disabled>
+                Sesion iniciada
               </button>
             ) : (
               <button
@@ -204,13 +275,93 @@ function StudentTutorialSessionsPage({ user }) {
       ) : null}
 
       <section className="tutorials-panel">
+        <div className="tutorials-panel-header">
+          <h3>Mis tutorias</h3>
+          <p className="tutorials-panel-subtitle">
+            Aqui ves las sesiones donde ya reservaste cupo. Si todavia no empiezan, puedes cancelar tu asistencia y liberar el cupo.
+          </p>
+        </div>
+
+        {mySessions.length === 0 ? (
+          <p className="tutorials-empty">Todavia no reservaste cupos en tutorias. Cuando te inscribas, tus sesiones apareceran aqui.</p>
+        ) : (
+          <div className="tutorials-grid">
+            {mySessions.map((session) => {
+              const sessionState = getEnrollmentState(session, user?.user_id, nowReference)
+
+              return (
+                <article key={session.id} className="tutorial-card is-enrolled">
+                  <div className="tutorial-card-head">
+                    <div>
+                      <span className="tutorial-badge">Mi tutoria</span>
+                      <h4>{session.topic}</h4>
+                    </div>
+                    <strong className="tutorial-seats">{session.seats_left} cupos libres</strong>
+                  </div>
+
+                  <div className="tutorial-card-facts">
+                    <span>{session.tutor_name}</span>
+                    <span>{session.session_date}</span>
+                    <span>{session.start_time} - {session.end_time}</span>
+                    <span>{session.location || 'Ubicacion por definir'}</span>
+                  </div>
+
+                  <div className="tutorial-meta">
+                    <span>Inscritos: {session.enrolled_count} de {session.max_students}</span>
+                    <span className={`tutorial-status-pill${sessionState.hasStarted ? ' active' : ''}`}>
+                      {sessionState.hasStarted ? 'Tutoria en curso' : 'Reserva confirmada'}
+                    </span>
+                  </div>
+
+                  <div className="tutorial-card-action-row">
+                    <button
+                      type="button"
+                      className="tutorials-secondary"
+                      onClick={() => {
+                        setFocusedSessionId(session.id)
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                    >
+                      Ver detalle
+                    </button>
+
+                    {sessionState.canCancel ? (
+                      <button
+                        type="button"
+                        className="tutorials-danger"
+                        disabled={cancellingId === session.id}
+                        onClick={() => handleCancelEnrollment(session)}
+                      >
+                        {cancellingId === session.id ? 'Cancelando...' : 'Cancelar asistencia'}
+                      </button>
+                    ) : (
+                      <button type="button" className="tutorials-secondary" disabled>
+                        {sessionState.hasStarted ? 'Tutoria iniciada' : 'Asistencia registrada'}
+                      </button>
+                    )}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="tutorials-panel">
+        <div className="tutorials-panel-header">
+          <h3>Cartelera publica</h3>
+          <p className="tutorials-panel-subtitle">
+            Explora todas las tutorias publicadas y reserva tu cupo solo en sesiones futuras con capacidad disponible.
+          </p>
+        </div>
+
         {availableSessions.length === 0 ? (
           <p className="tutorials-empty">No hay tutorias publicadas por el momento.</p>
         ) : (
           <div className="tutorials-grid">
             {availableSessions.map((session) => {
               const isFocused = focusedSessionId === session.id
-              const sessionState = getEnrollmentState(session, user?.user_id)
+              const sessionState = getEnrollmentState(session, user?.user_id, nowReference)
 
               return (
                 <article
@@ -255,9 +406,22 @@ function StudentTutorialSessionsPage({ user }) {
                       <button type="button" className="tutorials-secondary" disabled>
                         Es tu tutoria
                       </button>
+                    ) : sessionState.canCancel ? (
+                      <button
+                        type="button"
+                        className="tutorials-danger"
+                        disabled={cancellingId === session.id}
+                        onClick={() => handleCancelEnrollment(session)}
+                      >
+                        {cancellingId === session.id ? 'Cancelando...' : 'Cancelar asistencia'}
+                      </button>
                     ) : sessionState.isEnrolled ? (
                       <button type="button" className="tutorials-secondary" disabled>
-                        Ya inscrito
+                        {sessionState.hasStarted ? 'Tutoria iniciada' : 'Ya inscrito'}
+                      </button>
+                    ) : sessionState.hasStarted ? (
+                      <button type="button" className="tutorials-secondary" disabled>
+                        Sesion iniciada
                       </button>
                     ) : (
                       <button
