@@ -10,7 +10,44 @@ import { hasAnyPermission } from '../../../shared/lib/permissions'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import './AdminAssetsPage.css'
 
-const defaultForm = { name: '', location: '', capacity: 20, description: '', area_id: '', is_active: true }
+const ACCESS_ROLE_OPTIONS = ['Estudiante', 'Docente', 'Auxiliar', 'Encargado', 'Administrador']
+
+const defaultForm = {
+  name: '',
+  location: '',
+  capacity: 20,
+  description: '',
+  area_id: '',
+  is_active: true,
+  allowed_roles: [],
+  allowed_user_ids: [],
+  required_permissions: [],
+}
+
+function parseAccessList(value) {
+  return Array.from(new Set(String(value || '')
+    .split(/[,\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean)))
+}
+
+function formatAccessList(value) {
+  return Array.isArray(value) ? value.join(', ') : ''
+}
+
+function summarizeAccess(lab) {
+  const parts = []
+  if (Array.isArray(lab.allowed_roles) && lab.allowed_roles.length) {
+    parts.push(`Roles: ${lab.allowed_roles.join(', ')}`)
+  }
+  if (Array.isArray(lab.allowed_user_ids) && lab.allowed_user_ids.length) {
+    parts.push(`${lab.allowed_user_ids.length} usuario(s) especifico(s)`)
+  }
+  if (Array.isArray(lab.required_permissions) && lab.required_permissions.length) {
+    parts.push(`Permisos: ${lab.required_permissions.join(', ')}`)
+  }
+  return parts.length ? parts.join(' · ') : 'Acceso general para usuarios activos'
+}
 
 function AdminLaboratoriosPage({ user }) {
   const [areas, setAreas] = useState([])
@@ -201,6 +238,59 @@ function AdminLaboratoriosPage({ user }) {
                   <span>Laboratorio activo para reservas</span>
                 </label>
               </div>
+              <div className="infra-form-section">
+                <span className="infra-form-section-label">4 — Acceso a reservas</span>
+                <p className="infra-muted">
+                  Si dejas estos campos vacios, cualquier usuario activo con acceso al modulo podra ver y reservar este laboratorio.
+                </p>
+                <div className="infra-form-grid">
+                  <label>
+                    <span>Roles autorizados</span>
+                    <select
+                      multiple
+                      value={form.allowed_roles}
+                      onChange={(event) => setForm((prev) => ({
+                        ...prev,
+                        allowed_roles: Array.from(event.target.selectedOptions, (option) => option.value),
+                      }))}
+                      disabled={!canManage}
+                    >
+                      {ACCESS_ROLE_OPTIONS.map((role) => (
+                        <option key={role} value={role}>{role}</option>
+                      ))}
+                    </select>
+                    <small>Usa Ctrl o Shift para seleccionar varios roles.</small>
+                  </label>
+                  <label>
+                    <span>Permisos requeridos</span>
+                    <textarea
+                      rows="3"
+                      value={formatAccessList(form.required_permissions)}
+                      onChange={(event) => setForm((prev) => ({
+                        ...prev,
+                        required_permissions: parseAccessList(event.target.value),
+                      }))}
+                      placeholder="Ej. reservar_laboratorio_especial"
+                      disabled={!canManage}
+                    />
+                    <small>Opcional. Separa permisos con coma o salto de linea.</small>
+                  </label>
+                </div>
+                <label>
+                  <span>Usuarios autorizados especificos</span>
+                  <textarea
+                    rows="3"
+                    value={formatAccessList(form.allowed_user_ids)}
+                    onChange={(event) => setForm((prev) => ({
+                      ...prev,
+                      allowed_user_ids: parseAccessList(event.target.value),
+                    }))}
+                    placeholder="Ej. 3gyzwrw9yophi7r, je3b9oa1ilac1af"
+                    disabled={!canManage}
+                  />
+                  <small>Opcional. Sirve para laboratorios restringidos por usuario interno.</small>
+                </label>
+              </div>
               <div className="infra-actions">
                 <button type="submit" className="infra-primary" disabled={!canManage}>
                   {editingId ? 'Actualizar laboratorio' : 'Crear laboratorio'}
@@ -220,6 +310,7 @@ function AdminLaboratoriosPage({ user }) {
                     <strong>{lab.name}</strong>
                     <p>{lab.location} · Capacidad {lab.capacity}</p>
                     <small>{lab.area_name || areaNameById[String(lab.area_id)] || 'Sin area'}</small>
+                    <small>{summarizeAccess(lab)}</small>
                   </div>
                   <div className="infra-actions compact">
                     <button
@@ -235,6 +326,9 @@ function AdminLaboratoriosPage({ user }) {
                           description: lab.description || '',
                           area_id: String(lab.area_id),
                           is_active: lab.is_active !== false,
+                          allowed_roles: Array.isArray(lab.allowed_roles) ? lab.allowed_roles : [],
+                          allowed_user_ids: Array.isArray(lab.allowed_user_ids) ? lab.allowed_user_ids : [],
+                          required_permissions: Array.isArray(lab.required_permissions) ? lab.required_permissions : [],
                         })
                       }}
                     >
