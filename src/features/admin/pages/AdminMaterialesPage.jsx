@@ -30,6 +30,7 @@ function AdminMaterialesPage({ user }) {
   const [editingId, setEditingId] = useState(null)
   const [materialForm, setMaterialForm] = useState(defaultMaterialForm)
   const [movementForm, setMovementForm] = useState(defaultMovementForm)
+  const [activeModal, setActiveModal] = useState(null)
 
   const [confirmModal, setConfirmModal] = useState(null)
 
@@ -88,6 +89,44 @@ function AdminMaterialesPage({ user }) {
     setMaterialForm(defaultMaterialForm)
   }
 
+  const openMaterialModal = (material = null) => {
+    setError('')
+    setMessage('')
+    if (material) {
+      setEditingId(material.id)
+      setMaterialForm({
+        name: material.name,
+        category: material.category,
+        unit: material.unit,
+        quantity_available: material.quantity_available,
+        minimum_stock: material.minimum_stock,
+        laboratory_id: material.laboratory_id ? String(material.laboratory_id) : '',
+        description: material.description || '',
+      })
+    } else {
+      resetMaterialForm()
+    }
+    setActiveModal('material')
+  }
+
+  const openMovementModal = (material = null) => {
+    setError('')
+    setMessage('')
+    setMovementForm((prev) => ({
+      ...prev,
+      stock_item_id: material?.id ? String(material.id) : prev.stock_item_id || (materials[0]?.id ? String(materials[0].id) : ''),
+    }))
+    setActiveModal('movement')
+  }
+
+  const closeWorkflowModal = () => {
+    setActiveModal(null)
+    setError('')
+    if (activeModal === 'material') {
+      resetMaterialForm()
+    }
+  }
+
   const handleMaterialSubmit = async (event) => {
     event.preventDefault()
     if (!canManage) return
@@ -108,6 +147,7 @@ function AdminMaterialesPage({ user }) {
         setMessage('Material creado correctamente.')
       }
       resetMaterialForm()
+      setActiveModal(null)
       await loadData()
     } catch (err) {
       setError(err.message || 'No se pudo guardar el material')
@@ -153,6 +193,7 @@ function AdminMaterialesPage({ user }) {
       })
       setMessage('Movimiento de stock registrado y auditado correctamente.')
       setMovementForm((prev) => ({ ...defaultMovementForm, stock_item_id: prev.stock_item_id }))
+      setActiveModal(null)
       await loadData()
     } catch (err) {
       setError(err.message || 'No se pudo registrar el movimiento de stock')
@@ -168,6 +209,194 @@ function AdminMaterialesPage({ user }) {
           onConfirm={confirmModal.onConfirm}
           onCancel={() => setConfirmModal(null)}
         />
+      ) : null}
+      {activeModal ? (
+        <div className="infra-workflow-backdrop" role="dialog" aria-modal="true" aria-label={activeModal === 'material' ? 'Gestionar material' : 'Registrar movimiento de stock'}>
+          <section className="infra-workflow-modal">
+            <div className="infra-workflow-modal-head">
+              <div>
+                <p className="infra-kicker">{activeModal === 'material' ? 'Catalogo de materiales' : 'Trazabilidad de stock'}</p>
+                <h3>{activeModal === 'material' ? (editingId ? 'Editar material' : 'Nuevo material') : 'Movimiento de stock'}</h3>
+                <p>
+                  {activeModal === 'material'
+                    ? 'Registra materiales con laboratorio, unidad de medida y stock minimo para que el inventario sea facil de leer.'
+                    : 'Documenta ingresos, devoluciones o consumos con saldo actualizado y observaciones para auditoria.'}
+                </p>
+              </div>
+              <button type="button" className="infra-workflow-close" onClick={closeWorkflowModal} aria-label="Cerrar">
+                x
+              </button>
+            </div>
+
+            {error ? <p className="infra-alert infra-error">{error}</p> : null}
+
+            {activeModal === 'material' ? (
+              <form className="infra-form infra-workflow-form" onSubmit={handleMaterialSubmit}>
+                <div className="infra-form-section">
+                  <span className="infra-form-section-label">1 - Identificacion</span>
+                  <div className="infra-form-grid">
+                    <label>
+                      <span>Nombre del material</span>
+                      <input
+                        value={materialForm.name}
+                        onChange={(e) => setMaterialForm((prev) => ({ ...prev, name: e.target.value }))}
+                        placeholder="Ej. Alcohol isopropilico, cable UTP, resistencia 220 ohm"
+                        required
+                        disabled={!canManage}
+                      />
+                    </label>
+                    <label>
+                      <span>Categoria</span>
+                      <input
+                        value={materialForm.category}
+                        onChange={(e) => setMaterialForm((prev) => ({ ...prev, category: e.target.value }))}
+                        placeholder="Reactivo, electronica, redes, limpieza"
+                        required
+                        disabled={!canManage}
+                      />
+                    </label>
+                  </div>
+                  <label>
+                    <span>Descripcion</span>
+                    <textarea
+                      rows="3"
+                      value={materialForm.description}
+                      onChange={(e) => setMaterialForm((prev) => ({ ...prev, description: e.target.value }))}
+                      placeholder="Agrega detalles utiles para docentes, auxiliares o encargados."
+                      disabled={!canManage}
+                    />
+                  </label>
+                </div>
+
+                <div className="infra-form-section">
+                  <span className="infra-form-section-label">2 - Stock y asignacion</span>
+                  <div className="infra-form-grid">
+                    <label>
+                      <span>Unidad</span>
+                      <input
+                        value={materialForm.unit}
+                        onChange={(e) => setMaterialForm((prev) => ({ ...prev, unit: e.target.value }))}
+                        placeholder="unidad, ml, g, kit, metro"
+                        required
+                        disabled={!canManage}
+                      />
+                    </label>
+                    <label>
+                      <span>Laboratorio</span>
+                      <select value={materialForm.laboratory_id} onChange={(e) => setMaterialForm((prev) => ({ ...prev, laboratory_id: e.target.value }))} disabled={!canManage}>
+                        <option value="">Disponible para cualquier laboratorio</option>
+                        {labs.map((lab) => (
+                          <option key={lab.id} value={lab.id}>{lab.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Stock disponible</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={materialForm.quantity_available}
+                        onChange={(e) => setMaterialForm((prev) => ({ ...prev, quantity_available: e.target.value }))}
+                        required
+                        disabled={!canManage}
+                      />
+                    </label>
+                    <label>
+                      <span>Stock minimo</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={materialForm.minimum_stock}
+                        onChange={(e) => setMaterialForm((prev) => ({ ...prev, minimum_stock: e.target.value }))}
+                        required
+                        disabled={!canManage}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="infra-actions infra-workflow-actions">
+                  <button type="button" className="infra-secondary" onClick={closeWorkflowModal}>
+                    Cerrar
+                  </button>
+                  <button type="submit" className="infra-primary" disabled={!canManage}>
+                    {editingId ? 'Actualizar material' : 'Crear material'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form className="infra-form infra-workflow-form" onSubmit={handleMovementSubmit}>
+                <div className="infra-form-section">
+                  <span className="infra-form-section-label">1 - Material y tipo</span>
+                  <div className="infra-form-grid">
+                    <label>
+                      <span>Material</span>
+                      <select value={movementForm.stock_item_id} onChange={(e) => setMovementForm((prev) => ({ ...prev, stock_item_id: e.target.value }))} disabled={!canManage} required>
+                        <option value="">Selecciona un material</option>
+                        {materials.map((m) => (
+                          <option key={m.id} value={m.id}>{m.name} ({m.quantity_available} {m.unit})</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Tipo de movimiento</span>
+                      <select value={movementForm.movement_type} onChange={(e) => setMovementForm((prev) => ({ ...prev, movement_type: e.target.value }))} disabled={!canManage}>
+                        <option value="entry">Ingreso / compra</option>
+                        <option value="return">Devolucion</option>
+                        <option value="consumption">Consumo / merma</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="infra-form-section">
+                  <span className="infra-form-section-label">2 - Cantidad y observaciones</span>
+                  <div className="infra-form-grid">
+                    <label>
+                      <span>Cantidad</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max={movementForm.movement_type === 'consumption' ? selectedMovementMaterial?.quantity_available || 1 : undefined}
+                        value={movementForm.quantity}
+                        onChange={(e) => setMovementForm((prev) => ({ ...prev, quantity: e.target.value }))}
+                        disabled={!canManage}
+                        required
+                      />
+                    </label>
+                    <label>
+                      <span>Stock actual</span>
+                      <input value={selectedMovementMaterial ? `${selectedMovementMaterial.quantity_available} ${selectedMovementMaterial.unit}` : 'Selecciona un material'} disabled />
+                    </label>
+                  </div>
+                  <label>
+                    <span>Motivo u observaciones</span>
+                    <textarea
+                      rows="3"
+                      value={movementForm.notes}
+                      onChange={(e) => setMovementForm((prev) => ({ ...prev, notes: e.target.value }))}
+                      placeholder="Ej. consumo en practica de quimica, compra semestral o devolucion del grupo 2"
+                      disabled={!canManage}
+                    />
+                  </label>
+                </div>
+
+                {movementWillExceedStock ? (
+                  <p className="infra-inline-error">La cantidad a descontar supera el stock disponible del material seleccionado.</p>
+                ) : null}
+
+                <div className="infra-actions infra-workflow-actions">
+                  <button type="button" className="infra-secondary" onClick={closeWorkflowModal}>
+                    Cerrar
+                  </button>
+                  <button type="submit" className="infra-primary" disabled={!canManage || movementWillExceedStock || !movementForm.stock_item_id}>
+                    Registrar movimiento
+                  </button>
+                </div>
+              </form>
+            )}
+          </section>
+        </div>
       ) : null}
       <header className="infra-header">
         <div>
@@ -188,6 +417,36 @@ function AdminMaterialesPage({ user }) {
         <p className="infra-empty">Cargando materiales...</p>
       ) : (
         <div className="infra-grid">
+          <section className="infra-command-panel infra-card-full">
+            <div className="infra-command-copy">
+              <p className="infra-kicker">Centro de stock</p>
+              <h3>Materiales listos para practicas</h3>
+              <p>
+                Controla reactivos, consumibles y materiales por laboratorio sin llenar la pantalla de formularios.
+                Primero elige la accion y luego completa solo el flujo necesario.
+              </p>
+            </div>
+            {canManage ? (
+              <div className="infra-action-grid">
+                <button type="button" className="infra-action-card is-primary" onClick={() => openMaterialModal()}>
+                  <span>1</span>
+                  <strong>Nuevo material</strong>
+                  <small>Registra stock, unidad, categoria y laboratorio asignado.</small>
+                </button>
+                <button type="button" className="infra-action-card" onClick={() => openMovementModal()}>
+                  <span>2</span>
+                  <strong>Movimiento de stock</strong>
+                  <small>Ingreso, devolucion o consumo con trazabilidad.</small>
+                </button>
+                <button type="button" className="infra-action-card" onClick={() => document.querySelector('.infra-materials-catalog')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+                  <span>3</span>
+                  <strong>Revisar catalogo</strong>
+                  <small>Consulta existencias y edita cada material cuando lo necesites.</small>
+                </button>
+              </div>
+            ) : null}
+          </section>
+
           <section className="infra-card">
             <div className="infra-section-head">
               <div>
@@ -390,7 +649,7 @@ function AdminMaterialesPage({ user }) {
             </section>
           </section>
 
-          <section className="infra-card">
+          <section className="infra-card infra-materials-catalog">
             <div className="infra-section-head">
               <div>
                 <h3>Lista de materiales</h3>
@@ -408,49 +667,46 @@ function AdminMaterialesPage({ user }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {materials.map((material) => (
-                    <tr key={material.id}>
-                      <td>{material.name}</td>
-                      <td>{material.category}</td>
-                      <td>{material.laboratory_id ? labNameById[Number(material.laboratory_id)] || `Lab ${material.laboratory_id}` : 'General'}</td>
-                      <td>
-                        <strong>{material.quantity_available} {material.unit}</strong>
-                        <small>Minimo {material.minimum_stock}</small>
-                      </td>
-                      <td>
-                        <div className="infra-actions compact">
-                          {canManage ? (
-                            <>
-                              <button type="button" className="infra-secondary" onClick={() => setMovementForm((prev) => ({ ...prev, stock_item_id: String(material.id) }))}>
-                                Mover stock
-                              </button>
-                              <button
-                                type="button"
-                                className="infra-secondary"
-                                onClick={() => {
-                                  setEditingId(material.id)
-                                  setMaterialForm({
-                                    name: material.name,
-                                    category: material.category,
-                                    unit: material.unit,
-                                    quantity_available: material.quantity_available,
-                                    minimum_stock: material.minimum_stock,
-                                    laboratory_id: material.laboratory_id ? String(material.laboratory_id) : '',
-                                    description: material.description || '',
-                                  })
-                                }}
-                              >
-                                Editar
-                              </button>
-                              <button type="button" className="infra-danger" onClick={() => handleDelete(material.id)}>
-                                Eliminar
-                              </button>
-                            </>
-                          ) : null}
-                        </div>
+                  {materials.length === 0 ? (
+                    <tr>
+                      <td colSpan="5">
+                        Todavia no hay materiales registrados. Usa el boton "Nuevo material" para crear el primer recurso del inventario.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    materials.map((material) => (
+                      <tr key={material.id}>
+                        <td>{material.name}</td>
+                        <td>{material.category}</td>
+                        <td>{material.laboratory_id ? labNameById[Number(material.laboratory_id)] || `Lab ${material.laboratory_id}` : 'General'}</td>
+                        <td>
+                          <strong>{material.quantity_available} {material.unit}</strong>
+                          <small>Minimo {material.minimum_stock}</small>
+                        </td>
+                        <td>
+                          <div className="infra-actions compact">
+                            {canManage ? (
+                              <>
+                                <button type="button" className="infra-secondary" onClick={() => openMovementModal(material)}>
+                                  Mover stock
+                                </button>
+                                <button
+                                  type="button"
+                                  className="infra-secondary"
+                                  onClick={() => openMaterialModal(material)}
+                                >
+                                  Editar
+                                </button>
+                                <button type="button" className="infra-danger" onClick={() => handleDelete(material.id)}>
+                                  Eliminar
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
