@@ -170,13 +170,20 @@ function mapReservationPage(record) {
 }
 
 function normalizeStringArray(value) {
-  if (!Array.isArray(value)) {
-    return []
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
   }
 
-  return value
-    .map((item) => String(item || '').trim())
-    .filter(Boolean)
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+
+  return []
 }
 
 export function isLabAccessibleToUser(lab, user) {
@@ -215,6 +222,22 @@ function mapNotification(record) {
   const nextEnd = splitDateTime(payload?.new_end_at)
   const reminderStart = splitDateTime(payload?.starts_at)
   const reservationStart = splitDateTime(payload?.start_at)
+  const tutorialOldStart = {
+    date: payload?.old_session_date || '',
+    time: payload?.old_start_time || '',
+  }
+  const tutorialOldEnd = {
+    date: payload?.old_session_date || '',
+    time: payload?.old_end_time || '',
+  }
+  const tutorialNewStart = {
+    date: payload?.new_session_date || '',
+    time: payload?.new_start_time || '',
+  }
+  const tutorialNewEnd = {
+    date: payload?.new_session_date || '',
+    time: payload?.new_end_time || '',
+  }
 
   return {
     id: record?.id || '',
@@ -226,7 +249,7 @@ function mapNotification(record) {
     created_at: record?.created_at || '',
     payload,
     reservation_id: payload?.reservation_id || '',
-    purpose: payload?.purpose || '',
+    purpose: payload?.purpose || payload?.topic || '',
     change_kinds: Array.isArray(payload?.change_kinds) ? payload.change_kinds : [],
     old_laboratory_id: payload?.old_laboratory_id || '',
     new_laboratory_id: payload?.new_laboratory_id || '',
@@ -237,17 +260,29 @@ function mapNotification(record) {
     actor_name: payload?.actor_name || '',
     reminder_kind: payload?.reminder_kind || '',
     reminder_laboratory_id: payload?.laboratory_id || '',
-    reminder_date: reminderStart.date || '',
-    reminder_time: reminderStart.time || '',
+    reminder_date: reminderStart.date || payload?.session_date || '',
+    reminder_time: reminderStart.time || payload?.start_time || '',
+    reminder_end_time: payload?.end_time || '',
+    reminder_location: payload?.location || payload?.laboratory_name || '',
+    reminder_tutor_name: payload?.tutor_name || '',
+    reminder_event_type: record?.notification_type === 'tutorial_reminder' ? 'tutorial' : 'reservation',
     status: payload?.status || '',
     cancel_reason: payload?.cancel_reason || '',
     target_path: payload?.target_path || '',
     tutorial_session_id: payload?.tutorial_session_id || '',
-    tutorial_date: payload?.session_date || '',
-    tutorial_start_time: payload?.start_time || '',
-    tutorial_end_time: payload?.end_time || '',
-    tutorial_location: payload?.location || '',
-    tutor_name: payload?.tutor_name || '',
+    tutorial_date: payload?.session_date || payload?.new_session_date || '',
+    tutorial_start_time: payload?.start_time || payload?.new_start_time || '',
+    tutorial_end_time: payload?.end_time || payload?.new_end_time || '',
+    tutorial_location: payload?.location || payload?.new_location || '',
+    tutor_name: payload?.tutor_name || payload?.new_tutor_name || '',
+    old_tutor_name: payload?.old_tutor_name || '',
+    new_tutor_name: payload?.new_tutor_name || '',
+    old_tutorial_location: payload?.old_location || '',
+    new_tutorial_location: payload?.new_location || '',
+    old_tutorial_date: tutorialOldStart.date || tutorialOldEnd.date || '',
+    new_tutorial_date: tutorialNewStart.date || tutorialNewEnd.date || '',
+    old_tutorial_time_range: tutorialOldStart.time && tutorialOldEnd.time ? `${tutorialOldStart.time} - ${tutorialOldEnd.time}` : '',
+    new_tutorial_time_range: tutorialNewStart.time && tutorialNewEnd.time ? `${tutorialNewStart.time} - ${tutorialNewEnd.time}` : '',
     start_date: nextStart.date || reminderStart.date || reservationStart.date || '',
     start_time: nextStart.time || reminderStart.time || reservationStart.time || '',
     penalty_id: payload?.penalty_id || '',
@@ -265,7 +300,13 @@ function mapPenalty(record) {
     user_email: record?.user_email || '',
     reason: record?.reason || '',
     evidence_type: record?.evidence_type || 'damage_report',
+    evidence_ticket_id: record?.evidence_ticket_id || '',
     evidence_report_id: record?.evidence_report_id || '',
+    incident_scope: record?.incident_scope || 'asset',
+    incident_laboratory_id: record?.incident_laboratory_id || '',
+    incident_date: record?.incident_date || '',
+    incident_start_time: record?.incident_start_time || '',
+    incident_end_time: record?.incident_end_time || '',
     asset_id: record?.asset_id || '',
     related_reservation_id: record?.related_reservation_id || '',
     starts_at: record?.starts_at || '',
@@ -282,21 +323,6 @@ function mapPenalty(record) {
     lifted_by: record?.lifted_by || '',
     lifted_by_name: record?.lifted_by_name || '',
     lift_reason: record?.lift_reason || '',
-  }
-}
-
-function mapSupplyReservation(record) {
-  return {
-    id: String(record?.id || ''),
-    stock_item_id: String(record?.stock_item_id || ''),
-    stock_item_name: String(record?.stock_item_name || ''),
-    quantity: Number(record?.quantity || 0),
-    status: String(record?.status || 'pending'),
-    requested_by: String(record?.requested_by || ''),
-    requested_for: String(record?.requested_for || ''),
-    notes: String(record?.notes || ''),
-    created: String(record?.created || ''),
-    updated: String(record?.updated || ''),
   }
 }
 
@@ -473,8 +499,12 @@ export async function getLabAvailability(laboratoryId, day) {
   return request(`${reservationsBase}/availability/labs/${laboratoryId}?${search.toString()}`, { cacheTtlMs: 1500 })
 }
 
-export async function listReservationNotifications() {
-  const data = await request(`${reservationsBase}/notifications/mine`, { cacheTtlMs: 1500 })
+export async function listReservationNotifications(options = {}) {
+  const skipCache = Boolean(options?.skipCache)
+  const data = await request(`${reservationsBase}/notifications/mine`, {
+    cacheTtlMs: skipCache ? 0 : 1500,
+    skipCache,
+  })
   return Array.isArray(data) ? data.map(mapNotification) : []
 }
 
@@ -518,7 +548,13 @@ export async function createPenalty(payload) {
       user_email: String(payload.user_email || '').trim().toLowerCase(),
       reason: String(payload.reason || '').trim(),
       evidence_type: String(payload.evidence_type || 'damage_report'),
+      evidence_ticket_id: String(payload.evidence_ticket_id || '').trim(),
       evidence_report_id: String(payload.evidence_report_id || '').trim(),
+      incident_scope: String(payload.incident_scope || 'asset').trim(),
+      incident_laboratory_id: String(payload.incident_laboratory_id || '').trim(),
+      incident_date: String(payload.incident_date || '').trim(),
+      incident_start_time: String(payload.incident_start_time || '').trim(),
+      incident_end_time: String(payload.incident_end_time || '').trim(),
       asset_id: String(payload.asset_id || '').trim(),
       starts_at: String(payload.starts_at || '').trim(),
       ends_at: String(payload.ends_at || '').trim(),
@@ -538,54 +574,6 @@ export async function liftPenalty(penaltyId, options = {}) {
   })
   clearReservationsCache()
   return mapPenalty(data?.penalty || {})
-}
-
-export async function listSupplyReservations(filters = {}, user = null) {
-  const search = new URLSearchParams()
-  if (filters.status) {
-    search.set('status', String(filters.status).trim())
-  }
-
-  const query = search.toString() ? `?${search.toString()}` : ''
-  const data = await request(`${reservationsBase}/supply-reservations${query}`, { cacheTtlMs: 1500 })
-  const mapped = Array.isArray(data) ? data.map(mapSupplyReservation) : []
-
-  if (!user) {
-    return mapped
-  }
-
-  const identityCandidates = [
-    String(user?.username || '').trim().toLowerCase(),
-    String(user?.name || '').trim().toLowerCase(),
-    String(user?.user_id || '').trim().toLowerCase(),
-  ].filter(Boolean)
-
-  if (identityCandidates.length === 0) {
-    return mapped
-  }
-
-  return mapped.filter((reservation) => identityCandidates.includes(String(reservation.requested_by || '').trim().toLowerCase()))
-}
-
-export async function createSupplyReservation(payload) {
-  const normalized = {
-    stock_item_id: String(payload.stock_item_id || '').trim(),
-    quantity: Number(payload.quantity || 0),
-    requested_for: String(payload.requested_for || '').trim(),
-    notes: String(payload.notes || '').trim(),
-  }
-
-  if (!normalized.stock_item_id || normalized.quantity <= 0) {
-    throw new Error('Debes seleccionar un reactivo y una cantidad valida.')
-  }
-
-  const record = await request(`${reservationsBase}/supply-reservations`, {
-    method: 'POST',
-    body: JSON.stringify(normalized),
-  })
-
-  clearReservationsCache()
-  return mapSupplyReservation(record)
 }
 
 export function subscribeReservationsRealtime(onMessage) {
