@@ -72,6 +72,46 @@
   flex-direction: column;
   overflow: auto;
   animation: pageIn 0.28s ease both;
+  position: relative;
+}
+
+.section-help-trigger-wrap {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  z-index: 15;
+  margin: 0;
+}
+
+.section-help-trigger {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(10, 37, 64, 0.22);
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.42), transparent 46%),
+    linear-gradient(145deg, #fcd84a, #e9b30b);
+  color: #0a2540;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(13, 34, 61, 0.14);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), filter var(--transition-fast);
+}
+
+.section-help-trigger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 30px rgba(13, 34, 61, 0.2);
+  filter: saturate(1.08);
+}
+
+.section-help-trigger:focus-visible {
+  outline: 0;
+  box-shadow:
+    0 0 0 3px rgba(6, 63, 119, 0.18),
+    0 12px 26px rgba(13, 34, 61, 0.18);
 }
 
 @keyframes pageIn {

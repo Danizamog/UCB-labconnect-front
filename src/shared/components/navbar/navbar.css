@@ -99,6 +99,60 @@
   line-height: 1;
 }
 
+/* ── Search block ─────────────────────────────────────────── */
+.sidebar-search-wrap {
+  position: relative;
+  z-index: 1;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(10, 37, 64, 0.18);
+  background: rgba(255, 255, 255, 0.56);
+  color: rgba(10, 37, 64, 0.68);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+
+.sidebar-search svg {
+  flex-shrink: 0;
+  opacity: 0.82;
+}
+
+.sidebar-search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #0a2540;
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 0.84rem;
+}
+
+.sidebar-search input::placeholder {
+  color: rgba(10, 37, 64, 0.52);
+}
+
+.sidebar-search:focus-within {
+  border-color: rgba(6, 63, 119, 0.52);
+  box-shadow: 0 0 0 3px rgba(6, 63, 119, 0.14);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.sidebar-search-hint {
+  margin: 8px 2px 0;
+  font-size: 0.72rem;
+  color: rgba(10, 37, 64, 0.62);
+  font-weight: 600;
+}
+
 /* ── Nav links ─────────────────────────────────────────── */
 .sidebar-nav {
   position: relative;
@@ -119,6 +173,22 @@
 .sidebar-nav::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.15);
   border-radius: 2px;
+}
+
+.sidebar-group {
+  display: grid;
+  gap: 3px;
+}
+
+.sidebar-group-title {
+  margin: 8px 2px 4px;
+  padding: 0 10px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(10, 37, 64, 0.45);
+  font-family: var(--font-display);
 }
 
 .sidebar-link {
@@ -180,6 +250,31 @@
   background: rgba(255, 255, 255, 0.8);
   color: var(--ucb-blue, #063f77);
   transform: none;
+}
+
+.sidebar-link--subsection {
+  padding-block: 8px;
+  min-height: 38px;
+  font-size: 0.82rem;
+  color: rgba(10, 37, 64, 0.62);
+}
+
+.sidebar-subsection-line {
+  display: inline-block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-empty-results {
+  margin: 10px 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px dashed rgba(10, 37, 64, 0.2);
+  background: rgba(255, 255, 255, 0.42);
+  color: rgba(10, 37, 64, 0.7);
+  font-size: 0.8rem;
+  line-height: 1.45;
 }
 
 /* ── Footer / user section ─────────────────────────────── */
