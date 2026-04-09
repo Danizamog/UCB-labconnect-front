@@ -7,26 +7,7 @@ const reservationsBase = gatewayBase.endsWith('/v1') ? gatewayBase : `${gatewayB
 const requestCache = new Map()
 const inFlightRequests = new Map()
 
-function resolveReservationWsUrl() {
-  const rawValue = String(import.meta.env.VITE_RESERVATION_WS_URL || '').trim()
-  if (rawValue.startsWith('ws://') || rawValue.startsWith('wss://')) {
-    return rawValue
-  }
 
-  try {
-    const gatewayUrl = new URL(gatewayBase)
-    const protocol = gatewayUrl.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = gatewayUrl.hostname || 'localhost'
-    const port = gatewayUrl.hostname === 'localhost' || gatewayUrl.hostname === '127.0.0.1' ? '8005' : gatewayUrl.port
-    const authority = port ? `${host}:${port}` : host
-    if (!rawValue && host !== 'localhost' && host !== '127.0.0.1') {
-      return ''
-    }
-    return `${protocol}//${authority}/v1/ws/reservations`
-  } catch {
-    return 'ws://localhost:8005/v1/ws/reservations'
-  }
-}
 
 function authHeaders(withJson = false) {
   const token = getAuthToken()
@@ -580,78 +561,81 @@ export async function liftPenalty(penaltyId, options = {}) {
   return mapPenalty(data?.penalty || {})
 }
 
-// PocketBase collection name → topic name emitted to subscribers
-const _PB_COLLECTION_TOPICS = {
-  lab_reservation: 'lab_reservation',
-  lab_block: 'lab_reservation',
-  tutorial_session: 'tutorial_session',
-  notification: 'user_notification',
-  user_penalty: 'user_penalty',
-}
-
-// Topics handled by PocketBase — the legacy WS only emits topics NOT in this set
-const _PB_HANDLED_TOPICS = new Set(Object.values(_PB_COLLECTION_TOPICS))
-
 export function subscribeReservationsRealtime(onMessage) {
   const pb = getPocketBaseClient()
   let isActive = true
-  const cleanupFns = []
+  const unsubscribeFns = []
 
-  const subscribeCollection = async (collection, topic) => {
-    try {
-      const unsub = await pb.collection(collection).subscribe('*', (e) => {
-        if (isActive) {
-          onMessage?.({ topic, action: e.action, record: e.record })
-        }
-      })
+  // Subscribe to lab_reservation collection changes
+  try {
+    console.log('[RealtimeSubscribe] Conectando a lab_reservation collection...')
+    const unsubLab = pb.collection('lab_reservation').subscribe('*', (e) => {
       if (isActive) {
-        cleanupFns.push(unsub)
-      } else {
-        try { unsub?.() } catch { /* ignore */ }
-      }
-    } catch {
-      // Collection may not exist or auth may be required — ignore silently
-    }
-  }
-
-  for (const [collection, topic] of Object.entries(_PB_COLLECTION_TOPICS)) {
-    subscribeCollection(collection, topic)
-  }
-
-  // Legacy WebSocket as fallback for server-side events not stored in PocketBase
-  // (e.g. scheduler broadcasts, lab_access, auto_completed events)
-  const wsUrl = resolveReservationWsUrl()
-  if (wsUrl) {
-    let closeWhenConnected = false
-    const socket = new WebSocket(wsUrl)
-
-    socket.onopen = () => {
-      if (closeWhenConnected) socket.close()
-    }
-
-    socket.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data)
-        // Only forward topics not already covered by PocketBase to avoid duplicates
-        if (!_PB_HANDLED_TOPICS.has(payload?.topic)) {
-          onMessage?.(payload)
-        }
-      } catch { /* ignore malformed messages */ }
-    }
-
-    socket.onerror = () => {}
-
-    cleanupFns.push(() => {
-      if (socket.readyState === WebSocket.CONNECTING) {
-        closeWhenConnected = true
-      } else if (socket.readyState === WebSocket.OPEN) {
-        socket.close()
+        console.log('[RealtimeSubscribe] lab_reservation event:', e.action, e.record?.id)
+        onMessage?.({ topic: 'lab_reservation', action: e.action, record: e.record })
       }
     })
+    unsubscribeFns.push(unsubLab)
+    console.log('[RealtimeSubscribe] ✓ lab_reservation subscribed')
+  } catch (err) {
+    console.error('[RealtimeSubscribe] Error suscribiendo a lab_reservation:', err)
+  }
+
+  // Subscribe to lab_block collection changes
+  try {
+    console.log('[RealtimeSubscribe] Conectando a lab_block collection...')
+    const unsubBlock = pb.collection('lab_block').subscribe('*', (e) => {
+      if (isActive) {
+        console.log('[RealtimeSubscribe] lab_block event:', e.action, e.record?.id)
+        onMessage?.({ topic: 'lab_reservation', action: e.action, record: e.record })
+      }
+    })
+    unsubscribeFns.push(unsubBlock)
+    console.log('[RealtimeSubscribe] ✓ lab_block subscribed')
+  } catch (err) {
+    console.error('[RealtimeSubscribe] Error suscribiendo a lab_block:', err)
+  }
+
+  // Subscribe to user_penalty collection changes
+  try {
+    console.log('[RealtimeSubscribe] Conectando a user_penalty collection...')
+    const unsubPenalty = pb.collection('user_penalty').subscribe('*', (e) => {
+      if (isActive) {
+        console.log('[RealtimeSubscribe] user_penalty event:', e.action, e.record?.id)
+        onMessage?.({ topic: 'user_penalty', action: e.action, record: e.record, recipients: [e.record?.user_id] })
+      }
+    })
+    unsubscribeFns.push(unsubPenalty)
+    console.log('[RealtimeSubscribe] ✓ user_penalty subscribed')
+  } catch (err) {
+    console.error('[RealtimeSubscribe] Error suscribiendo a user_penalty:', err)
+  }
+
+  // Subscribe to notification collection changes
+  try {
+    console.log('[RealtimeSubscribe] Conectando a notification collection...')
+    const unsubNotif = pb.collection('notification').subscribe('*', (e) => {
+      if (isActive) {
+        console.log('[RealtimeSubscribe] notification event:', e.action, e.record?.id)
+        onMessage?.({ topic: 'user_notification', action: e.action, record: e.record, recipients: [e.record?.recipient_user_id] })
+      }
+    })
+    unsubscribeFns.push(unsubNotif)
+    console.log('[RealtimeSubscribe] ✓ notification subscribed')
+  } catch (err) {
+    console.error('[RealtimeSubscribe] Error suscribiendo a notification:', err)
   }
 
   return () => {
+    console.log('[RealtimeSubscribe] Unsubscribing all...')
     isActive = false
-    cleanupFns.forEach((fn) => { try { fn?.() } catch { /* ignore */ } })
+    unsubscribeFns.forEach((fn) => { 
+      try { 
+        fn?.() 
+      } catch (err) { 
+        console.error('[RealtimeSubscribe] Error en unsubscribe:', err)
+      } 
+    })
+    console.log('[RealtimeSubscribe] ✓ All unsubscribed')
   }
 }
