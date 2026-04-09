@@ -79,6 +79,11 @@ export async function listMyTutorialSessions() {
   return Array.isArray(data) ? data.map(mapTutorialSession) : []
 }
 
+export async function listMyEnrolledTutorialSessions() {
+  const data = await request(`${tutorialsBase}/tutorial-sessions/my-enrollments`)
+  return Array.isArray(data) ? data.map(mapTutorialSession) : []
+}
+
 export async function getTutorialSessionById(sessionId) {
   if (!sessionId) {
     throw new Error('No se pudo identificar la tutoria seleccionada.')
@@ -100,6 +105,30 @@ export async function createTutorialSession(payload) {
       start_time: String(payload.start_time || ''),
       end_time: String(payload.end_time || ''),
       max_students: Number(payload.max_students || 0),
+      ...(payload.tutor_name ? { tutor_name: String(payload.tutor_name).trim() } : {}),
+    }),
+  })
+  return mapTutorialSession(record)
+}
+
+export async function updateTutorialSession(sessionId, payload) {
+  if (!sessionId) {
+    throw new Error('No se pudo identificar la tutoria a actualizar.')
+  }
+
+  const record = await request(`${tutorialsBase}/tutorial-sessions/${sessionId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      topic: String(payload.topic || '').trim(),
+      description: String(payload.description || '').trim(),
+      laboratory_id: String(payload.laboratory_id || '').trim(),
+      location: String(payload.location || '').trim(),
+      session_date: String(payload.session_date || ''),
+      start_time: String(payload.start_time || ''),
+      end_time: String(payload.end_time || ''),
+      max_students: Number(payload.max_students || 0),
+      ...(payload.tutor_name ? { tutor_name: String(payload.tutor_name).trim() } : {}),
+      ...(payload.tutor_email ? { tutor_email: String(payload.tutor_email).trim() } : {}),
     }),
   })
   return mapTutorialSession(record)
@@ -114,6 +143,13 @@ export async function deleteTutorialSession(sessionId) {
 export async function enrollInTutorialSession(sessionId) {
   const record = await request(`${tutorialsBase}/tutorial-sessions/${sessionId}/enroll`, {
     method: 'POST',
+  })
+  return mapTutorialSession(record)
+}
+
+export async function cancelTutorialEnrollment(sessionId) {
+  const record = await request(`${tutorialsBase}/tutorial-sessions/${sessionId}/enroll`, {
+    method: 'DELETE',
   })
   return mapTutorialSession(record)
 }

@@ -89,11 +89,9 @@ export function useAuthStore() {
       return undefined
     }
 
-    const refreshInitialSession = async () => {
-      await refreshSession({ force: true })
-    }
-
-    refreshInitialSession()
+    const initialRefreshTimer = window.setTimeout(() => {
+      refreshSession({ force: true })
+    }, 0)
 
     const handleWindowFocus = () => {
       refreshSession()
@@ -109,6 +107,7 @@ export function useAuthStore() {
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
+      window.clearTimeout(initialRefreshTimer)
       window.removeEventListener('focus', handleWindowFocus)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }

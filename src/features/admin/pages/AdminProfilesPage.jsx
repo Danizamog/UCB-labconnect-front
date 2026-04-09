@@ -167,90 +167,6 @@ function AdminProfilesPage({ user }) {
 
       <div className="profiles-grid">
         <section className="profiles-card">
-          {editingUser ? (
-            <>
-              <div className="profiles-card-head">
-                <div>
-                  <h3>Editar perfil</h3>
-                  <p>{editingUser.username || editingUser.name}</p>
-                </div>
-              </div>
-
-              <form className="profiles-form" onSubmit={handleSubmit}>
-                <div className="profiles-form-section">
-                  <span className="profiles-form-section-label">1 — Datos del usuario</span>
-                  <label>
-                    <span>Nombre completo</span>
-                    <input
-                      value={form.name}
-                      onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                      required
-                      disabled={!canManage}
-                    />
-                  </label>
-                  <label>
-                    <span>Rol</span>
-                    <select
-                      value={form.roleId}
-                      onChange={(e) => setForm((prev) => ({ ...prev, roleId: e.target.value }))}
-                      disabled={!canManage}
-                    >
-                      <option value="">Sin rol asignado</option>
-                      {roles.map((r) => (
-                        <option key={r.id} value={r.id}>{r.nombre}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <div className="profiles-form-section">
-                  <span className="profiles-form-section-label">2 — Seguridad y acceso</span>
-                  <label>
-                    <span>Nueva contraseña (opcional)</span>
-                    <input
-                      type="password"
-                      value={form.password}
-                      onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-                      placeholder="Solo si deseas cambiarla"
-                      disabled={!canManage}
-                    />
-                  </label>
-                  <label className="profiles-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={form.is_active}
-                      onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))}
-                      disabled={!canReactivate}
-                    />
-                    <span>Cuenta activa</span>
-                  </label>
-                </div>
-                <div className="profiles-actions">
-                  <button
-                    type="submit"
-                    className="profiles-primary"
-                    disabled={!canManage && !canReactivate}
-                  >
-                    Guardar cambios
-                  </button>
-                  <button type="button" className="profiles-secondary" onClick={cancelEdit}>
-                    Cancelar
-                  </button>
-                </div>
-              </form>
-            </>
-          ) : (
-            <div className="profiles-card-head">
-              <div>
-                <h3>Editar perfil</h3>
-                <p className="profiles-empty">
-                  Selecciona un usuario de la lista para editar su información.
-                </p>
-              </div>
-            </div>
-          )}
-        </section>
-
-        <section className="profiles-card">
           <div className="profiles-card-head">
             <div>
               <h3>Directorio institucional</h3>
@@ -311,6 +227,79 @@ function AdminProfilesPage({ user }) {
               ))}
             </div>
           )}
+        </section>
+
+        <section className="profiles-card">
+          <details className="ux-extra-toggle" open={Boolean(editingUser)}>
+            <summary>{editingUser ? `Editar perfil: ${editingUser.username || editingUser.name}` : 'Opciones de edicion de perfil'}</summary>
+            <div className="ux-extra-toggle-content">
+              {editingUser ? (
+                <form className="profiles-form" onSubmit={handleSubmit}>
+                  <div className="profiles-form-section">
+                    <span className="profiles-form-section-label">1 — Datos del usuario</span>
+                    <label>
+                      <span>Nombre completo</span>
+                      <input
+                        value={form.name}
+                        onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                        required
+                        disabled={!canManage}
+                      />
+                    </label>
+                    <label>
+                      <span>Rol</span>
+                      <select
+                        value={form.roleId}
+                        onChange={(e) => setForm((prev) => ({ ...prev, roleId: e.target.value }))}
+                        disabled={!canManage}
+                      >
+                        <option value="">Sin rol asignado</option>
+                        {roles.map((r) => (
+                          <option key={r.id} value={r.id}>{r.nombre}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="profiles-form-section">
+                    <span className="profiles-form-section-label">2 — Seguridad y acceso</span>
+                    <label>
+                      <span>Nueva contraseña (opcional)</span>
+                      <input
+                        type="password"
+                        value={form.password}
+                        onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+                        placeholder="Solo si deseas cambiarla"
+                        disabled={!canManage}
+                      />
+                    </label>
+                    <label className="profiles-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={form.is_active}
+                        onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))}
+                        disabled={!canReactivate}
+                      />
+                      <span>Cuenta activa</span>
+                    </label>
+                  </div>
+                  <div className="profiles-actions">
+                    <button
+                      type="submit"
+                      className="profiles-primary"
+                      disabled={!canManage && !canReactivate}
+                    >
+                      Guardar cambios
+                    </button>
+                    <button type="button" className="profiles-secondary" onClick={cancelEdit}>
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <p className="profiles-empty">Selecciona un usuario en el directorio para habilitar este formulario.</p>
+              )}
+            </div>
+          </details>
         </section>
       </div>
     </section>

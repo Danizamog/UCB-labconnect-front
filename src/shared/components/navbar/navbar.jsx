@@ -19,6 +19,7 @@ import {
 import { NAVIGATION_LINKS } from '../../config/navigationLinks'
 import { hasAnyPermission } from '../../lib/permissions'
 import ucbLapazLogo from '../../../assets/branding/ucb-san-pablo-lapaz.png'
+import ucbShieldLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
 import './navbar.css'
 
 const iconMap = {
@@ -34,7 +35,6 @@ const iconMap = {
   calendar: Layers,
   tutorials_manage: CalendarPlus,
   tutorials_public: BookOpenCheck,
-  reserve_reactivos: Package,
   reserve: FlaskConical,
   mapa: Map,
   logout: LogOut,
@@ -140,6 +140,21 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const isAdmin = user?.role === 'admin'
+  const navPriority = {
+    home: 0,
+    admin_reservas: 1,
+    reserve: 1,
+    calendar: 2,
+    tutorials_public: 3,
+    tutorials_manage: 3,
+    equipos: 4,
+    materiales: 5,
+    laboratorios: 6,
+    areas: 7,
+    penalties: 8,
+    profiles: 9,
+    roles: 10,
+  }
 
   const visibleLinks = NAVIGATION_LINKS.filter((link) => {
     if (link.requiredAnyPermission) return hasAnyPermission(user, link.requiredAnyPermission)
@@ -147,7 +162,9 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
     return true
   })
 
-  const navLinks = visibleLinks.filter((link) => !link.action)
+  const navLinks = visibleLinks
+    .filter((link) => !link.action)
+    .sort((a, b) => (navPriority[a.id] ?? 99) - (navPriority[b.id] ?? 99) || a.label.localeCompare(b.label))
   const logoutLink = visibleLinks.find((link) => link.action === 'logout') || null
   const normalizedQuery = normalizeSearchText(searchQuery)
 
@@ -228,10 +245,10 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
       {/* Mobile top bar */}
       <div className="sidebar-topbar">
         <div className="sidebar-brand-mobile">
-          <img src={ucbLapazLogo} alt="UCB San Pablo La Paz" className="sidebar-logo" />
-          <div style={{display: 'flex', flexDirection: 'column', gap: '2px'}}>
-            <span style={{fontSize: '0.7rem', color: '#0a2540', fontWeight: 600, lineHeight: 1}}>UCB San Pablo</span>
-            <strong className="sidebar-title" style={{fontSize: '0.95rem'}}>LabConnect</strong>
+          <img src={ucbShieldLogo} alt="Escudo UCB San Pablo La Paz" className="sidebar-logo" />
+          <div className="sidebar-brand-mobile-text">
+            <span className="sidebar-brand-mobile-kicker">UCB San Pablo</span>
+            <strong className="sidebar-brand-mobile-title">LabConnect</strong>
           </div>
         </div>
         <button
@@ -251,9 +268,9 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
       {/* Sidebar */}
       <aside className={`sidebar ${isOpen ? 'sidebar--open' : ''}`}>
         <div className="sidebar-brand">
-          <img src={ucbLapazLogo} alt="UCB San Pablo La Paz" className="sidebar-logo" />
+          <img src={ucbShieldLogo} alt="Escudo UCB San Pablo La Paz" className="sidebar-logo" />
           <div className="sidebar-brand-text">
-            <span className="sidebar-kicker"><span style={{color: '#0a2540'}}>UCB San Pablo</span> · La Paz</span>
+            <span className="sidebar-kicker">UCB San Pablo · La Paz</span>
             <strong className="sidebar-title">LabConnect</strong>
           </div>
         </div>

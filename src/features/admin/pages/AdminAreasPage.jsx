@@ -116,52 +116,6 @@ function AdminAreasPage({ user }) {
               </div>
             </div>
 
-            <form className="infra-form" onSubmit={handleSubmit}>
-              <div className="infra-form-section">
-                <span className="infra-form-section-label">1 — Identificacion</span>
-                <label>
-                  <span>Nombre del area</span>
-                  <input
-                    value={form.name}
-                    onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                    required
-                    disabled={!canManage}
-                  />
-                </label>
-                <label>
-                  <span>Descripcion</span>
-                  <textarea
-                    rows="3"
-                    value={form.description}
-                    onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-                    disabled={!canManage}
-                  />
-                </label>
-              </div>
-              <div className="infra-form-section">
-                <span className="infra-form-section-label">2 — Configuracion</span>
-                <label className="infra-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={form.is_active}
-                    onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
-                    disabled={!canManage}
-                  />
-                  <span>Area activa para estudiantes</span>
-                </label>
-              </div>
-              <div className="infra-actions">
-                <button type="submit" className="infra-primary" disabled={!canManage}>
-                  {editingId ? 'Actualizar area' : 'Crear area'}
-                </button>
-                {editingId ? (
-                  <button type="button" className="infra-secondary" onClick={resetForm} disabled={!canManage}>
-                    Cancelar edicion
-                  </button>
-                ) : null}
-              </div>
-            </form>
-
             <div className="infra-list">
               {areas.map((area) => (
                 <article key={area.id} className="infra-item">
@@ -194,6 +148,57 @@ function AdminAreasPage({ user }) {
                 </article>
               ))}
             </div>
+
+            <details className="ux-extra-toggle" open={Boolean(editingId)}>
+              <summary>{editingId ? 'Editar area seleccionada' : 'Agregar nueva area'}</summary>
+              <div className="ux-extra-toggle-content">
+                <form className="infra-form" onSubmit={handleSubmit}>
+                  <div className="infra-form-section">
+                    <span className="infra-form-section-label">1 — Identificacion</span>
+                    <label>
+                      <span>Nombre del area</span>
+                      <input
+                        value={form.name}
+                        onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                        required
+                        disabled={!canManage}
+                      />
+                    </label>
+                    <label>
+                      <span>Descripcion</span>
+                      <textarea
+                        rows="3"
+                        value={form.description}
+                        onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
+                        disabled={!canManage}
+                      />
+                    </label>
+                  </div>
+                  <div className="infra-form-section">
+                    <span className="infra-form-section-label">2 — Configuracion</span>
+                    <label className="infra-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={form.is_active}
+                        onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
+                        disabled={!canManage}
+                      />
+                      <span>Area activa para estudiantes</span>
+                    </label>
+                  </div>
+                  <div className="infra-actions">
+                    <button type="submit" className="infra-primary" disabled={!canManage}>
+                      {editingId ? 'Actualizar area' : 'Crear area'}
+                    </button>
+                    {editingId ? (
+                      <button type="button" className="infra-secondary" onClick={resetForm} disabled={!canManage}>
+                        Cancelar edicion
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
+              </div>
+            </details>
           </section>
         </div>
       )}

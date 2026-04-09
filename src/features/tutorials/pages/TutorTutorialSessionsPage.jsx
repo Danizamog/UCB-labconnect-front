@@ -7,6 +7,7 @@ import {
   getTutorialSessionById,
   listMyTutorialSessions,
   subscribeTutorialSessionsRealtime,
+  updateTutorialSession,
 } from '../services/tutorialSessionsService'
 import TutorialSessionDetailModal from './TutorialSessionDetailModal'
 import './TutorialPages.css'
@@ -36,6 +37,7 @@ function maxReservableDateString() {
 function createDefaultForm(overrides = {}) {
   return {
     topic: '',
+    tutor_name: '',
     description: '',
     laboratory_id: '',
     location: '',
@@ -131,6 +133,7 @@ function getSlotLabel(slot, dateValue, referenceNow) {
 
 function TutorTutorialSessionsPage() {
   const [form, setForm] = useState(() => createDefaultForm())
+  const [editingSessionId, setEditingSessionId] = useState('')
   const [sessions, setSessions] = useState([])
   const [labs, setLabs] = useState([])
   const [slots, setSlots] = useState([])
@@ -212,6 +215,11 @@ function TutorTutorialSessionsPage() {
     [form.laboratory_id, labs],
   )
 
+  const editingSession = useMemo(
+    () => sessions.find((session) => session.id === editingSessionId) || null,
+    [editingSessionId, sessions],
+  )
+
   useEffect(() => {
     let mounted = true
 
@@ -233,7 +241,14 @@ function TutorTutorialSessionsPage() {
         setSlots(nextSlots)
 
         const currentKey = `${form.start_time}-${form.end_time}`
-        const matchingSlot = nextSlots.find((slot) => getSlotKey(slot) === currentKey && slot.state === 'available')
+        const matchingSlot = nextSlots.find(
+          (slot) =>
+            getSlotKey(slot) === currentKey
+            && (
+              slot.state === 'available'
+              || (slot.source === 'tutorial_session' && slot.source_id === editingSessionId)
+            ),
+        )
         if (matchingSlot) {
           setSelectedSlotKey(getSlotKey(matchingSlot))
         } else {
@@ -262,7 +277,7 @@ function TutorTutorialSessionsPage() {
     return () => {
       mounted = false
     }
-  }, [availabilityRefreshNonce, form.end_time, form.laboratory_id, form.session_date, form.start_time])
+  }, [availabilityRefreshNonce, editingSessionId, form.end_time, form.laboratory_id, form.session_date, form.start_time])
 
   const selectedSlot = useMemo(
     () => slots.find((slot) => getSlotKey(slot) === selectedSlotKey) || null,
@@ -292,7 +307,8 @@ function TutorTutorialSessionsPage() {
     if (String(form.topic || '').trim().length < MIN_TOPIC_LENGTH) {
       return `El tema debe tener al menos ${MIN_TOPIC_LENGTH} caracteres.`
     }
-    if (!selectedSlot || selectedSlot.state !== 'available') {
+    const isCurrentTutorialSlot = selectedSlot?.source === 'tutorial_session' && selectedSlot?.source_id === editingSessionId
+    if (!selectedSlot || (!isCurrentTutorialSlot && selectedSlot.state !== 'available')) {
       return 'Debes seleccionar un bloque disponible del laboratorio para publicar la tutoria.'
     }
     if (isPastSlotForDate(selectedSlot, form.session_date, nowReference)) {
@@ -312,7 +328,7 @@ function TutorTutorialSessionsPage() {
       return `La descripcion no puede superar los ${MAX_DESCRIPTION_LENGTH} caracteres.`
     }
     return ''
-  }, [form.description, form.max_students, form.session_date, form.topic, nowReference, selectedLab, selectedSlot, sessionEnd, sessionStart])
+  }, [editingSessionId, form.description, form.max_students, form.session_date, form.topic, nowReference, selectedLab, selectedSlot, sessionEnd, sessionStart])
 
   const canSubmit = !validationMessage && labs.length > 0
 
@@ -356,8 +372,40 @@ function TutorTutorialSessionsPage() {
     }
   }
 
+  const resetEditor = () => {
+    setEditingSessionId('')
+    setSelectedSlotKey('')
+    setForm(createDefaultForm({
+      session_date: todayLocalDateString(),
+      laboratory_id: String(selectedLab?.id || labs[0]?.id || ''),
+      location: String(selectedLab?.name || labs[0]?.name || ''),
+    }))
+  }
+
+  const handleStartEditing = (session) => {
+    if (!session) {
+      return
+    }
+
+    setEditingSessionId(session.id)
+    setForm(createDefaultForm({
+      topic: session.topic,
+      tutor_name: session.tutor_name || '',
+      description: session.description,
+      laboratory_id: String(session.laboratory_id || ''),
+      location: String(session.location || ''),
+      session_date: session.session_date,
+      start_time: session.start_time,
+      end_time: session.end_time,
+      max_students: session.max_students,
+    }))
+    setSelectedSlotKey(`${session.start_time}-${session.end_time}`)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const handleSelectSlot = (slot) => {
-    if (slot.state !== 'available') {
+    const isCurrentTutorialSlot = slot?.source === 'tutorial_session' && slot?.source_id === editingSessionId
+    if (slot.state !== 'available' && !isCurrentTutorialSlot) {
       return
     }
 
@@ -402,13 +450,26 @@ function TutorTutorialSessionsPage() {
 
     setIsSubmitting(true)
     try {
-      await createTutorialSession({
+      const payload = {
         ...form,
         laboratory_id: String(selectedLab?.id || ''),
         location: String(selectedLab?.name || ''),
         max_students: Number(form.max_students),
-      })
-      setMessage('Tutoria publicada correctamente. Ya esta visible para los estudiantes.')
+      }
+
+      if (editingSessionId) {
+        await updateTutorialSession(editingSessionId, payload)
+        setMessage(
+          editingSession?.enrolled_count > 0
+            ? 'Tutoria actualizada. Los estudiantes inscritos ya fueron notificados del cambio.'
+            : 'Tutoria actualizada correctamente.',
+        )
+      } else {
+        await createTutorialSession(payload)
+        setMessage('Tutoria publicada correctamente. Ya esta visible para los estudiantes.')
+      }
+
+      setEditingSessionId('')
       setForm(createDefaultForm({
         session_date: form.session_date,
         laboratory_id: String(selectedLab?.id || ''),
@@ -418,7 +479,7 @@ function TutorTutorialSessionsPage() {
       setAvailabilityRefreshNonce((value) => value + 1)
       await loadSessions()
     } catch (err) {
-      setError(err.message || 'No se pudo publicar la tutoria.')
+      setError(err.message || (editingSessionId ? 'No se pudo actualizar la tutoria.' : 'No se pudo publicar la tutoria.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -431,6 +492,9 @@ function TutorTutorialSessionsPage() {
 
     try {
       await deleteTutorialSession(session.id)
+      if (editingSessionId === session.id) {
+        resetEditor()
+      }
       setMessage(
         session.enrolled_count > 0
           ? 'Tutoria eliminada. Las inscripciones se cancelaron y los estudiantes fueron notificados.'
@@ -463,14 +527,10 @@ function TutorTutorialSessionsPage() {
       {error ? <p className="tutorials-message error">{error}</p> : null}
 
       <section className="tutorials-panel">
-        <div className="tutorials-panel-header">
-          <h3>Nuevo bloque</h3>
-          <p className="tutorials-panel-subtitle">
-            Publica una sesion visible de inmediato para estudiantes y auxiliares.
-          </p>
-        </div>
-
-        <form className="tutorials-form" onSubmit={handleSubmit}>
+        <details className="ux-extra-toggle" open={Boolean(editingSessionId)}>
+          <summary>{editingSessionId ? 'Editar bloque seleccionado' : 'Publicar nueva tutoria'}</summary>
+          <div className="ux-extra-toggle-content">
+            <form className="tutorials-form" onSubmit={handleSubmit}>
           <div className="tutorials-form-grid">
             <label>
               <span>Tema</span>
@@ -481,6 +541,16 @@ function TutorTutorialSessionsPage() {
                 onChange={(event) => handleFormChange('topic', event.target.value)}
                 placeholder="Ej. Refuerzo de algoritmos"
                 required
+              />
+            </label>
+            <label>
+              <span>Tutor visible</span>
+              <input
+                type="text"
+                value={form.tutor_name}
+                maxLength={120}
+                onChange={(event) => handleFormChange('tutor_name', event.target.value)}
+                placeholder="Se mostrara este nombre a los estudiantes"
               />
             </label>
             <label>
@@ -577,7 +647,8 @@ function TutorTutorialSessionsPage() {
                   {slots.map((slot) => {
                     const slotKey = getSlotKey(slot)
                     const isSelected = selectedSlotKey === slotKey
-                    const isAvailable = slot.state === 'available' && !isPastSlotForDate(slot, form.session_date, nowReference)
+                    const isCurrentTutorial = slot.source === 'tutorial_session' && slot.source_id === editingSessionId
+                    const isAvailable = (slot.state === 'available' || isCurrentTutorial) && !isPastSlotForDate(slot, form.session_date, nowReference)
                     const isTutorial = slot.source === 'tutorial_session'
                     return (
                       <button
@@ -586,7 +657,7 @@ function TutorTutorialSessionsPage() {
                         className={`tutorial-slot ${getSlotTone(slot, form.session_date, nowReference)}${isSelected ? ' is-selected' : ''}`}
                         disabled={!isAvailable && !isTutorial}
                         onClick={() => {
-                          if (isTutorial) {
+                          if (isTutorial && !isCurrentTutorial) {
                             handleOpenTutorialDetails(slot.source_id)
                             return
                           }
@@ -621,12 +692,19 @@ function TutorTutorialSessionsPage() {
 
           {validationMessage ? <p className="tutorials-inline-hint">{validationMessage}</p> : null}
 
-          <div className="tutorials-actions">
-            <button type="submit" className="tutorials-primary" disabled={!canSubmit || isSubmitting}>
-              {isSubmitting ? 'Publicando...' : 'Publicar tutoria'}
-            </button>
+              <div className="tutorials-actions">
+                {editingSessionId ? (
+                  <button type="button" className="tutorials-secondary" onClick={resetEditor}>
+                    Cancelar edicion
+                  </button>
+                ) : null}
+                <button type="submit" className="tutorials-primary" disabled={!canSubmit || isSubmitting}>
+                  {isSubmitting ? (editingSessionId ? 'Guardando...' : 'Publicando...') : (editingSessionId ? 'Guardar cambios' : 'Publicar tutoria')}
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
+        </details>
       </section>
 
       <section className="tutorials-panel">
@@ -671,6 +749,13 @@ function TutorTutorialSessionsPage() {
                 </div>
 
                 <div className="tutorials-actions">
+                  <button
+                    type="button"
+                    className="tutorials-secondary"
+                    onClick={() => handleStartEditing(session)}
+                  >
+                    Editar bloque
+                  </button>
                   <button
                     type="button"
                     className="tutorials-danger"

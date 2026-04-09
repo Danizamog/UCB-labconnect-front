@@ -314,85 +314,90 @@ function AdminRolesPage({ user, onSessionRefresh }) {
 
       {!loading && activeTab === TABS.ROLES ? (
         <>
-          <div className="roles-form-card">
-            <h3>{editingRoleId ? 'Editar rol' : 'Crear nuevo rol'}</h3>
-            <div className="roles-form-grid">
-              <label>
-                <span>Nombre</span>
-                <input
-                  className="roles-input"
-                  value={roleDraft.nombre}
-                  onChange={(event) => handleRoleDraftChange('nombre', event.target.value)}
-                  placeholder="Administrador"
-                />
-              </label>
-              <label>
-                <span>Descripción</span>
-                <input
-                  className="roles-input"
-                  value={roleDraft.descripcion}
-                  onChange={(event) => handleRoleDraftChange('descripcion', event.target.value)}
-                  placeholder="Acceso total"
-                />
-              </label>
-              <label className="roles-form-full">
-                <span>Permisos seleccionados ({selectedPermissions.length})</span>
-                <div className="roles-permissions-display">
-                  {selectedPermissions.length > 0 ? (
-                    <div className="roles-chips-container">
-                      {selectedPermissions.map((permission) => {
-                        const option = currentPermissionOptions.find((opt) => opt.value === permission)
+          <details className="ux-extra-toggle" open={Boolean(editingRoleId)}>
+            <summary>{editingRoleId ? 'Editar rol seleccionado' : 'Crear nuevo rol'}</summary>
+            <div className="ux-extra-toggle-content">
+              <div className="roles-form-card">
+                <h3>{editingRoleId ? 'Editar rol' : 'Crear nuevo rol'}</h3>
+                <div className="roles-form-grid">
+                  <label>
+                    <span>Nombre</span>
+                    <input
+                      className="roles-input"
+                      value={roleDraft.nombre}
+                      onChange={(event) => handleRoleDraftChange('nombre', event.target.value)}
+                      placeholder="Administrador"
+                    />
+                  </label>
+                  <label>
+                    <span>Descripción</span>
+                    <input
+                      className="roles-input"
+                      value={roleDraft.descripcion}
+                      onChange={(event) => handleRoleDraftChange('descripcion', event.target.value)}
+                      placeholder="Acceso total"
+                    />
+                  </label>
+                  <label className="roles-form-full">
+                    <span>Permisos seleccionados ({selectedPermissions.length})</span>
+                    <div className="roles-permissions-display">
+                      {selectedPermissions.length > 0 ? (
+                        <div className="roles-chips-container">
+                          {selectedPermissions.map((permission) => {
+                            const option = currentPermissionOptions.find((opt) => opt.value === permission)
 
-                        return (
-                          <div key={permission} className="roles-chip" title={option?.label || permission}>
-                            <span className="roles-chip-icon">{option?.icon || '•'}</span>
-                            <span className="roles-chip-label">{option?.label || permission}</span>
-                            <button
-                              type="button"
-                              className="roles-chip-remove"
-                              onClick={() => handleRemovePermission(permission)}
-                              aria-label={`Eliminar ${option?.label || permission}`}
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        )
-                      })}
+                            return (
+                              <div key={permission} className="roles-chip" title={option?.label || permission}>
+                                <span className="roles-chip-icon">{option?.icon || '•'}</span>
+                                <span className="roles-chip-label">{option?.label || permission}</span>
+                                <button
+                                  type="button"
+                                  className="roles-chip-remove"
+                                  onClick={() => handleRemovePermission(permission)}
+                                  aria-label={`Eliminar ${option?.label || permission}`}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <p className="roles-empty-state">No hay permisos seleccionados</p>
+                      )}
                     </div>
-                  ) : (
-                    <p className="roles-empty-state">No hay permisos seleccionados</p>
-                  )}
+                    <button
+                      type="button"
+                      className="roles-primary-button"
+                      onClick={() => setIsPermissionsModalOpen(true)}
+                    >
+                      {selectedPermissions.length > 0 ? 'Editar permisos' : 'Seleccionar permisos'}
+                    </button>
+                  </label>
                 </div>
-                <button
-                  type="button"
-                  className="roles-primary-button"
-                  onClick={() => setIsPermissionsModalOpen(true)}
-                >
-                  {selectedPermissions.length > 0 ? 'Editar permisos' : 'Seleccionar permisos'}
-                </button>
-              </label>
-            </div>
-            <div className="roles-toolbar">
-              <span className="roles-counter">
-                {roles.length} rol{roles.length === 1 ? '' : 'es'} registrado{roles.length === 1 ? '' : 's'}
-              </span>
-              <div className="roles-actions">
-                {editingRoleId ? (
-                  <button type="button" className="roles-ghost-button" onClick={resetDraft}>
-                    Cancelar
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="roles-save-button"
-                  onClick={handleSaveRole}
-                  disabled={Boolean(roleUpdatingId)}
-                >
-                  {editingRoleId ? 'Guardar rol' : 'Crear rol'}
-                </button>
+                <div className="roles-toolbar">
+                  <span className="roles-counter">
+                    {roles.length} rol{roles.length === 1 ? '' : 'es'} registrado{roles.length === 1 ? '' : 's'}
+                  </span>
+                  <div className="roles-actions">
+                    {editingRoleId ? (
+                      <button type="button" className="roles-ghost-button" onClick={resetDraft}>
+                        Cancelar
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="roles-save-button"
+                      onClick={handleSaveRole}
+                      disabled={Boolean(roleUpdatingId)}
+                    >
+                      {editingRoleId ? 'Guardar rol' : 'Crear rol'}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </details>
 
           {isPermissionsModalOpen ? (
             <div className="roles-modal-backdrop" role="dialog" aria-modal="true" aria-label="Seleccionar permisos">
