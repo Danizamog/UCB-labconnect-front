@@ -153,6 +153,7 @@ function mapReservation(record) {
     check_in_time: checkInTime || '',
     check_out_time: checkOutTime || '',
     is_walk_in: Boolean(record?.is_walk_in),
+    user_modification_count: Number(record?.user_modification_count || 0),
   }
 }
 
@@ -230,6 +231,8 @@ function mapNotification(record) {
     change_kinds: Array.isArray(payload?.change_kinds) ? payload.change_kinds : [],
     old_laboratory_id: payload?.old_laboratory_id || '',
     new_laboratory_id: payload?.new_laboratory_id || '',
+    old_laboratory_name: payload?.old_laboratory_name || '',
+    new_laboratory_name: payload?.new_laboratory_name || '',
     old_date: previousStart.date || previousEnd.date || '',
     new_date: nextStart.date || nextEnd.date || '',
     old_time_range: previousStart.time && previousEnd.time ? `${previousStart.time} - ${previousEnd.time}` : '',

@@ -32,9 +32,7 @@ function ReservationEditModal({
             <p className="reservation-modal-kicker">Modificar reserva</p>
             <h3>Ajustar fecha, horario o laboratorio</h3>
             <p>
-              {reservation.status === 'approved'
-                ? 'Si modificas una reserva aprobada, volvera a pendiente para una nueva revision.'
-                : 'Los cambios se guardaran sobre tu solicitud actual.'}
+              Solo puedes modificar una reserva una vez. Los cambios se guardaran directamente sobre tu reserva actual.
             </p>
           </div>
           <button type="button" className="reservation-modal-close" onClick={onClose} aria-label="Cerrar modal">
