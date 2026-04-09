@@ -151,3 +151,24 @@
   transform: translateY(-2px);
   box-shadow: 0 18px 30px rgba(13, 34, 61, 0.14);
 }
+
+/* Typography upgrade */
+.confirm-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.confirm-message {
+  font-family: var(--font-body);
+}
+
+.confirm-cancel,
+.confirm-ok {
+  font-family: var(--font-ui);
+}
+
+/* Modal border radius upgrade */
+.confirm-modal {
+  border-radius: 32px;
+}

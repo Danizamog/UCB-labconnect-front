@@ -527,16 +527,10 @@ function TutorTutorialSessionsPage() {
       {error ? <p className="tutorials-message error">{error}</p> : null}
 
       <section className="tutorials-panel">
-        <div className="tutorials-panel-header">
-          <h3>{editingSessionId ? 'Editar bloque' : 'Nuevo bloque'}</h3>
-          <p className="tutorials-panel-subtitle">
-            {editingSessionId
-              ? 'Ajusta horario, laboratorio o cupos. Si ya hay estudiantes inscritos, el sistema les avisara del cambio.'
-              : 'Publica una sesion visible de inmediato para estudiantes y auxiliares.'}
-          </p>
-        </div>
-
-        <form className="tutorials-form" onSubmit={handleSubmit}>
+        <details className="ux-extra-toggle" open={Boolean(editingSessionId)}>
+          <summary>{editingSessionId ? 'Editar bloque seleccionado' : 'Publicar nueva tutoria'}</summary>
+          <div className="ux-extra-toggle-content">
+            <form className="tutorials-form" onSubmit={handleSubmit}>
           <div className="tutorials-form-grid">
             <label>
               <span>Tema</span>
@@ -698,17 +692,19 @@ function TutorTutorialSessionsPage() {
 
           {validationMessage ? <p className="tutorials-inline-hint">{validationMessage}</p> : null}
 
-          <div className="tutorials-actions">
-            {editingSessionId ? (
-              <button type="button" className="tutorials-secondary" onClick={resetEditor}>
-                Cancelar edicion
-              </button>
-            ) : null}
-            <button type="submit" className="tutorials-primary" disabled={!canSubmit || isSubmitting}>
-              {isSubmitting ? (editingSessionId ? 'Guardando...' : 'Publicando...') : (editingSessionId ? 'Guardar cambios' : 'Publicar tutoria')}
-            </button>
+              <div className="tutorials-actions">
+                {editingSessionId ? (
+                  <button type="button" className="tutorials-secondary" onClick={resetEditor}>
+                    Cancelar edicion
+                  </button>
+                ) : null}
+                <button type="submit" className="tutorials-primary" disabled={!canSubmit || isSubmitting}>
+                  {isSubmitting ? (editingSessionId ? 'Guardando...' : 'Publicando...') : (editingSessionId ? 'Guardar cambios' : 'Publicar tutoria')}
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
+        </details>
       </section>
 
       <section className="tutorials-panel">

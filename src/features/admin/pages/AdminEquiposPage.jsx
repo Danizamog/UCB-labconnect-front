@@ -13,7 +13,6 @@ import {
   listLoansDashboard,
   returnLoanRecord,
   updateAsset,
-  updateAssetStatus,
 } from '../services/infrastructureService'
 import { listUserProfiles } from '../services/profileService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
@@ -178,6 +177,18 @@ function AdminEquiposPage({ user }) {
       .slice(0, 6)
   }, [activeUserProfiles, userSearch])
   const filteredAssets = useMemo(() => assets.filter((asset) => assetMatchesSearch(asset, assetSearch)), [assets, assetSearch])
+  const canSubmitAssetForm = useMemo(() => {
+    const nameOk = String(form.name || '').trim().length >= 3
+    const categoryOk = String(form.category || '').trim().length >= 3
+    const locationOk = String(form.location || '').trim().length >= 3
+    return canManage && nameOk && categoryOk && locationOk
+  }, [canManage, form.category, form.location, form.name])
+  const canSubmitTicketForm = useMemo(() => {
+    const hasAsset = String(ticketForm.asset_id || '').trim().length > 0
+    const titleOk = String(ticketForm.title || '').trim().length >= 5
+    const descriptionOk = String(ticketForm.description || '').trim().length >= 10
+    return canManageStatus && hasAsset && titleOk && descriptionOk && !savingTicket
+  }, [canManageStatus, savingTicket, ticketForm.asset_id, ticketForm.description, ticketForm.title])
 
   const resetForm = () => {
     setEditingId(null)
@@ -244,20 +255,32 @@ function AdminEquiposPage({ user }) {
       setError('Debes seleccionar el equipo afectado.')
       return
     }
-    if (!ticketForm.title.trim() || !ticketForm.description.trim()) {
+    const normalizedTitle = ticketForm.title.trim()
+    const normalizedDescription = ticketForm.description.trim()
+    const normalizedEvidenceId = ticketForm.evidence_report_id.trim()
+
+    if (!normalizedTitle || !normalizedDescription) {
       setError('Debes completar el titulo y la descripcion del ticket.')
+      return
+    }
+    if (normalizedTitle.length < 5) {
+      setError('El titulo debe tener al menos 5 caracteres.')
+      return
+    }
+    if (normalizedDescription.length < 10) {
+      setError('La descripcion debe tener al menos 10 caracteres.')
       return
     }
     setSavingTicket(true)
     try {
       await createAssetMaintenanceTicket(ticketForm.asset_id, {
         ticket_type: ticketForm.ticket_type,
-        title: ticketForm.title.trim(),
-        description: ticketForm.description.trim(),
+        title: normalizedTitle,
+        description: normalizedDescription,
         severity: ticketForm.severity,
-        evidence_report_id: ticketForm.evidence_report_id.trim(),
+        evidence_report_id: normalizedEvidenceId,
       })
-      setMessage(ticketForm.ticket_type === 'damage' ? 'Dano registrado. El equipo paso automaticamente a mantenimiento.' : 'Mantenimiento registrado correctamente.')
+      setMessage(ticketForm.ticket_type === 'damage' ? 'Dano registrado. El equipo paso automaticamente a mantenimiento y el ID de reporte se genero automaticamente.' : 'Mantenimiento registrado con ID de reporte automatico.')
       resetTicketForm()
       setActiveModal(null)
       await loadData()
@@ -333,20 +356,6 @@ function AdminEquiposPage({ user }) {
     })
   }
 
-  const handleStatusChange = async (assetId, status) => {
-    if (!canManageStatus) return
-    setError('')
-    setMessage('')
-    try {
-      const updated = await updateAssetStatus(assetId, status)
-      setAssets((previous) => previous.map((asset) => (asset.id === assetId ? updated : asset)))
-      if (selectedAssetHistoryId === assetId) await loadAssetDetailHistory(assetId)
-      setMessage('Estado del equipo actualizado correctamente.')
-    } catch (err) {
-      setError(err.message || 'No se pudo actualizar el estado del equipo')
-    }
-  }
-
   const handleToggleHistory = async (assetId) => {
     if (selectedAssetHistoryId === assetId && activeModal === 'history') {
       setActiveModal(null)
@@ -364,6 +373,10 @@ function AdminEquiposPage({ user }) {
     const resolutionNotes = String(resolutionDrafts[ticketId] || '').trim()
     if (!resolutionNotes) {
       setError('Debes registrar la resolucion antes de cerrar el ticket.')
+      return
+    }
+    if (resolutionNotes.length < 5) {
+      setError('La resolucion debe tener al menos 5 caracteres.')
       return
     }
 
@@ -635,7 +648,7 @@ function AdminEquiposPage({ user }) {
 
                 <div className="infra-actions infra-workflow-actions">
                   <button type="button" className="infra-secondary" onClick={handleCloseWorkflowModal}>Cerrar</button>
-                  <button type="submit" className="infra-primary">{editingId ? 'Guardar cambios' : 'Crear equipo'}</button>
+                  <button type="submit" className="infra-primary" disabled={!canSubmitAssetForm}>{editingId ? 'Guardar cambios' : 'Crear equipo'}</button>
                 </div>
               </form>
             ) : null}
@@ -670,7 +683,7 @@ function AdminEquiposPage({ user }) {
                     </label>
                     <label>
                       <span>ID de reporte</span>
-                      <input value={ticketForm.evidence_report_id} onChange={(event) => setTicketForm((previous) => ({ ...previous, evidence_report_id: event.target.value }))} placeholder="Ej. MTTO-204 o DANO-031" />
+                      <input value="Se genera automaticamente al guardar" readOnly />
                     </label>
                   </div>
                 </div>
@@ -689,7 +702,7 @@ function AdminEquiposPage({ user }) {
 
                 <div className="infra-actions infra-workflow-actions">
                   <button type="button" className="infra-secondary" onClick={handleCloseWorkflowModal}>Cerrar</button>
-                  <button type="submit" className="infra-primary" disabled={!canManageStatus || savingTicket}>{savingTicket ? 'Guardando ticket...' : 'Registrar ticket'}</button>
+                  <button type="submit" className="infra-primary" disabled={!canSubmitTicketForm}>{savingTicket ? 'Guardando ticket...' : 'Registrar ticket'}</button>
                 </div>
               </form>
             ) : null}
@@ -782,9 +795,10 @@ function AdminEquiposPage({ user }) {
                               </div>
                               <div>
                                 <strong>{entry.title}</strong>
+                                <small>ID reporte: {entry.evidence_report_id || 'Sin ID registrado'}</small>
                                 <small>{entry.description}</small>
                                 <small>Estado: {assetStatusLabel(entry.asset_status_before || 'available')} {' -> '} {assetStatusLabel(entry.asset_status_after_open || 'maintenance')}</small>
-                                {entry.resolved_at ? <small>Resuelto: {formatDateTime(entry.resolved_at)} por {entry.resolved_by || 'Sistema'}</small> : null}
+                                {entry.resolved_at ? <small>Resuelto: {formatDateTime(entry.resolved_at)} por {entry.resolved_by || 'Sistema'}{entry.resolved_by_email ? ` (${entry.resolved_by_email})` : ''}</small> : null}
                                 {entry.resolution_notes ? <small>Resolucion: {entry.resolution_notes}</small> : null}
                                 {entry.is_responsibility_flagged ? <small className="infra-negative">Ultimo prestamo asociado: {entry.responsible_borrower_name || entry.responsible_borrower_email || 'Responsable no identificado'}</small> : null}
                               </div>
@@ -967,7 +981,7 @@ function AdminEquiposPage({ user }) {
                 </div>
 
                 <div className="infra-actions">
-                  <button type="submit" className="infra-primary">{editingId ? 'Actualizar equipo' : 'Crear equipo'}</button>
+                  <button type="submit" className="infra-primary" disabled={!canSubmitAssetForm}>{editingId ? 'Actualizar equipo' : 'Crear equipo'}</button>
                   {editingId ? <button type="button" className="infra-secondary" onClick={resetForm}>Cancelar edicion</button> : null}
                 </div>
               </form>
@@ -1011,7 +1025,7 @@ function AdminEquiposPage({ user }) {
                   </label>
                   <label>
                     <span>ID de reporte</span>
-                    <input value={ticketForm.evidence_report_id} onChange={(event) => setTicketForm((previous) => ({ ...previous, evidence_report_id: event.target.value }))} placeholder="Ej. MTTO-204 o DANO-031" />
+                    <input value="Se genera automaticamente al guardar" readOnly />
                   </label>
                 </div>
                 <label>
@@ -1025,7 +1039,7 @@ function AdminEquiposPage({ user }) {
               </div>
 
               <div className="infra-actions">
-                <button type="submit" className="infra-primary" disabled={!canManageStatus || savingTicket}>{savingTicket ? 'Guardando ticket...' : 'Registrar ticket'}</button>
+                <button type="submit" className="infra-primary" disabled={!canSubmitTicketForm}>{savingTicket ? 'Guardando ticket...' : 'Registrar ticket'}</button>
                 <button type="button" className="infra-secondary" onClick={resetTicketForm}>Limpiar</button>
               </div>
             </form>
@@ -1055,16 +1069,16 @@ function AdminEquiposPage({ user }) {
                     </div>
                     <p className="infra-ticket-copy">{ticket.description}</p>
                     <div className="infra-ticket-meta">
-                      <span><strong>Reporte:</strong> {ticket.evidence_report_id || 'Sin ID'}</span>
-                      <span><strong>Abierto:</strong> {formatDateTime(ticket.reported_at)}</span>
-                      <span><strong>Por:</strong> {ticket.reported_by}</span>
+                      <span><strong>ID reporte:</strong> {ticket.evidence_report_id || 'Pendiente de generar'}</span>
+                      <span><strong>Equipo:</strong> {ticket.asset_name || assetNameById[String(ticket.asset_id)] || 'Equipo no identificado'} · ID {ticket.asset_id || 'Sin ID'}</span>
+                      <span><strong>Abierto:</strong> {formatDateTime(ticket.reported_at)} por {ticket.reported_by || 'Sin registro'}{ticket.reported_by_email ? ` (${ticket.reported_by_email})` : ''}</span>
                       {ticket.is_responsibility_flagged ? <span className="infra-negative">Responsable asociado: {ticket.responsible_borrower_name || ticket.responsible_borrower_email || 'Prestamo previo'}</span> : null}
                     </div>
-                    <label>
+                    <label className="infra-ticket-resolution">
                       <span>Resolucion para cierre</span>
                       <textarea rows="3" value={resolutionDrafts[ticket.id] || ''} onChange={(event) => setResolutionDrafts((previous) => ({ ...previous, [ticket.id]: event.target.value }))} placeholder="Describe la reparacion realizada y el resultado." />
                     </label>
-                    <div className="infra-actions">
+                    <div className="infra-actions infra-actions-start">
                       <button type="button" className="infra-primary" disabled={closingTicketId === ticket.id || !canManageStatus} onClick={() => handleCloseTicket(ticket.id)}>
                         {closingTicketId === ticket.id ? 'Cerrando...' : 'Cerrar ticket'}
                       </button>
@@ -1213,14 +1227,6 @@ function AdminEquiposPage({ user }) {
                         <div className="infra-status-cell">
                           <span className={`infra-status-badge ${assetStatusBadgeClass(asset.status)}`}>{assetStatusLabel(asset.status)}</span>
                           <small>{asset.status_updated_by ? `Ultimo cambio: ${asset.status_updated_by} - ${formatDateTime(asset.status_updated_at)}` : 'Sin cambios registrados'}</small>
-                          {canManageStatus ? (
-                            <select value={asset.status} onChange={(event) => handleStatusChange(asset.id, event.target.value)}>
-                              <option value="available">Disponible</option>
-                              <option value="loaned">Prestado</option>
-                              <option value="maintenance">Mantenimiento</option>
-                              <option value="damaged">Danado</option>
-                            </select>
-                          ) : null}
                         </div>
                       </td>
                       <td>

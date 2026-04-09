@@ -249,6 +249,26 @@ function AdminReservationsPage({ user }) {
     selectedWalkInLab && Number(selectedWalkInLab.capacity || 0) > 0
       ? Math.max(Number(selectedWalkInLab.capacity || 0) - selectedWalkInLabOccupancy, 0)
       : null
+  const walkInCurrentStartTime = nowTime()
+  const isWalkInChronologyValid = minutesFromClock(walkInForm.end_time) > minutesFromClock(walkInCurrentStartTime)
+  const isWalkInCapacityAvailable =
+    selectedWalkInLab && Number(selectedWalkInLab.capacity || 0) > 0 ? selectedWalkInLabRemainingCapacity > 0 : true
+  const isWalkInFormValid =
+    String(walkInForm.laboratory_id || '').trim().length > 0 &&
+    walkInForm.requested_by.trim().length >= 4 &&
+    walkInForm.occupant_name.trim().length >= 5 &&
+    walkInForm.occupant_email.trim().length > 0 &&
+    walkInForm.purpose.trim().length >= 8 &&
+    isWalkInChronologyValid &&
+    isWalkInCapacityAvailable
+  const isEditChronologyValid = minutesFromClock(draft.end_time) > minutesFromClock(draft.start_time)
+  const isEditFormValid =
+    String(draft.laboratory_id || '').trim().length > 0 &&
+    String(draft.date || '').trim().length > 0 &&
+    String(draft.start_time || '').trim().length > 0 &&
+    String(draft.end_time || '').trim().length > 0 &&
+    draft.purpose.trim().length >= 8 &&
+    isEditChronologyValid
 
   const todaysReservations = useMemo(
     () => reservations.filter((item) => item.date === todayDate()).sort((a, b) => a.start_time.localeCompare(b.start_time)),
@@ -484,7 +504,7 @@ function AdminReservationsPage({ user }) {
       {message ? <p className="reservations-message success">{message}</p> : null}
       {error ? <p className="reservations-message error">{error}</p> : null}
 
-      <section className="reservations-panel">
+      <section className="reservations-panel reservations-panel-secondary">
         <div className="reservations-panel-header">
           <h3>Ocupacion actual</h3>
           <p className="reservations-panel-subtitle">
@@ -535,7 +555,10 @@ function AdminReservationsPage({ user }) {
         )}
       </section>
 
-      <section className="reservations-panel">
+      <section className="reservations-panel reservations-panel-tertiary">
+        <details className="ux-extra-toggle">
+          <summary>Opciones extra: ingreso rapido (walk-in)</summary>
+          <div className="ux-extra-toggle-content">
         <div className="reservations-panel-header">
           <h3>Ingreso rapido sin reserva previa</h3>
           <p className="reservations-panel-subtitle">
@@ -564,6 +587,7 @@ function AdminReservationsPage({ user }) {
                 value={walkInForm.requested_by}
                 onChange={(event) => setWalkInForm((prev) => ({ ...prev, requested_by: event.target.value }))}
                 placeholder="Codigo o identificador"
+                minLength={4}
                 required
               />
             </label>
@@ -573,6 +597,7 @@ function AdminReservationsPage({ user }) {
                 value={walkInForm.occupant_name}
                 onChange={(event) => setWalkInForm((prev) => ({ ...prev, occupant_name: event.target.value }))}
                 placeholder="Nombre del usuario"
+                minLength={5}
                 required
               />
             </label>
@@ -583,6 +608,7 @@ function AdminReservationsPage({ user }) {
                 value={walkInForm.occupant_email}
                 onChange={(event) => setWalkInForm((prev) => ({ ...prev, occupant_email: event.target.value }))}
                 placeholder="correo institucional"
+                required
               />
             </label>
             <label>
@@ -610,6 +636,8 @@ function AdminReservationsPage({ user }) {
               value={walkInForm.purpose}
               onChange={(event) => setWalkInForm((prev) => ({ ...prev, purpose: event.target.value }))}
               placeholder="Ej. Practica corta, apoyo docente, prueba de equipo"
+              minLength={8}
+              required
             />
           </label>
           <p className="reservation-inline-hint">
@@ -619,15 +647,23 @@ function AdminReservationsPage({ user }) {
                 : 'Este laboratorio no tiene capacidad configurada; el sistema seguira validando disponibilidad horaria al guardar.'
               : 'Selecciona un laboratorio para ver su ocupacion actual antes de registrar el walk-in.'}
           </p>
+          {!isWalkInChronologyValid ? (
+            <p className="reservation-inline-hint">La hora estimada de salida debe ser mayor a la hora actual.</p>
+          ) : null}
+          {selectedWalkInLab && Number(selectedWalkInLab.capacity || 0) > 0 && !isWalkInCapacityAvailable ? (
+            <p className="reservation-inline-hint">No hay cupos disponibles para registrar un nuevo walk-in en este laboratorio.</p>
+          ) : null}
           <div className="reservations-actions">
-            <button type="submit" className="reservations-primary" disabled={!canManage}>
+            <button type="submit" className="reservations-primary" disabled={!canManage || !isWalkInFormValid}>
               Registrar walk-in
             </button>
           </div>
         </form>
+          </div>
+        </details>
       </section>
 
-      <section className="reservations-panel">
+      <section className="reservations-panel reservations-panel-secondary">
         <div className="reservations-panel-header">
           <h3>Control de entradas y salidas del dia</h3>
           <p className="reservations-panel-subtitle">
@@ -740,11 +776,17 @@ function AdminReservationsPage({ user }) {
                 rows="3"
                 value={draft.purpose}
                 onChange={(event) => setDraft((prev) => ({ ...prev, purpose: event.target.value }))}
+                minLength={8}
+                required
               />
             </label>
 
+            {!isEditChronologyValid ? (
+              <p className="reservation-inline-hint">La hora de fin debe ser mayor a la hora de inicio.</p>
+            ) : null}
+
             <div className="reservations-actions">
-              <button type="submit" className="reservations-primary">Guardar cambios</button>
+              <button type="submit" className="reservations-primary" disabled={!canManage || !isEditFormValid}>Guardar cambios</button>
               <button type="button" className="reservations-secondary" onClick={handleCancelEdit}>
                 Cancelar
               </button>
@@ -753,11 +795,11 @@ function AdminReservationsPage({ user }) {
         </section>
       ) : null}
 
-      <section className="reservations-panel">
+      <section className="reservations-panel reservations-panel-priority">
         <div className="reservations-panel-header">
           <h3>Solicitudes de reserva</h3>
           <p className="reservations-panel-subtitle">
-            Esta tabla consulta al backend con paginacion, ordenacion y filtro compuesto. Puedes demostrarlo en DevTools o Postman.
+            Revisa y responde primero las solicitudes pendientes. Usa los filtros avanzados solo cuando necesites busquedas mas especificas.
           </p>
         </div>
 
@@ -802,66 +844,59 @@ function AdminReservationsPage({ user }) {
               />
             </label>
 
-            <label>
-              <span>Ordenar por</span>
-              <select
-                value={tableFilters.sortBy}
-                onChange={(event) => setTableFilters((previous) => ({ ...previous, sortBy: event.target.value }))}
-              >
-                {TABLE_SORT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              <span>Direccion</span>
-              <select
-                value={tableFilters.sortType}
-                onChange={(event) => setTableFilters((previous) => ({ ...previous, sortType: event.target.value }))}
-              >
-                <option value="DESC">DESC</option>
-                <option value="ASC">ASC</option>
-              </select>
-            </label>
-
-            <label>
-              <span>Tamano de pagina</span>
-              <select
-                value={tableFilters.pageSize}
-                onChange={(event) => setTableFilters((previous) => ({ ...previous, pageSize: Number(event.target.value) }))}
-              >
-                <option value="5">5</option>
-                <option value="10">10</option>
-                <option value="20">20</option>
-                <option value="50">50</option>
-              </select>
-            </label>
           </div>
 
-          <label>
-            <span>Filtro avanzado `where`</span>
-            <input
-              value={tableFilters.where}
-              onChange={(event) => setTableFilters((previous) => ({ ...previous, where: event.target.value }))}
-              placeholder="Ej. purpose~practica;status=approved;date>=2026-03-01"
-            />
-          </label>
+          <details className="ux-extra-toggle">
+            <summary>Opciones avanzadas de filtro</summary>
+            <div className="ux-extra-toggle-content">
+              <div className="reservations-controls">
+                <label>
+                  <span>Ordenar por</span>
+                  <select
+                    value={tableFilters.sortBy}
+                    onChange={(event) => setTableFilters((previous) => ({ ...previous, sortBy: event.target.value }))}
+                  >
+                    {TABLE_SORT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
 
-          <p className="reservation-inline-hint">
-            Consulta API actual:
-            {' '}
-            <code>
-              /api/v1/reservations/search?pageNumber={tableQuery.pageNumber}
-              &amp;pageSize={tableQuery.pageSize}
-              &amp;sortBy={tableQuery.sortBy}
-              &amp;sortType={tableQuery.sortType}
-              {tableQuery.status && tableQuery.status !== 'all' ? `&status=${tableQuery.status}` : ''}
-              {tableQuery.laboratory_id ? `&laboratory_id=${tableQuery.laboratory_id}` : ''}
-              {tableQuery.date ? `&day=${tableQuery.date}` : ''}
-              {tableQuery.where ? `&where=${encodeURIComponent(tableQuery.where)}` : ''}
-            </code>
-          </p>
+                <label>
+                  <span>Direccion</span>
+                  <select
+                    value={tableFilters.sortType}
+                    onChange={(event) => setTableFilters((previous) => ({ ...previous, sortType: event.target.value }))}
+                  >
+                    <option value="DESC">DESC</option>
+                    <option value="ASC">ASC</option>
+                  </select>
+                </label>
+
+                <label>
+                  <span>Tamano de pagina</span>
+                  <select
+                    value={tableFilters.pageSize}
+                    onChange={(event) => setTableFilters((previous) => ({ ...previous, pageSize: Number(event.target.value) }))}
+                  >
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                  </select>
+                </label>
+              </div>
+
+              <label>
+                <span>Filtro avanzado where (opcional)</span>
+                <input
+                  value={tableFilters.where}
+                  onChange={(event) => setTableFilters((previous) => ({ ...previous, where: event.target.value }))}
+                  placeholder="Ej. purpose~practica;status=approved;date>=2026-03-01"
+                />
+              </label>
+            </div>
+          </details>
 
           <div className="reservations-actions">
             <button type="submit" className="reservations-primary">Aplicar filtros</button>

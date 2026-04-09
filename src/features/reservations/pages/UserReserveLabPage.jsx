@@ -409,7 +409,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     return () => {
       mounted = false
     }
-  }, [availabilityRefreshNonce, form.date, form.end_time, form.laboratory_id, form.start_time, selectedLabIsAccessible])
+  }, [availabilityRefreshNonce, form.date, form.laboratory_id, selectedLabIsAccessible])
 
   const labNameById = useMemo(
     () => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])),
@@ -643,7 +643,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     return () => {
       mounted = false
     }
-  }, [editingReservation, editForm.date, editForm.end_time, editForm.laboratory_id, editForm.start_time, isEditSlotSelectable])
+  }, [editingReservation, editForm.date, editForm.laboratory_id, isEditSlotSelectable])
 
   const selectedEditSlot = useMemo(
     () => editSlots.find((slot) => getSlotKey(slot) === editSelectedSlotKey) || null,

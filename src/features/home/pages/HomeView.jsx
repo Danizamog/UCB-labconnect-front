@@ -306,13 +306,15 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
                         <div className="home-admin-badges">
                           {operationsSnapshot.lab_breakdown.map((entry) => (
                             <span key={entry.laboratory_id} className="home-admin-badge">
-                              {entry.laboratory_id}: {entry.occupancy_count}
+                              <FlaskConical size={13} aria-hidden="true" />
+                              {entry.laboratory_id}
+                              <strong>{entry.occupancy_count}</strong>
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <p className="home-role-note">
-                          No hay usuarios dentro del laboratorio en este momento. El contador se actualizara al registrar nuevas entradas y salidas.
+                        <p className="home-role-note home-empty-note">
+                          Sin usuarios activos en laboratorios ahora mismo. El contador se actualiza en tiempo real al registrar entradas y salidas.
                         </p>
                       )}
                     </div>
@@ -458,54 +460,6 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
                     ) : null}
                   </div>
 
-                  <div className="home-hero">
-                    <img src={ucbEscudoLogo} alt="UCB Escudo" className="home-hero-logo" />
-                    <div className="home-hero-meta">
-                      <h2>Universidad Católica Boliviana San Pablo</h2>
-                      <p>Desde 1966 formando profesionales comprometidos con la excelencia académica y la responsabilidad social.</p>
-                    </div>
-                  </div>
-
-                  <div className="home-section">
-                    <h3 className="home-section-title">¿Qué es LabConnect?</h3>
-                    <p className="home-section-text">
-                      LabConnect es la plataforma integral de gestión de laboratorios de la UCB San Pablo.
-                      Conecta docentes, estudiantes y personal administrativo en un ecosistema colaborativo que facilita:
-                    </p>
-                    <ul className="home-features">
-                      <li><strong>Reserva de laboratorios</strong> para prácticas y proyectos académicos</li>
-                      <li><strong>Gestión de inventario</strong> de equipos y materiales disponibles</li>
-                      <li><strong>Control de acceso</strong> seguro a espacios especializados</li>
-                      <li><strong>Seguimiento de préstamos</strong> y mantenimiento preventivo</li>
-                    </ul>
-                  </div>
-
-                  <div className="home-section">
-                    <h3 className="home-section-title">Nuestros Laboratorios</h3>
-                    <p className="home-section-text">
-                      Contamos con espacios modernos y completamente equipados para diferentes disciplinas:
-                    </p>
-                    <div className="home-labs-grid">
-                      <div className="home-lab-card">
-                        <strong>Laboratorios de Ciencias</strong>
-                        <p>Física, Química y Biología</p>
-                      </div>
-                      <div className="home-lab-card">
-                        <strong>Laboratorios de Ingeniería</strong>
-                        <p>Sistemas, Mecánica y Electrónica</p>
-                      </div>
-                      <div className="home-lab-card">
-                        <strong>Laboratorios de Administración</strong>
-                        <p>Sistemas de Información y Negocios</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {hasManagementModules ? (
-                    <p className="home-role-note">
-                      Tu rol actual también incluye accesos de gestión. Puedes usar las pestañas habilitadas según tus permisos.
-                    </p>
-                  ) : null}
                 </>
               )}
             </section>

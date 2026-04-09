@@ -226,6 +226,10 @@
   justify-content: flex-end;
 }
 
+.infra-actions-start {
+  justify-content: flex-start;
+}
+
 .infra-primary,
 .infra-secondary,
 .infra-danger {
@@ -413,10 +417,10 @@
 .infra-ticket-card {
   display: grid;
   gap: 12px;
-  padding: 16px;
-  border-radius: 14px;
-  border: 1px solid rgba(10, 53, 89, 0.08);
-  background: #fafbfc;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(10, 53, 89, 0.12);
+  background: linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%);
 }
 
 .infra-ticket-head {
@@ -429,15 +433,60 @@
 .infra-ticket-copy {
   margin: 0;
   color: var(--ink-800);
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   line-height: 1.6;
+  padding: 10px 12px;
+  background: rgba(6, 63, 119, 0.04);
+  border: 1px solid rgba(6, 63, 119, 0.1);
+  border-radius: 10px;
 }
 
 .infra-ticket-meta {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   color: var(--ink-700);
+  font-size: 0.83rem;
+}
+
+.infra-ticket-meta span {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid rgba(10, 53, 89, 0.08);
+}
+
+.infra-ticket-resolution {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 720px);
+}
+
+.infra-ticket-resolution > span {
   font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink-700);
+}
+
+.infra-ticket-resolution textarea {
+  width: 100%;
+  max-width: 100%;
+  min-height: 92px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line-300);
+  background: #fff;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--ink-900);
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.infra-ticket-resolution textarea:focus {
+  outline: none;
+  border-color: rgba(6, 77, 144, 0.5);
+  box-shadow: 0 0 0 3px rgba(6, 77, 144, 0.08);
 }
 
 /* ── Misc utilities ────────────────────────────────────── */

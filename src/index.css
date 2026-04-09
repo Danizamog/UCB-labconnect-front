@@ -1,30 +1,51 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=Source+Sans+3:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
 
 :root {
+  /* UCB Institucional */
   --ucb-blue: #063f77;
   --ucb-blue-700: #0a3559;
   --ucb-blue-500: #1260aa;
+  --ucb-blue-deep: #041f3a;
   --ucb-gold: #f4c542;
   --ucb-gold-strong: #d89b00;
+  --ucb-gold-light: #fef3c7;
+
+  /* Ink scale */
   --ink-900: #0d223d;
   --ink-800: #19324f;
   --ink-700: #3d5676;
+  --ink-500: #6580a0;
+
+  /* Surface scale */
   --surface-100: #ffffff;
   --surface-200: #f5f8fc;
   --surface-300: #edf3f8;
   --line-300: #d8e2ee;
+  --line-200: #e8eef6;
 
+  /* Border radius */
+  --radius-xs: 6px;
   --radius-sm: 10px;
   --radius-md: 16px;
   --radius-lg: 22px;
+  --radius-xl: 32px;
 
+  /* Shadows */
   --shadow-soft: 0 22px 52px rgba(6, 48, 89, 0.14);
   --shadow-subtle: 0 10px 26px rgba(13, 34, 61, 0.08);
   --shadow-card: 0 18px 42px rgba(13, 34, 61, 0.09);
+  --shadow-gold: 0 8px 24px rgba(244, 197, 66, 0.3);
+  --shadow-blue: 0 8px 24px rgba(6, 63, 119, 0.25);
 
-  --font-body: 'Source Sans 3', 'Segoe UI', sans-serif;
-  --font-display: 'Barlow Condensed', 'Source Sans 3', sans-serif;
-  --font-ui: 'Inter', 'Source Sans 3', sans-serif;
+  /* Typography */
+  --font-body: 'DM Sans', 'Segoe UI', sans-serif;
+  --font-display: 'Sora', 'DM Sans', sans-serif;
+  --font-ui: 'DM Sans', 'Segoe UI', sans-serif;
+
+  /* Transitions */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * {
@@ -46,7 +67,8 @@ body {
     radial-gradient(circle at 86% 0%, rgba(6, 63, 119, 0.12), transparent 26%),
     linear-gradient(135deg, #eef4f9 0%, #f8fbff 52%, #eef5fb 100%);
   font-size: 16px;
-  line-height: 1.5;
+  line-height: 1.58;
+  letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -71,7 +93,38 @@ textarea {
 }
 
 button {
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
+}
+
+:where(
+  .infra-header h2,
+  .profiles-header h2,
+  .roles-header h2,
+  .reservations-header h2,
+  .tutorials-header h2,
+  .home-modern-hero h1,
+  .home-placeholder h2,
+  .login-card h1
+) {
+  font-family: var(--font-ui);
+  letter-spacing: -0.015em !important;
+  line-height: 1.14 !important;
+}
+
+:where(
+  .infra-kicker,
+  .profiles-kicker,
+  .roles-header-kicker,
+  .reservations-kicker,
+  .tutorials-kicker,
+  .home-modern-kicker,
+  .login-brand-kicker,
+  .reservation-modal-kicker,
+  .tutorial-detail-kicker,
+  .reservation-user-card-kicker
+) {
+  letter-spacing: 0.07em !important;
+  font-family: var(--font-ui);
 }
 
 button:focus-visible,
@@ -89,22 +142,24 @@ textarea:focus-visible {
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(216, 226, 238, 0.45);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(6, 63, 119, 0.28);
-  border: 2px solid rgba(245, 248, 252, 0.8);
+  background: rgba(6, 63, 119, 0.22);
+  border: 2px solid transparent;
+  background-clip: padding-box;
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(6, 63, 119, 0.42);
+  background: rgba(6, 63, 119, 0.38);
+  background-clip: padding-box;
 }
 
 /* Global premium UI layer for LabConnect screens */
@@ -183,7 +238,7 @@ textarea:focus-visible {
   color: #ffbc6e;
   font-family: var(--font-ui);
   font-weight: 800;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
 }
 
 .infra-header h2,
@@ -193,7 +248,8 @@ textarea:focus-visible {
 .tutorials-header h2 {
   font-family: var(--font-ui);
   font-weight: 800;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
 }
 
 .infra-summary div,
@@ -213,6 +269,45 @@ textarea:focus-visible {
 .reservations-page,
 .tutorials-page {
   gap: clamp(18px, 2.6vw, 30px);
+}
+
+.ux-extra-toggle {
+  border: 1px solid rgba(10, 53, 89, 0.14);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 251, 255, 0.94));
+  box-shadow: 0 12px 28px rgba(13, 34, 61, 0.08);
+}
+
+.ux-extra-toggle > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  color: var(--ink-900);
+  font-weight: 700;
+}
+
+.ux-extra-toggle > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ux-extra-toggle > summary::after {
+  content: 'Mostrar';
+  font-size: 0.8rem;
+  color: var(--ink-700);
+  font-weight: 600;
+}
+
+.ux-extra-toggle[open] > summary::after {
+  content: 'Ocultar';
+}
+
+.ux-extra-toggle-content {
+  padding: 0 16px 16px;
+  border-top: 1px solid rgba(10, 53, 89, 0.08);
 }
 
 .infra-card,
@@ -439,4 +534,110 @@ textarea:focus-visible {
   .tutorials-summary div {
     flex: 1 1 130px;
   }
+}
+
+/* ── Form validation global states ─────────────────────── */
+.field-invalid .field-wrap,
+.field-wrap.is-invalid {
+  border-color: rgba(185, 28, 28, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+}
+
+.field-valid .field-wrap,
+.field-wrap.is-valid {
+  border-color: rgba(22, 163, 74, 0.45) !important;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+}
+
+.field-hint {
+  font-size: 0.78rem;
+  margin: 3px 0 0 2px;
+  font-weight: 500;
+  transition: color var(--transition-fast);
+}
+
+.field-hint.is-error {
+  color: #b91c1c;
+}
+
+.field-hint.is-ok {
+  color: #16a34a;
+}
+
+.field-hint.is-muted {
+  color: var(--ink-500);
+}
+
+/* ── Global button disabled state ───────────────────────── */
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* ── Page entry animation ────────────────────────────────── */
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.animate-page-in {
+  animation: pageIn 0.3s var(--transition-base) both;
+}
+
+/* ── Badge ──────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.badge-gold {
+  background: var(--ucb-gold);
+  color: var(--ucb-blue-deep);
+}
+
+.badge-blue {
+  background: var(--ucb-blue);
+  color: #fff;
+}
+
+/* ── Scrollbar refinement ────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(6, 63, 119, 0.2);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 63, 119, 0.36);
+  background-clip: padding-box;
 }
