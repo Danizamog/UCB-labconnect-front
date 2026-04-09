@@ -1,6 +1,5 @@
 import { listAdminLabs } from '../../admin/services/infrastructureService'
 import { getAuthToken } from '../../../shared/utils/storage'
-import { getPocketBaseClient } from '../../../shared/lib/pocketbaseClient'
 
 const gatewayBase = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
 const reservationsBase = gatewayBase.endsWith('/v1') ? gatewayBase : `${gatewayBase}/v1`
@@ -562,80 +561,75 @@ export async function liftPenalty(penaltyId, options = {}) {
 }
 
 export function subscribeReservationsRealtime(onMessage) {
-  const pb = getPocketBaseClient()
   let isActive = true
-  const unsubscribeFns = []
+  let ws = null
+  let reconnectTimer = null
+  const RECONNECT_DELAY_MS = 3000
 
-  // Subscribe to lab_reservation collection changes
-  try {
-    console.log('[RealtimeSubscribe] Conectando a lab_reservation collection...')
-    const unsubLab = pb.collection('lab_reservation').subscribe('*', (e) => {
-      if (isActive) {
-        console.log('[RealtimeSubscribe] lab_reservation event:', e.action, e.record?.id)
-        onMessage?.({ topic: 'lab_reservation', action: e.action, record: e.record })
-      }
-    })
-    unsubscribeFns.push(unsubLab)
-    console.log('[RealtimeSubscribe] ✓ lab_reservation subscribed')
-  } catch (err) {
-    console.error('[RealtimeSubscribe] Error suscribiendo a lab_reservation:', err)
+  function getWsUrl() {
+    const configured = (import.meta.env.VITE_RESERVATION_WS_URL || '').replace(/\/$/, '')
+    if (configured) {
+      return configured.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')
+    }
+    return 'ws://localhost:8005/v1/ws/reservations'
   }
 
-  // Subscribe to lab_block collection changes
-  try {
-    console.log('[RealtimeSubscribe] Conectando a lab_block collection...')
-    const unsubBlock = pb.collection('lab_block').subscribe('*', (e) => {
-      if (isActive) {
-        console.log('[RealtimeSubscribe] lab_block event:', e.action, e.record?.id)
-        onMessage?.({ topic: 'lab_reservation', action: e.action, record: e.record })
+  function connect() {
+    if (!isActive) return
+
+    const url = getWsUrl()
+    console.log('[RealtimeWS] Connecting to', url)
+
+    try {
+      ws = new WebSocket(url)
+    } catch (err) {
+      console.error('[RealtimeWS] Failed to create WebSocket:', err)
+      scheduleReconnect()
+      return
+    }
+
+    ws.onopen = () => {
+      console.log('[RealtimeWS] Connected')
+    }
+
+    ws.onmessage = (event) => {
+      if (!isActive) return
+      try {
+        const data = JSON.parse(event.data)
+        if (data.type === 'connected') return
+        onMessage?.(data)
+      } catch {
+        // ignore non-JSON messages
       }
-    })
-    unsubscribeFns.push(unsubBlock)
-    console.log('[RealtimeSubscribe] ✓ lab_block subscribed')
-  } catch (err) {
-    console.error('[RealtimeSubscribe] Error suscribiendo a lab_block:', err)
+    }
+
+    ws.onclose = () => {
+      console.log('[RealtimeWS] Disconnected')
+      ws = null
+      scheduleReconnect()
+    }
+
+    ws.onerror = (err) => {
+      console.error('[RealtimeWS] Error:', err)
+      ws?.close()
+    }
   }
 
-  // Subscribe to user_penalty collection changes
-  try {
-    console.log('[RealtimeSubscribe] Conectando a user_penalty collection...')
-    const unsubPenalty = pb.collection('user_penalty').subscribe('*', (e) => {
-      if (isActive) {
-        console.log('[RealtimeSubscribe] user_penalty event:', e.action, e.record?.id)
-        onMessage?.({ topic: 'user_penalty', action: e.action, record: e.record, recipients: [e.record?.user_id] })
-      }
-    })
-    unsubscribeFns.push(unsubPenalty)
-    console.log('[RealtimeSubscribe] ✓ user_penalty subscribed')
-  } catch (err) {
-    console.error('[RealtimeSubscribe] Error suscribiendo a user_penalty:', err)
+  function scheduleReconnect() {
+    if (!isActive) return
+    reconnectTimer = setTimeout(connect, RECONNECT_DELAY_MS)
   }
 
-  // Subscribe to notification collection changes
-  try {
-    console.log('[RealtimeSubscribe] Conectando a notification collection...')
-    const unsubNotif = pb.collection('notification').subscribe('*', (e) => {
-      if (isActive) {
-        console.log('[RealtimeSubscribe] notification event:', e.action, e.record?.id)
-        onMessage?.({ topic: 'user_notification', action: e.action, record: e.record, recipients: [e.record?.recipient_user_id] })
-      }
-    })
-    unsubscribeFns.push(unsubNotif)
-    console.log('[RealtimeSubscribe] ✓ notification subscribed')
-  } catch (err) {
-    console.error('[RealtimeSubscribe] Error suscribiendo a notification:', err)
-  }
+  connect()
 
   return () => {
-    console.log('[RealtimeSubscribe] Unsubscribing all...')
+    console.log('[RealtimeWS] Unsubscribing')
     isActive = false
-    unsubscribeFns.forEach((fn) => { 
-      try { 
-        fn?.() 
-      } catch (err) { 
-        console.error('[RealtimeSubscribe] Error en unsubscribe:', err)
-      } 
-    })
-    console.log('[RealtimeSubscribe] ✓ All unsubscribed')
+    clearTimeout(reconnectTimer)
+    if (ws) {
+      ws.onclose = null
+      ws.close()
+      ws = null
+    }
   }
 }
