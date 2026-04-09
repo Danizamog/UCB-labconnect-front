@@ -54,6 +54,7 @@ const STATUS_LABELS = { pending: 'Pendiente', approved: 'Aprobada', rejected: 'R
 const FOCUSED_RESERVATION_KEY = 'labconnect.focus_reservation_id'
 const OPEN_RESERVATION_EVENT = 'labconnect:open-reservation-details'
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000
+const HISTORY_STATUSES = new Set(['rejected', 'cancelled', 'completed', 'absent'])
 
 function getTutorialPrimaryAction(session, userId) {
   const normalizedUserId = String(userId || '')
@@ -160,11 +161,13 @@ function getReservationActionState(reservation) {
   const hasStarted = diffMs <= 0
   const withinTwoHours = diffMs > 0 && diffMs < TWO_HOURS_MS
   const isMutableStatus = reservation.status === 'pending' || reservation.status === 'approved'
+  const modificationLimitReached = Number(reservation.user_modification_count || 0) >= 1
 
   return {
     hasStarted,
     withinTwoHours,
-    canModify: isMutableStatus && !hasStarted && !withinTwoHours,
+    modificationLimitReached,
+    canModify: isMutableStatus && !hasStarted && !withinTwoHours && !modificationLimitReached,
     canCancel: isMutableStatus && !hasStarted,
   }
 }
@@ -479,12 +482,12 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
   )
 
   const upcomingReservations = useMemo(
-    () => myReservations.filter((item) => !getReservationActionState(item).hasStarted),
+    () => myReservations.filter((item) => !HISTORY_STATUSES.has(item.status) && !getReservationActionState(item).hasStarted),
     [myReservations],
   )
 
   const reservationHistory = useMemo(
-    () => myReservations.filter((item) => getReservationActionState(item).hasStarted).reverse(),
+    () => myReservations.filter((item) => HISTORY_STATUSES.has(item.status) || getReservationActionState(item).hasStarted).reverse(),
     [myReservations],
   )
 
@@ -517,6 +520,14 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       setIsLoadingReservationDetails(false)
     }
   }, [focusedReservationId, isReservationDetailOpen, myReservations])
+
+  useEffect(() => {
+    if (!message && !error) {
+      return
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [message, error])
 
   useEffect(() => {
     if (!focusedReservationId || !isReservationDetailOpen) {
@@ -843,11 +854,8 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
         ...editForm,
         area_id: selectedEditLab?.area_id || '',
       })
-      const wasApproved = editingReservation.status === 'approved'
       setMessage(
-        wasApproved
-          ? 'La reserva fue actualizada y regreso a pendiente de aprobacion para una nueva revision.'
-          : 'Reserva actualizada correctamente.',
+        'Reserva actualizada correctamente. Recuerda que esta accion solo puede realizarse una vez por reserva.',
       )
       setFocusedReservationId(updatedReservation.id)
       setFocusedReservationDetails(updatedReservation)
@@ -1403,6 +1411,12 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                           </button>
                         ) : null}
 
+                        {!actionState.canModify && !actionState.hasStarted && actionState.modificationLimitReached ? (
+                          <button type="button" className="reservations-secondary" disabled>
+                            Modificacion usada
+                          </button>
+                        ) : null}
+
                         {actionState.canCancel ? (
                           <button
                             type="button"
@@ -1417,6 +1431,12 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                       {!actionState.hasStarted && actionState.withinTwoHours ? (
                         <p className="reservation-inline-hint">
                           Faltan menos de 2 horas para el inicio, por eso el boton de modificar esta deshabilitado.
+                        </p>
+                      ) : null}
+
+                      {!actionState.hasStarted && actionState.modificationLimitReached ? (
+                        <p className="reservation-inline-hint">
+                          Ya utilizaste la unica modificacion permitida para esta reserva.
                         </p>
                       ) : null}
                     </article>

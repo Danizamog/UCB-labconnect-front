@@ -26,6 +26,8 @@ const STATUS_LABELS = {
   absent: 'Ausente',
 }
 
+const FINAL_RESERVATION_STATUSES = new Set(['rejected', 'cancelled', 'completed', 'absent'])
+
 const TABLE_SORT_OPTIONS = [
   { value: 'start_at', label: 'Fecha de inicio' },
   { value: 'end_at', label: 'Fecha de fin' },
@@ -946,11 +948,14 @@ function AdminReservationsPage({ user }) {
                   <td>{item.start_time} - {item.end_time}</td>
                   <td><span className={`reservations-status ${item.status}`}>{STATUS_LABELS[item.status] ?? item.status}</span></td>
                   <td>
+                    {(() => {
+                      const isFinalStatus = FINAL_RESERVATION_STATUSES.has(item.status)
+                      return (
                     <div className="reservations-actions">
                       <button
                         type="button"
                         className="reservations-secondary"
-                        disabled={!canManage}
+                        disabled={!canManage || isFinalStatus}
                         onClick={() => handleStartEdit(item)}
                       >
                         Editar
@@ -958,7 +963,7 @@ function AdminReservationsPage({ user }) {
                       <button
                         type="button"
                         className="reservations-primary"
-                        disabled={!canManage || item.status === 'approved'}
+                        disabled={!canManage || item.status === 'approved' || isFinalStatus}
                         onClick={() => handleUpdateStatus(item.id, 'approved')}
                       >
                         Aprobar
@@ -990,13 +995,15 @@ function AdminReservationsPage({ user }) {
                         <button
                           type="button"
                           className="reservations-danger"
-                          disabled={!canManage || item.status === 'rejected'}
+                          disabled={!canManage || item.status === 'rejected' || isFinalStatus}
                           onClick={() => handleStartReject(item)}
                         >
                           Rechazar
                         </button>
                       )}
                     </div>
+                      )
+                    })()}
 
                     {rejectingReservationId === item.id ? (
                       <div className="reservation-reject-box">
