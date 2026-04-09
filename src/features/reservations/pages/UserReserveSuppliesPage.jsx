@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { listMaterials } from '../../admin/services/infrastructureService'
 import {
   createSupplyReservation,
@@ -54,7 +54,7 @@ function UserReserveSuppliesPage({ user }) {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
       const [labsData, materialsData, reservationsData] = await Promise.all([
@@ -72,11 +72,11 @@ function UserReserveSuppliesPage({ user }) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [user])
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [loadData])
 
   const availableMaterials = useMemo(() => {
     return materials.filter((material) => {

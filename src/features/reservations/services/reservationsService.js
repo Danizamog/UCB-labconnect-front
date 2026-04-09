@@ -1,5 +1,6 @@
 import { listAdminLabs } from '../../admin/services/infrastructureService'
 import { getAuthToken } from '../../../shared/utils/storage'
+import { getPocketBaseClient } from '../../../shared/lib/pocketbaseClient'
 
 const gatewayBase = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
 const reservationsBase = gatewayBase.endsWith('/v1') ? gatewayBase : `${gatewayBase}/v1`
@@ -18,6 +19,9 @@ function resolveReservationWsUrl() {
     const host = gatewayUrl.hostname || 'localhost'
     const port = gatewayUrl.hostname === 'localhost' || gatewayUrl.hostname === '127.0.0.1' ? '8005' : gatewayUrl.port
     const authority = port ? `${host}:${port}` : host
+    if (!rawValue && host !== 'localhost' && host !== '127.0.0.1') {
+      return ''
+    }
     return `${protocol}//${authority}/v1/ws/reservations`
   } catch {
     return 'ws://localhost:8005/v1/ws/reservations'
@@ -576,22 +580,78 @@ export async function liftPenalty(penaltyId, options = {}) {
   return mapPenalty(data?.penalty || {})
 }
 
-export function subscribeReservationsRealtime(onMessage) {
-  const wsUrl = resolveReservationWsUrl()
-  const socket = new WebSocket(wsUrl)
+// PocketBase collection name → topic name emitted to subscribers
+const _PB_COLLECTION_TOPICS = {
+  lab_reservation: 'lab_reservation',
+  lab_block: 'lab_reservation',
+  tutorial_session: 'tutorial_session',
+  notification: 'user_notification',
+  user_penalty: 'user_penalty',
+}
 
-  socket.onmessage = (event) => {
+// Topics handled by PocketBase — the legacy WS only emits topics NOT in this set
+const _PB_HANDLED_TOPICS = new Set(Object.values(_PB_COLLECTION_TOPICS))
+
+export function subscribeReservationsRealtime(onMessage) {
+  const pb = getPocketBaseClient()
+  let isActive = true
+  const cleanupFns = []
+
+  const subscribeCollection = async (collection, topic) => {
     try {
-      const payload = JSON.parse(event.data)
-      onMessage?.(payload)
+      const unsub = await pb.collection(collection).subscribe('*', (e) => {
+        if (isActive) {
+          onMessage?.({ topic, action: e.action, record: e.record })
+        }
+      })
+      if (isActive) {
+        cleanupFns.push(unsub)
+      } else {
+        try { unsub?.() } catch { /* ignore */ }
+      }
     } catch {
-      onMessage?.(null)
+      // Collection may not exist or auth may be required — ignore silently
     }
   }
 
-  socket.onerror = () => {}
+  for (const [collection, topic] of Object.entries(_PB_COLLECTION_TOPICS)) {
+    subscribeCollection(collection, topic)
+  }
+
+  // Legacy WebSocket as fallback for server-side events not stored in PocketBase
+  // (e.g. scheduler broadcasts, lab_access, auto_completed events)
+  const wsUrl = resolveReservationWsUrl()
+  if (wsUrl) {
+    let closeWhenConnected = false
+    const socket = new WebSocket(wsUrl)
+
+    socket.onopen = () => {
+      if (closeWhenConnected) socket.close()
+    }
+
+    socket.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data)
+        // Only forward topics not already covered by PocketBase to avoid duplicates
+        if (!_PB_HANDLED_TOPICS.has(payload?.topic)) {
+          onMessage?.(payload)
+        }
+      } catch { /* ignore malformed messages */ }
+    }
+
+    socket.onerror = () => {}
+
+    cleanupFns.push(() => {
+      if (socket.readyState === WebSocket.CONNECTING) {
+        closeWhenConnected = true
+      } else if (socket.readyState === WebSocket.OPEN) {
+        socket.close()
+      }
+    })
+  }
 
   return () => {
-    socket.close()
+    isActive = false
+    cleanupFns.forEach((fn) => { try { fn?.() } catch { /* ignore */ } })
   }
 }

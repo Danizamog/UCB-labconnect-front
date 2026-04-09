@@ -14,6 +14,7 @@ function ReservationEditModal({
   getSlotKey,
   getSlotTone,
   getSlotLabel,
+  getSlotDisabledHint = () => '',
   isSlotSelectable,
   onChange,
   onSubmit,
@@ -123,13 +124,21 @@ function ReservationEditModal({
                   const slotKey = getSlotKey(slot)
                   const selectable = isSlotSelectable(slot)
                   const isSelected = selectedSlotKey === slotKey
+                  const disabledHint = !selectable ? getSlotDisabledHint(slot) : ''
                   return (
                     <button
                       key={slotKey}
                       type="button"
                       className={`reservations-slot ${getSlotTone(slot)}${isSelected ? ' is-selected' : ''}`}
                       disabled={!selectable}
-                      onClick={() => onSelectSlot(slot)}
+                      aria-disabled={!selectable}
+                      title={disabledHint || undefined}
+                      onClick={() => {
+                        if (!selectable) {
+                          return
+                        }
+                        onSelectSlot(slot)
+                      }}
                     >
                       <strong>{slot.start_time} - {slot.end_time}</strong>
                       <span>{getSlotLabel(slot)}</span>

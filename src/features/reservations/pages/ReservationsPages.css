@@ -283,6 +283,11 @@
   opacity: 0.92;
 }
 
+.reservations-slot:disabled.past {
+  opacity: 0.6;
+  filter: grayscale(0.15);
+}
+
 .reservations-slot.available {
   border-left-color: #16a34a;
   background: rgba(22, 163, 74, 0.05);
@@ -317,6 +322,10 @@
   border-left-color: #475569;
   background: rgba(71, 85, 105, 0.08);
   color: #334155;
+}
+
+.reservations-slot.past:not(:disabled) {
+  cursor: not-allowed;
 }
 
 .reservations-slot.is-selected {

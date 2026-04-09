@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { listAdminLabs } from '../../admin/services/infrastructureService'
 import { listUserProfiles } from '../../admin/services/profileService'
 import {
@@ -118,7 +118,7 @@ function AdminReservationsPage({ user }) {
 
   const canManage = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
 
-  const loadReferenceData = async () => {
+  const loadReferenceData = useCallback(async () => {
     try {
       const [labsResult, profilesResult] = await Promise.allSettled([
         listAdminLabs(),
@@ -143,9 +143,9 @@ function AdminReservationsPage({ user }) {
     } catch (err) {
       setError(err.message || 'No se pudieron cargar los datos base del panel de reservas.')
     }
-  }
+  }, [])
 
-  const loadOperationalData = async () => {
+  const loadOperationalData = useCallback(async () => {
     try {
       const [reservationsResult, occupancyResult] = await Promise.allSettled([
         listReservations(),
@@ -161,9 +161,9 @@ function AdminReservationsPage({ user }) {
     } catch (err) {
       setError(err.message || 'No se pudo cargar el panel de reservas.')
     }
-  }
+  }, [])
 
-  const loadTableData = async (query = tableQuery) => {
+  const loadTableData = useCallback(async (query) => {
     setTableLoading(true)
     try {
       const page = await listReservationsPage(query)
@@ -183,7 +183,7 @@ function AdminReservationsPage({ user }) {
     } finally {
       setTableLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     tableQueryRef.current = tableQuery
@@ -207,11 +207,11 @@ function AdminReservationsPage({ user }) {
       window.clearTimeout(realtimeRefreshTimeoutRef.current)
       unsubscribe?.()
     }
-  }, [])
+  }, [loadOperationalData, loadReferenceData, loadTableData])
 
   useEffect(() => {
     loadTableData(tableQuery)
-  }, [tableQuery])
+  }, [loadTableData, tableQuery])
 
   const labNameById = useMemo(
     () => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])),
