@@ -1,5 +1,6 @@
 import { listAdminLabs } from '../../admin/services/infrastructureService'
 import { getAuthToken } from '../../../shared/utils/storage'
+import { clearStoredSession } from '../../auth/services/authService'
 
 const gatewayBase = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
 const reservationsBase = gatewayBase.endsWith('/v1') ? gatewayBase : `${gatewayBase}/v1`
@@ -32,9 +33,9 @@ function cloneCachedValue(value) {
   return JSON.parse(JSON.stringify(value))
 }
 
-function buildRequestCacheKey(url, options = {}) {
+function buildRequestCacheKey(url, options = {}, token = '') {
   const method = String(options.method || 'GET').toUpperCase()
-  return `${method}:${url}`
+  return `${method}:${url}:${token}`
 }
 
 function clearReservationsCache() {
@@ -45,8 +46,9 @@ function clearReservationsCache() {
 async function request(url, options = {}) {
   const { cacheTtlMs = 0, skipCache = false, ...fetchOptions } = options
   const method = String(fetchOptions.method || 'GET').toUpperCase()
+  const token = getAuthToken() || ''
   const canCache = method === 'GET' && cacheTtlMs > 0 && !skipCache
-  const cacheKey = buildRequestCacheKey(url, fetchOptions)
+  const cacheKey = buildRequestCacheKey(url, fetchOptions, token)
 
   if (canCache) {
     const cachedEntry = requestCache.get(cacheKey)
@@ -71,6 +73,9 @@ async function request(url, options = {}) {
 
   const data = await parseJson(response, null)
   if (!response.ok) {
+    if (response.status === 401) {
+      clearStoredSession()
+    }
     throw new Error(data?.detail || `Error ${response.status}`)
   }
 
@@ -580,7 +585,18 @@ export function subscribeReservationsRealtime(onMessage) {
   function connect() {
     if (!isActive) return
 
-    const url = getWsUrl()
+    let url = getWsUrl()
+    const token = getAuthToken()
+    if (token) {
+      try {
+        const wsUrl = new URL(url)
+        wsUrl.searchParams.set('token', token)
+        url = wsUrl.toString()
+      } catch {
+        // Keep original url if it cannot be parsed.
+      }
+    }
+
     console.log('[RealtimeWS] Connecting to', url)
 
     try {

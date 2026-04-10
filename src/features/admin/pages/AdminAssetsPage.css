@@ -1039,6 +1039,8 @@
   z-index: 120;
   display: grid;
   place-items: center;
+  min-height: 100dvh;
+  overflow-y: auto;
   padding: clamp(12px, 3vw, 28px);
   background:
     radial-gradient(circle at 50% 12%, rgba(244, 197, 66, 0.18), transparent 30%),
@@ -1046,9 +1048,14 @@
   backdrop-filter: blur(10px);
 }
 
+.infra-workflow-open {
+  overflow: hidden;
+}
+
 .infra-workflow-modal {
   width: min(980px, 100%);
   max-height: min(92vh, 920px);
+  margin: auto;
   overflow: auto;
   display: grid;
   gap: 18px;
@@ -1169,6 +1176,253 @@
   color: #fff;
 }
 
+.infra-filter-callout {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(6, 63, 119, 0.08), rgba(244, 197, 66, 0.12));
+  border: 1px solid rgba(6, 63, 119, 0.1);
+  color: var(--ink-800);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.infra-filter-grid {
+  align-items: end;
+}
+
+.infra-filter-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(6, 63, 119, 0.1);
+  background:
+    radial-gradient(circle at 94% 10%, rgba(244, 197, 66, 0.16), transparent 24%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(240, 246, 255, 0.94));
+  box-shadow: 0 18px 34px rgba(13, 34, 61, 0.08);
+}
+
+.infra-filter-primary,
+.infra-filter-row {
+  display: grid;
+  gap: 12px;
+}
+
+.infra-filter-primary {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.infra-filter-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+}
+
+.infra-filter-panel label {
+  display: grid;
+  gap: 6px;
+  color: var(--ink-700);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.infra-filter-panel input,
+.infra-filter-panel select {
+  min-height: 46px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(6, 63, 119, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0 14px;
+  font: inherit;
+  color: var(--ink-900);
+}
+
+.infra-filter-panel input:focus,
+.infra-filter-panel select:focus {
+  outline: none;
+  border-color: rgba(6, 77, 144, 0.5);
+  box-shadow: 0 0 0 3px rgba(6, 77, 144, 0.08);
+  background: #fff;
+}
+
+.infra-equipment-results {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.infra-equipment-results strong {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--ink-900);
+}
+
+.infra-equipment-results span {
+  color: var(--ink-700);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.infra-table-meta,
+.infra-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.infra-table-meta {
+  color: var(--ink-700);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.infra-secondary-strong {
+  background: linear-gradient(135deg, #0a3559, #1255a0);
+  color: #fff;
+  border: none;
+  box-shadow: 0 10px 20px rgba(10, 53, 89, 0.14);
+}
+
+.infra-secondary-strong:hover {
+  background: linear-gradient(135deg, #0d406d, #1763b8);
+}
+
+.infra-pagination-pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.infra-page-chip {
+  min-width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(6, 63, 119, 0.12);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ink-900);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+
+.infra-page-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 24px rgba(13, 34, 61, 0.1);
+}
+
+.infra-page-chip.is-active {
+  background: linear-gradient(135deg, #0a3559, #1255a0);
+  color: #fff;
+  border-color: rgba(10, 53, 89, 0.2);
+  box-shadow: 0 18px 28px rgba(10, 53, 89, 0.18);
+}
+
+.infra-manage-shell {
+  display: grid;
+  gap: 20px;
+}
+
+.infra-manage-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+  padding: 22px;
+  border-radius: 24px;
+  border: 1px solid rgba(6, 63, 119, 0.12);
+  background:
+    radial-gradient(circle at 92% 0%, rgba(244, 197, 66, 0.16), transparent 28%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(240, 246, 255, 0.94));
+}
+
+.infra-manage-copy {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.infra-manage-copy h4 {
+  margin: 0;
+  font-size: 1.35rem;
+  color: var(--ink-900);
+}
+
+.infra-manage-copy p {
+  margin: 0;
+  color: var(--ink-700);
+  line-height: 1.55;
+}
+
+.infra-manage-meta {
+  display: grid;
+  gap: 10px;
+}
+
+.infra-manage-meta span {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(10, 53, 89, 0.08);
+  color: var(--ink-700);
+  font-size: 0.86rem;
+}
+
+.infra-manage-meta strong {
+  color: var(--ink-900);
+}
+
+.infra-manage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.infra-manage-card {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(6, 63, 119, 0.12);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink-900);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 12px 22px rgba(13, 34, 61, 0.06);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.infra-manage-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(6, 63, 119, 0.22);
+  box-shadow: 0 18px 30px rgba(13, 34, 61, 0.12);
+}
+
+.infra-manage-card strong {
+  font-size: 1rem;
+  color: var(--ink-900);
+}
+
+.infra-manage-card span {
+  color: var(--ink-700);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.infra-manage-card.danger {
+  border-color: rgba(185, 28, 28, 0.14);
+  background: rgba(255, 250, 250, 0.96);
+}
+
+.infra-manage-card.danger strong {
+  color: #991b1b;
+}
+
 @media (max-width: 1020px) {
   .infra-command-panel {
     grid-template-columns: 1fr;
@@ -1182,6 +1436,11 @@
 
   .infra-history-modal-overview {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .infra-filter-row,
+  .infra-manage-hero {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1206,6 +1465,16 @@
 
   .infra-action-card {
     min-height: 132px;
+  }
+
+  .infra-pagination,
+  .infra-table-meta {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .infra-pagination-pages {
+    justify-content: center;
   }
 
   .infra-workflow-backdrop {
@@ -1239,5 +1508,9 @@
 
   .infra-page[aria-label="Materiales y reactivos"] .infra-table {
     min-width: 720px;
+  }
+
+  .infra-equipment-results {
+    justify-items: start;
   }
 }

@@ -48,7 +48,7 @@ const FOCUSED_TUTORIAL_KEY = 'labconnect.focus_tutorial_session_id'
 const OPEN_TUTORIAL_EVENT = 'labconnect:open-tutorial-session'
 const OPERATIONS_RECIPIENT_ID = '__operations__'
 
-function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout }) {
+function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession, onLogout }) {
   const [notifications, setNotifications] = useState([])
   const [operationsSnapshot, setOperationsSnapshot] = useState({
     current_occupancy: 0,
@@ -256,7 +256,9 @@ function HomeView({ user, currentPath, onNavigate, onRefreshSession, onLogout })
           {canManageProfiles && activeSection === 'profiles' ? <AdminProfilesPage user={user} /> : null}
           {canManageRoles && activeSection === 'roles' ? <AdminRolesPage user={user} onSessionRefresh={onRefreshSession} /> : null}
           {canManagePenalties && activeSection === 'penalties' ? <AdminPenaltiesPage user={user} /> : null}
-          {canManageStructure && activeSection === 'admin_reservas' ? <AdminReservationsPage user={user} /> : null}
+          {canManageStructure && activeSection === 'admin_reservas' ? (
+            <AdminReservationsPage user={user} currentHash={currentHash} onNavigate={onNavigate} />
+          ) : null}
           {canManageTutorials && activeSection === 'tutorials_manage' ? <TutorTutorialSessionsPage /> : null}
           {canManageStructure && activeSection === 'areas' ? <AdminAreasPage user={user} /> : null}
           {canManageStructure && activeSection === 'laboratorios' ? <AdminLaboratoriosPage user={user} /> : null}
