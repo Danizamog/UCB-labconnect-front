@@ -37,6 +37,14 @@ const TABLE_SORT_OPTIONS = [
   { value: 'requested_by_email', label: 'Correo' },
 ]
 
+const WHERE_EXAMPLES = [
+  { label: 'Solo pendientes', value: 'status=pending' },
+  { label: 'Solo aprobadas', value: 'status=approved' },
+  { label: 'Con al menos 2 asistentes', value: 'attendees_count>=2' },
+  { label: 'Motivo contiene "practica"', value: 'purpose~practica' },
+  { label: 'Aprobadas con minimo 1 asistente', value: 'status=approved;attendees_count>=1' },
+]
+
 const defaultTableFilters = {
   status: 'all',
   laboratory_id: '',
@@ -73,6 +81,22 @@ function minutesFromClock(time) {
 function minutesSinceStart(reservation) {
   const startsAt = new Date(`${reservation.date}T${reservation.start_time}:00`)
   return Math.floor((Date.now() - startsAt.getTime()) / 60000)
+}
+
+function buildAutoWhereFromFilters(filters = {}) {
+  const clauses = []
+
+  if (filters.status && filters.status !== 'all') {
+    clauses.push(`status=${filters.status}`)
+  }
+  if (filters.laboratory_id) {
+    clauses.push(`laboratory_id=${filters.laboratory_id}`)
+  }
+  if (filters.date) {
+    clauses.push(`date=${filters.date}`)
+  }
+
+  return clauses.join(';')
 }
 
 function AdminReservationsPage({ user }) {
@@ -458,8 +482,16 @@ function AdminReservationsPage({ user }) {
 
   const handleApplyTableFilters = (event) => {
     event.preventDefault()
-    setTableQuery({
+    const manualWhere = String(tableFilters.where || '').trim()
+    const effectiveWhere = manualWhere || buildAutoWhereFromFilters(tableFilters)
+    const nextFilters = {
       ...tableFilters,
+      where: effectiveWhere,
+    }
+
+    setTableFilters(nextFilters)
+    setTableQuery({
+      ...nextFilters,
       pageNumber: 0,
     })
   }
@@ -926,6 +958,26 @@ function AdminReservationsPage({ user }) {
                   onChange={(event) => setTableFilters((previous) => ({ ...previous, where: event.target.value }))}
                   placeholder="Ej. purpose~practica;status=approved;date>=2026-03-01"
                 />
+                <small className="reservation-inline-hint">
+                  Si dejas este campo vacio, al aplicar filtros se genera automaticamente desde estado, laboratorio y fecha.
+                </small>
+              </label>
+
+              <label>
+                <span>Ejemplos rapidos de where</span>
+                <select
+                  defaultValue=""
+                  onChange={(event) => {
+                    const selectedWhere = event.target.value
+                    if (!selectedWhere) return
+                    setTableFilters((previous) => ({ ...previous, where: selectedWhere }))
+                  }}
+                >
+                  <option value="">Selecciona un ejemplo...</option>
+                  {WHERE_EXAMPLES.map((item) => (
+                    <option key={item.value} value={item.value}>{item.label}</option>
+                  ))}
+                </select>
               </label>
             </div>
           </details>
