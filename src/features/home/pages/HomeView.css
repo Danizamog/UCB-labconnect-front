@@ -65,6 +65,42 @@
   gap: 10px;
 }
 
+.home-auth-warning {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: space-between;
+  margin: 14px 28px 0;
+  padding: 14px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(185, 28, 28, 0.22);
+  background: linear-gradient(135deg, rgba(254, 226, 226, 0.96), rgba(254, 242, 242, 0.98));
+  color: #7f1d1d;
+  box-shadow: 0 10px 22px rgba(127, 29, 29, 0.08);
+}
+
+.home-auth-warning strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.home-auth-warning p {
+  flex: 1;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.home-auth-warning button {
+  border: 1px solid rgba(127, 29, 29, 0.18);
+  background: rgba(255, 255, 255, 0.72);
+  color: #7f1d1d;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 /* ── Content window ────────────────────────────────────── */
 .content-window {
   flex: 1;

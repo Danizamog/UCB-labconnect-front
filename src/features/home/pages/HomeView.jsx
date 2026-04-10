@@ -32,6 +32,7 @@ import {
   getSectionIdFromPath,
   normalizePath,
 } from '../../../shared/config/navigationLinks'
+import { consumeStoredAuthWarning } from '../../auth/services/authService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import {
   getOccupancyDashboard,
@@ -50,6 +51,7 @@ const OPERATIONS_RECIPIENT_ID = '__operations__'
 
 function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession, onLogout }) {
   const [notifications, setNotifications] = useState([])
+  const [authWarning, setAuthWarning] = useState(() => consumeStoredAuthWarning())
   const [operationsSnapshot, setOperationsSnapshot] = useState({
     current_occupancy: 0,
     active_sessions: [],
@@ -254,6 +256,15 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
             />
           </div>
         </header>
+        {authWarning ? (
+          <section className="home-auth-warning" aria-label="Penalizacion activa">
+            <strong>Acceso con restricciones</strong>
+            <p>{authWarning}</p>
+            <button type="button" onClick={() => setAuthWarning('')}>
+              Entendido
+            </button>
+          </section>
+        ) : null}
         <section className="content-window" aria-label="Ventana principal">
           {canManageProfiles && activeSection === 'profiles' ? <AdminProfilesPage user={user} /> : null}
           {canManageRoles && activeSection === 'roles' ? <AdminRolesPage user={user} onSessionRefresh={onRefreshSession} /> : null}

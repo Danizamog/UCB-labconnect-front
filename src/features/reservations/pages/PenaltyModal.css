@@ -285,3 +285,603 @@
   transform: translateY(-2px);
   box-shadow: 0 14px 24px rgba(13, 34, 61, 0.12);
 }
+
+/* ==================== WIZARD STYLES ==================== */
+.penalty-modal-wizard {
+  display: flex;
+  flex-direction: column;
+  height: auto;
+}
+
+.penalty-progress-bar {
+  display: flex;
+  gap: 12px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(10, 53, 89, 0.04), rgba(244, 197, 66, 0.08));
+  border-bottom: 2px solid rgba(10, 53, 89, 0.12);
+}
+
+.penalty-progress-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  flex: 1;
+  position: relative;
+}
+
+.penalty-progress-step span {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(10, 53, 89, 0.1);
+  color: #0a3559;
+  font-weight: 900;
+  font-size: 0.9rem;
+  border: 2px solid rgba(10, 53, 89, 0.2);
+  flex: 0 0 auto;
+  transition: all 0.25s ease;
+}
+
+.penalty-progress-step label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #0a3559;
+  cursor: pointer;
+  margin: 0;
+  white-space: nowrap;
+  opacity: 0.6;
+  transition: opacity 0.25s ease;
+}
+
+.penalty-progress-step.active span {
+  background: linear-gradient(135deg, #0a3559, #155e9f);
+  color: #fff;
+  border-color: #0a3559;
+  box-shadow: 0 8px 16px rgba(10, 53, 89, 0.25);
+  transform: scale(1.1);
+}
+
+.penalty-progress-step.active label {
+  opacity: 1;
+  color: var(--ink-900);
+  font-weight: 900;
+}
+
+.penalty-progress-step.completed span {
+  background: rgba(34, 197, 94, 0.15);
+  color: #15803d;
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.penalty-progress-step.completed label {
+  color: #15803d;
+  opacity: 0.8;
+}
+
+.penalty-progress-step::after {
+  content: '';
+  position: absolute;
+  left: 29px;
+  top: 18px;
+  width: calc(100% - 37px);
+  height: 2px;
+  background: rgba(10, 53, 89, 0.12);
+  z-index: 0;
+}
+
+.penalty-progress-step:last-child::after {
+  display: none;
+}
+
+.penalty-progress-step.completed::after {
+  background: rgba(34, 197, 94, 0.3);
+}
+
+/* Form Step Styling */
+.penalty-form-wizard {
+  position: relative;
+}
+
+.penalty-form-step {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.penalty-wizard-nav {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+.penalty-wizard-nav button {
+  flex: 1;
+  max-width: 200px;
+}
+
+.penalty-wizard-nav button:first-child {
+  flex: 0 1 120px;
+}
+
+.penalty-duration-info {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(10, 53, 89, 0.06);
+  color: #0a3559;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+/* User History Section */
+.penalty-user-history {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: rgba(244, 197, 66, 0.08);
+  border-radius: 16px;
+  border: 1px solid rgba(244, 197, 66, 0.2);
+  margin-bottom: 12px;
+}
+
+.penalty-user-history h5 {
+  margin: 0 0 8px;
+  color: #0a3559;
+  font-size: 0.85rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.penalty-reservations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.penalty-reservation-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  border-left: 3px solid rgba(10, 53, 89, 0.3);
+}
+
+.penalty-reservation-item strong {
+  color: #0a3559;
+  font-size: 0.9rem;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.penalty-date-label {
+  display: inline-block;
+  padding: 3px 8px;
+  background: rgba(10, 53, 89, 0.08);
+  border-radius: 6px;
+  color: #0a3559;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.penalty-time-label {
+  display: inline-block;
+  padding: 3px 8px;
+  background: rgba(244, 197, 66, 0.15);
+  border-radius: 6px;
+  color: #b45309;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+.penalty-reservation-item small {
+  padding: 2px 6px;
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+/* Summary Section */
+.penalty-summary {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(10, 53, 89, 0.06));
+  border-radius: 16px;
+  border: 1px solid rgba(10, 53, 89, 0.12);
+  margin-top: 16px;
+}
+
+.penalty-summary h5 {
+  margin: 0 0 8px;
+  color: #0a3559;
+  font-size: 0.85rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.penalty-summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(10, 53, 89, 0.08);
+  font-size: 0.9rem;
+  color: #0a3559;
+}
+
+.penalty-summary-item:last-child {
+  border-bottom: none;
+}
+
+.penalty-summary-item strong {
+  font-weight: 800;
+}
+
+@media (max-width: 820px) {
+  .penalty-progress-bar {
+    gap: 8px;
+    padding: 14px;
+  }
+
+  .penalty-progress-step label {
+    display: none;
+  }
+
+  .penalty-progress-step span {
+    width: 32px;
+    height: 32px;
+    font-size: 0.85rem;
+  }
+
+  .penalty-progress-step.active span {
+    transform: scale(1.05);
+  }
+
+  .penalty-progress-step::after {
+    width: calc(100% - 32px);
+  }
+
+  .penalty-wizard-nav button {
+    max-width: none;
+  }
+
+  .penalty-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .penalty-user-history {
+    margin-bottom: 16px;
+  }
+
+  .penalty-reservations-list {
+    max-height: 150px;
+  }
+}
+
+@media (max-width: 640px) {
+  .penalty-progress-bar {
+    gap: 6px;
+    padding: 12px;
+  }
+
+  .penalty-progress-step span {
+    width: 28px;
+    height: 28px;
+    font-size: 0.8rem;
+  }
+
+  .penalty-progress-step::after {
+    left: 24px;
+  }
+
+  .penalty-modal {
+    border-radius: 24px;
+  }
+
+  .penalty-form-section {
+    padding: 12px;
+  }
+
+  .penalty-summary,
+  .penalty-user-history {
+    padding: 12px;
+  }
+
+  .penalty-summary h5,
+  .penalty-user-history h5 {
+    font-size: 0.8rem;
+  }
+}
+
+/* ==================== SIMPLE PENALTY FORM STYLES ==================== */
+.penalty-simple-form {
+  display: grid;
+  gap: 16px;
+}
+
+.penalty-user-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(10, 53, 89, 0.08), rgba(244, 197, 66, 0.08));
+  border: 1px solid rgba(10, 53, 89, 0.12);
+  margin-top: 8px;
+}
+
+.penalty-user-card div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.penalty-user-card strong {
+  color: #0a3559;
+  font-size: 0.95rem;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.penalty-user-card span {
+  color: #666;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.penalty-user-role {
+  display: inline-block !important;
+  padding: 4px 10px !important;
+  border-radius: 999px !important;
+  background: rgba(10, 53, 89, 0.08) !important;
+  color: #0a3559 !important;
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+  flex: 0 0 auto;
+}
+
+/* Reservations Grid */
+.penalty-reservations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.penalty-reservation-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 2px solid rgba(10, 53, 89, 0.15);
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.penalty-reservation-card:hover {
+  background: rgba(10, 53, 89, 0.03);
+  border-color: rgba(10, 53, 89, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(10, 53, 89, 0.08);
+}
+
+.penalty-reservation-card.active {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(10, 53, 89, 0.06));
+  border-color: rgba(34, 197, 94, 0.4);
+  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.15);
+}
+
+.reservation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.reservation-header strong {
+  color: #0a3559;
+  font-size: 0.92rem;
+  font-weight: 800;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(10, 53, 89, 0.1);
+  color: #0a3559;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.reservation-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  grid-column: 1 / -1;
+}
+
+.date-label,
+.time-label {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.date-label {
+  background: rgba(10, 53, 89, 0.08);
+  color: #0a3559;
+  width: fit-content;
+}
+
+.time-label {
+  background: rgba(244, 197, 66, 0.15);
+  color: #b45309;
+  width: fit-content;
+}
+
+/* Read-only fields */
+.readonly-field {
+  background: rgba(10, 53, 89, 0.04) !important;
+  border-color: rgba(10, 53, 89, 0.1) !important;
+  color: #666 !important;
+  cursor: not-allowed !important;
+}
+
+.readonly-field:focus {
+  border-color: rgba(10, 53, 89, 0.1) !important;
+  box-shadow: none !important;
+  background: rgba(10, 53, 89, 0.04) !important;
+}
+
+/* Duration Summary */
+.penalty-duration-summary {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(10, 53, 89, 0.04));
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 12px;
+  margin-top: 12px;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.summary-item strong {
+  color: #15803d;
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.summary-item small {
+  color: #0a3559;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.duration-pill {
+  border: 1.5px solid rgba(10, 53, 89, 0.15);
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: #fff;
+  color: #0a3559;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.duration-pill:hover {
+  background: rgba(10, 53, 89, 0.06);
+  border-color: rgba(10, 53, 89, 0.3);
+  transform: translateY(-1px);
+}
+
+.duration-pill:active {
+  background: rgba(10, 53, 89, 0.1);
+  border-color: rgba(10, 53, 89, 0.4);
+}
+
+@media (max-width: 820px) {
+  .penalty-reservations-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .penalty-user-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .penalty-user-card span {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .penalty-reservations-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .penalty-reservation-card {
+    grid-template-columns: 1fr;
+  }
+
+  .penalty-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .penalty-duration-pills {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .duration-pill {
+    flex: 1;
+    min-width: 60px;
+  }
+
+  .penalty-form-section {
+    padding: 14px;
+  }
+}
+

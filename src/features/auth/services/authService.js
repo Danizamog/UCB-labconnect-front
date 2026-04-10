@@ -6,6 +6,8 @@ const AUTH_LOGIN_ENDPOINT = `${apiBase}/auth/login`
 const AUTH_INSTITUTIONAL_ENDPOINT = `${apiBase}/auth/institutional`
 const AUTH_INSTITUTIONAL_CONFIG_ENDPOINT = `${apiBase}/auth/institutional/config`
 const AUTH_VALIDATE_ENDPOINT = `${apiBase}/auth/validate`
+const PENALTIES_MINE_ENDPOINT = `${apiBase}/v1/penalties/mine`
+const AUTH_WARNING_STORAGE_KEY = 'labconnect.auth_warning'
 
 const FRONTEND_GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim()
 const SESSION_VALIDATE_CACHE_TTL_MS = 1000
@@ -86,7 +88,55 @@ function clearStoredSession() {
   localStorage.removeItem('token')
   localStorage.removeItem('access_token')
   localStorage.removeItem('user')
+  localStorage.removeItem(AUTH_WARNING_STORAGE_KEY)
   resetValidateSessionCache()
+}
+
+function storeAuthWarning(message) {
+  const normalized = String(message || '').trim()
+  if (normalized) {
+    localStorage.setItem(AUTH_WARNING_STORAGE_KEY, normalized)
+    return
+  }
+  localStorage.removeItem(AUTH_WARNING_STORAGE_KEY)
+}
+
+async function loadPenaltyWarning(token) {
+  if (!token) {
+    return ''
+  }
+
+  try {
+    const response = await fetch(PENALTIES_MINE_ENDPOINT, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+    const payload = await response.json().catch(() => null)
+    if (!response.ok) {
+      if (response.status === 423) {
+        return String(payload?.detail || '').trim()
+      }
+      return ''
+    }
+
+    const penalties = Array.isArray(payload) ? payload : []
+    const activePenalty = Array.isArray(penalties)
+      ? penalties.find((penalty) => penalty?.is_active)
+      : null
+
+    if (!activePenalty) {
+      return ''
+    }
+
+    const reason = String(activePenalty.reason || 'Sin motivo registrado').trim()
+    const endsAt = String(activePenalty.ends_at || '').trim()
+    return endsAt
+      ? `Tu cuenta tiene una penalizacion activa. Motivo: ${reason}. Vigente hasta ${endsAt}.`
+      : `Tu cuenta tiene una penalizacion activa. Motivo: ${reason}.`
+  } catch {
+    return ''
+  }
 }
 
 export async function signIn(credentials) {
@@ -113,7 +163,17 @@ export async function signIn(credentials) {
       }
     }
 
-    return persistAuthResponse(data)
+    const authResponse = persistAuthResponse(data)
+    if (!authResponse.success) {
+      return authResponse
+    }
+
+    const warningMessage = await loadPenaltyWarning(authResponse.token)
+    storeAuthWarning(warningMessage)
+    return {
+      ...authResponse,
+      warningMessage,
+    }
   } catch {
     return {
       success: false,
@@ -195,7 +255,17 @@ export async function signInWithInstitutionalSSO(credential) {
       }
     }
 
-    return persistAuthResponse(data)
+    const authResponse = persistAuthResponse(data)
+    if (!authResponse.success) {
+      return authResponse
+    }
+
+    const warningMessage = await loadPenaltyWarning(authResponse.token)
+    storeAuthWarning(warningMessage)
+    return {
+      ...authResponse,
+      warningMessage,
+    }
   } catch {
     return {
       success: false,
@@ -206,6 +276,12 @@ export async function signInWithInstitutionalSSO(credential) {
 
 export async function signInWithGoogle(credential) {
   return signInWithInstitutionalSSO(credential)
+}
+
+export function consumeStoredAuthWarning() {
+  const message = localStorage.getItem(AUTH_WARNING_STORAGE_KEY) || ''
+  localStorage.removeItem(AUTH_WARNING_STORAGE_KEY)
+  return String(message || '').trim()
 }
 
 export async function validateSession() {

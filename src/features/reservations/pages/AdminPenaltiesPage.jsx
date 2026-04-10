@@ -3,7 +3,7 @@ import ConfirmModal from '../../../shared/components/ConfirmModal'
 import { listAdminLabs, listAssetMaintenanceTickets, listAssets } from '../../admin/services/infrastructureService'
 import { listUserProfiles } from '../../admin/services/profileService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
-import PenaltyModal from './PenaltyModal'
+import SimplePenaltyModal from './SimplePenaltyModal'
 import {
   createPenalty,
   liftPenalty,
@@ -106,22 +106,14 @@ function buildPenaltyValidation(form) {
     errors.incident_laboratory_id = 'Selecciona el laboratorio donde ocurrio el incidente.'
   }
 
+  if (!String(form.incident_date || '').trim()) {
+    errors.incident_date = 'Especifica la fecha del incidente.'
+  }
+
   if (!String(form.incident_start_time || '').trim() || !String(form.incident_end_time || '').trim()) {
     errors.incident_time = 'Selecciona el bloque horario del incidente.'
   } else if (form.incident_end_time <= form.incident_start_time) {
     errors.incident_time = 'La hora de fin del bloque debe ser posterior al inicio.'
-  }
-
-  if (form.incident_scope === 'asset' && !String(form.asset_id || '').trim()) {
-    errors.asset_id = 'Selecciona el equipo afectado en ese laboratorio.'
-  }
-
-  if (!String(form.evidence_ticket_id || '').trim()) {
-    errors.evidence_ticket_id = 'Selecciona un reporte tecnico existente como evidencia.'
-  }
-
-  if (!String(form.evidence_report_id || '').trim()) {
-    errors.evidence_report_id = 'El reporte tecnico enlazado es obligatorio.'
   }
 
   return errors
@@ -352,6 +344,28 @@ function AdminPenaltiesPage({ user }) {
     return assets.filter((asset) => String(asset.laboratory_id || '') === labId)
   }, [assets, form.incident_laboratory_id])
 
+  const userReservations = useMemo(() => {
+    if (!selectedUser) {
+      return []
+    }
+    const userId = String(selectedUser.user_id || '')
+    return reservations
+      .filter((r) => String(r.requested_by || '') === userId)
+      .map((r) => {
+        const labName = r.laboratory_name || (labs.find((l) => String(l.id) === String(r.laboratory_id))?.name || 'Laboratorio desconocido')
+        return {
+          id: r.id,
+          laboratory_id: r.laboratory_id || '',
+          laboratory_name: labName,
+          date: r.date || r.start_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+          start_time: r.start_time || r.start_at?.split('T')[1]?.slice(0, 5) || '00:00',
+          end_time: r.end_time || r.end_at?.split('T')[1]?.slice(0, 5) || '00:00',
+          status: r.status || 'unknown',
+        }
+      })
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+  }, [selectedUser, reservations, labs])
+
   const formErrors = useMemo(() => buildPenaltyValidation(form), [form])
   const formValidationMessage = Object.values(formErrors)[0] || ''
 
@@ -460,6 +474,16 @@ function AdminPenaltiesPage({ user }) {
     setForm((previous) => ({
       ...previous,
       ends_at: addDaysToDateTimeValue(previous.starts_at, days),
+    }))
+  }
+
+  const handleSelectReservation = (reservation) => {
+    setForm((previous) => ({
+      ...previous,
+      incident_laboratory_id: reservation.laboratory_id || '',
+      incident_date: reservation.date || '',
+      incident_start_time: reservation.start_time || '00:00',
+      incident_end_time: reservation.end_time || '00:00',
     }))
   }
 
@@ -603,21 +627,18 @@ function AdminPenaltiesPage({ user }) {
         )}
       </section>
 
-      <PenaltyModal
+      <SimplePenaltyModal
         isOpen={isModalOpen}
         form={form}
         userOptions={userOptions}
-        assetOptions={filteredAssets}
-        evidenceOptions={filteredEvidenceOptions}
         labOptions={labs}
         selectedUser={selectedUser}
-        selectedAsset={selectedAsset}
-        selectedLab={selectedLab}
-        selectedEvidence={selectedEvidence}
+        userReservations={userReservations}
         validationErrors={formErrors}
         validationMessage={formValidationMessage}
         onApplyDuration={handleApplyDuration}
         onChange={handleFormChange}
+        onSelectReservation={handleSelectReservation}
         onSubmit={handleCreatePenalty}
         onClose={closeModal}
         isSubmitting={isSubmitting}
