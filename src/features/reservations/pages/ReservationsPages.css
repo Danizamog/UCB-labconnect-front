@@ -1538,3 +1538,309 @@
 .reservation-suspension-banner {
   border-left: 5px solid #b91c1c;
 }
+
+/* Guided admin reservations flow */
+.reservations-header-copy {
+  max-width: 720px;
+  display: grid;
+  gap: 6px;
+}
+
+.reservations-summary-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 12px;
+  min-width: 152px;
+  text-align: left;
+}
+
+.reservations-summary-card-icon,
+.reservations-workspace-icon,
+.reservations-workspace-status-icon,
+.reservations-task-card-icon {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
+.reservations-summary-card > div {
+  display: grid;
+  gap: 2px;
+}
+
+.reservations-summary-card.tone-overview .reservations-summary-card-icon,
+.reservations-workspace-tab.tone-overview .reservations-workspace-icon,
+.reservations-workspace-status-icon.tone-overview,
+.reservations-task-card.tone-overview .reservations-task-card-icon {
+  background: rgba(6, 63, 119, 0.12);
+  color: #0b4a87;
+}
+
+.reservations-summary-card.tone-requests .reservations-summary-card-icon,
+.reservations-workspace-tab.tone-requests .reservations-workspace-icon,
+.reservations-workspace-status-icon.tone-requests,
+.reservations-task-card.tone-requests .reservations-task-card-icon {
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+}
+
+.reservations-summary-card.tone-live .reservations-summary-card-icon,
+.reservations-workspace-tab.tone-live .reservations-workspace-icon,
+.reservations-workspace-status-icon.tone-live,
+.reservations-task-card.tone-live .reservations-task-card-icon {
+  background: rgba(14, 165, 233, 0.14);
+  color: #0369a1;
+}
+
+.reservations-summary-card.tone-control .reservations-summary-card-icon,
+.reservations-workspace-tab.tone-control .reservations-workspace-icon,
+.reservations-workspace-status-icon.tone-control,
+.reservations-task-card.tone-control .reservations-task-card-icon {
+  background: rgba(34, 197, 94, 0.14);
+  color: #15803d;
+}
+
+.reservations-summary-card.tone-walkin .reservations-summary-card-icon,
+.reservations-workspace-tab.tone-walkin .reservations-workspace-icon,
+.reservations-workspace-status-icon.tone-walkin,
+.reservations-task-card.tone-walkin .reservations-task-card-icon {
+  background: rgba(168, 85, 247, 0.14);
+  color: #7e22ce;
+}
+
+.reservations-workspace-nav {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.reservations-workspace-tab {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(10, 53, 89, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 249, 255, 0.92));
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.reservations-workspace-tab-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reservations-workspace-tab strong {
+  color: var(--ink-900);
+  font-size: 0.98rem;
+}
+
+.reservations-workspace-tab span {
+  color: var(--ink-700);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.reservations-workspace-tab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 30px rgba(13, 34, 61, 0.1);
+  border-color: rgba(6, 63, 119, 0.18);
+}
+
+.reservations-workspace-tab.is-active {
+  border-color: rgba(6, 63, 119, 0.28);
+  background: radial-gradient(circle at 92% 10%, rgba(244, 197, 66, 0.18), transparent 28%), linear-gradient(135deg, rgba(6, 63, 119, 0.08), rgba(255, 255, 255, 0.96));
+  box-shadow: 0 24px 38px rgba(13, 34, 61, 0.12);
+}
+
+.reservations-workspace-status {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(6, 63, 119, 0.1);
+  background: radial-gradient(circle at 94% 8%, rgba(244, 197, 66, 0.12), transparent 24%), rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 26px rgba(13, 34, 61, 0.08);
+}
+
+.reservations-workspace-status > div {
+  display: grid;
+  gap: 4px;
+}
+
+.reservations-workspace-status strong {
+  color: var(--ink-900);
+  font-size: 0.95rem;
+}
+
+.reservations-workspace-status span {
+  color: var(--ink-700);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.reservations-task-grid,
+.reservations-insight-grid,
+.reservations-step-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.reservations-task-card,
+.reservations-insight-card,
+.reservations-step-card {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(10, 53, 89, 0.08);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 24px rgba(13, 34, 61, 0.06);
+}
+
+.reservations-task-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.reservations-task-card span,
+.reservations-insight-card span {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+  color: var(--ucb-blue);
+}
+
+.reservations-task-card h4 {
+  margin: 0;
+  color: var(--ink-900);
+  font-size: 1.08rem;
+}
+
+.reservations-task-card strong,
+.reservations-insight-card strong {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--ink-900);
+}
+
+.reservations-task-card.tone-requests {
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.98), rgba(255, 255, 255, 0.96));
+  border-color: rgba(245, 158, 11, 0.18);
+}
+
+.reservations-task-card.tone-control {
+  background: linear-gradient(180deg, rgba(240, 253, 244, 0.98), rgba(255, 255, 255, 0.96));
+  border-color: rgba(34, 197, 94, 0.18);
+}
+
+.reservations-task-card.tone-live {
+  background: linear-gradient(180deg, rgba(240, 249, 255, 0.98), rgba(255, 255, 255, 0.96));
+  border-color: rgba(14, 165, 233, 0.18);
+}
+
+.reservations-task-card.tone-walkin {
+  background: linear-gradient(180deg, rgba(250, 245, 255, 0.98), rgba(255, 255, 255, 0.96));
+  border-color: rgba(168, 85, 247, 0.18);
+}
+
+.reservations-task-card p,
+.reservations-insight-card p,
+.reservations-step-card span {
+  margin: 0;
+  color: var(--ink-700);
+  line-height: 1.55;
+  font-size: 0.88rem;
+}
+
+.reservations-step-card {
+  align-items: start;
+  grid-template-columns: auto 1fr;
+}
+
+.reservations-step-card strong {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(6, 63, 119, 0.1);
+  color: var(--ucb-blue);
+  font-size: 1rem;
+}
+
+.reservations-filter-callout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(6, 63, 119, 0.08), rgba(244, 197, 66, 0.12));
+  border: 1px solid rgba(6, 63, 119, 0.1);
+  color: var(--ink-800);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.reservations-filter-callout svg {
+  flex-shrink: 0;
+  color: var(--ucb-blue);
+}
+
+.reservations-table-wrap {
+  overflow-x: auto;
+  border-radius: 20px;
+  border: 1px solid rgba(6, 63, 119, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.reservations-table-row.status-pending td:first-child {
+  border-left: 4px solid #f59e0b;
+}
+
+.reservations-table-row.status-approved td:first-child,
+.reservations-table-row.status-in_progress td:first-child,
+.reservations-table-row.status-completed td:first-child {
+  border-left: 4px solid #16a34a;
+}
+
+.reservations-table-row.status-rejected td:first-child,
+.reservations-table-row.status-cancelled td:first-child,
+.reservations-table-row.status-absent td:first-child {
+  border-left: 4px solid #dc2626;
+}
+
+@media (max-width: 720px) {
+  .reservations-workspace-nav,
+  .reservations-task-grid,
+  .reservations-insight-grid,
+  .reservations-step-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reservations-workspace-tab {
+    padding: 14px 16px;
+  }
+
+  .reservations-summary-card,
+  .reservations-workspace-status {
+    grid-template-columns: 1fr;
+  }
+}

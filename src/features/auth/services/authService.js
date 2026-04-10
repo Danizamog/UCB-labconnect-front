@@ -1,9 +1,12 @@
+import { getAuthToken } from '../../../shared/utils/storage'
+
 const gatewayBase = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
 const apiBase = gatewayBase.endsWith('/v1') ? gatewayBase.slice(0, -3) : gatewayBase
 const AUTH_LOGIN_ENDPOINT = `${apiBase}/auth/login`
 const AUTH_INSTITUTIONAL_ENDPOINT = `${apiBase}/auth/institutional`
 const AUTH_INSTITUTIONAL_CONFIG_ENDPOINT = `${apiBase}/auth/institutional/config`
 const AUTH_VALIDATE_ENDPOINT = `${apiBase}/auth/validate`
+
 const FRONTEND_GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim()
 const SESSION_VALIDATE_CACHE_TTL_MS = 1000
 let validateSessionInFlight = null
@@ -32,8 +35,8 @@ function decodeJwtPayload(token) {
 }
 
 function persistAuthResponse(data) {
-  const token = data?.access_token
-  if (!token) {
+  const token = String(data?.access_token || '').trim()
+  if (!token || token === 'undefined' || token === 'null') {
     return {
       success: false,
       message: 'No se recibio token de autenticacion',
@@ -54,6 +57,7 @@ function persistAuthResponse(data) {
     : null
 
   localStorage.setItem('token', token)
+  localStorage.setItem('access_token', token)
   if (user) {
     localStorage.setItem('user', JSON.stringify(user))
   }
@@ -205,7 +209,7 @@ export async function signInWithGoogle(credential) {
 }
 
 export async function validateSession() {
-  const token = localStorage.getItem('token') || localStorage.getItem('access_token') || ''
+  const token = getAuthToken()
 
   if (!token) {
     return {

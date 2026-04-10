@@ -1,7 +1,16 @@
+import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import './ConfirmModal.css'
 
 function ConfirmModal({ title = 'Confirmar accion', message, onConfirm, onCancel, confirmLabel = 'Eliminar' }) {
-  return (
+  useEffect(() => {
+    document.body.classList.add('confirm-modal-open')
+    return () => {
+      document.body.classList.remove('confirm-modal-open')
+    }
+  }, [])
+
+  return createPortal(
     <div className="confirm-backdrop" onClick={onCancel} role="dialog" aria-modal="true">
       <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
         <div className="confirm-icon" aria-hidden="true">!</div>
@@ -16,7 +25,8 @@ function ConfirmModal({ title = 'Confirmar accion', message, onConfirm, onCancel
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

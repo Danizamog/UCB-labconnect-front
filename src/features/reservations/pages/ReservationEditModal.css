@@ -1,9 +1,16 @@
+.reservation-modal-open {
+  overflow: hidden;
+}
+
 .reservation-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 110;
   display: grid;
   place-items: center;
+  min-height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 20px;
   background: rgba(10, 20, 34, 0.55);
   backdrop-filter: blur(4px);
@@ -11,6 +18,9 @@
 
 .reservation-modal {
   width: min(720px, 100%);
+  max-height: calc(100dvh - 40px);
+  margin: auto;
+  overflow-y: auto;
   display: grid;
   gap: 18px;
   padding: 24px;
@@ -106,6 +116,30 @@
   justify-content: flex-end;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.reservation-modal-extra {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(10, 53, 89, 0.04);
+  border: 1px solid rgba(10, 53, 89, 0.08);
+}
+
+.reservation-modal-extra-head {
+  display: grid;
+  gap: 4px;
+}
+
+.reservation-modal-extra-head strong {
+  color: var(--ink-900);
+}
+
+.reservation-modal-extra-head p {
+  margin: 0;
+  color: var(--ink-700);
+  line-height: 1.5;
 }
 
 .reservation-modal-primary,

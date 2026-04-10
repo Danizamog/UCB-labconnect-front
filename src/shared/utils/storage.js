@@ -3,5 +3,7 @@
  * @returns {string}
  */
 export function getAuthToken() {
-  return localStorage.getItem('token') || localStorage.getItem('access_token') || ''
+  const rawToken = localStorage.getItem('token') || localStorage.getItem('access_token') || ''
+  const token = String(rawToken || '').trim()
+  return token && token !== 'undefined' && token !== 'null' ? token : ''
 }

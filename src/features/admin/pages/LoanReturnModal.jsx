@@ -1,11 +1,24 @@
+import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import './LoanReturnModal.css'
 
 function LoanReturnModal({ loan, onCancel, onSubmit, submitting = false }) {
+  useEffect(() => {
+    if (!loan) {
+      return undefined
+    }
+
+    document.body.classList.add('loan-return-open')
+    return () => {
+      document.body.classList.remove('loan-return-open')
+    }
+  }, [loan])
+
   if (!loan) {
     return null
   }
 
-  return (
+  return createPortal(
     <div className="loan-return-backdrop" onClick={onCancel} role="dialog" aria-modal="true">
       <div className="loan-return-modal" onClick={(event) => event.stopPropagation()}>
         <div className="loan-return-head">
@@ -61,7 +74,8 @@ function LoanReturnModal({ loan, onCancel, onSubmit, submitting = false }) {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   closeAssetMaintenanceTicket,
   createAsset,
@@ -25,6 +26,8 @@ const defaultForm = { name: '', category: '', location: '', description: '', ser
 const defaultTicketForm = { asset_id: '', ticket_type: 'maintenance', title: '', description: '', severity: 'medium', evidence_report_id: '' }
 const defaultLoanForm = { asset_id: '', borrower_id: '', borrower_name: '', borrower_email: '', borrower_role: '', purpose: '', notes: '' }
 const defaultLoanDashboard = { total_records: 0, active_count: 0, returned_count: 0, damaged_returns_count: 0, active_loans: [] }
+const defaultAssetFilters = { status: 'all', laboratory_id: '', category: 'all' }
+const ASSET_PAGE_SIZE = 6
 
 function normalizeLabId(value) {
   return value === '' ? '' : String(value)
@@ -94,6 +97,8 @@ function AdminEquiposPage({ user }) {
   const [userSearch, setUserSearch] = useState('')
   const [selectedBorrowerProfileId, setSelectedBorrowerProfileId] = useState('')
   const [assetSearch, setAssetSearch] = useState('')
+  const [assetFilters, setAssetFilters] = useState(defaultAssetFilters)
+  const [assetPage, setAssetPage] = useState(0)
   const [resolutionDrafts, setResolutionDrafts] = useState({})
   const [savingTicket, setSavingTicket] = useState(false)
   const [savingLoan, setSavingLoan] = useState(false)
@@ -102,6 +107,7 @@ function AdminEquiposPage({ user }) {
   const [returnModalLoan, setReturnModalLoan] = useState(null)
   const [confirmModal, setConfirmModal] = useState(null)
   const [activeModal, setActiveModal] = useState(null)
+  const [selectedManagedAssetId, setSelectedManagedAssetId] = useState(null)
   const [userDirectoryMessage, setUserDirectoryMessage] = useState('')
 
   const canManage = hasAnyPermission(user, ['gestionar_inventario'])
@@ -168,6 +174,10 @@ function AdminEquiposPage({ user }) {
     () => assets.find((asset) => String(asset.id) === String(selectedAssetHistoryId)) || null,
     [assets, selectedAssetHistoryId],
   )
+  const selectedManagedAsset = useMemo(
+    () => assets.find((asset) => String(asset.id) === String(selectedManagedAssetId)) || null,
+    [assets, selectedManagedAssetId],
+  )
   const filteredUsers = useMemo(() => {
     const needle = normalizeText(userSearch)
     if (!needle) return activeUserProfiles.slice(0, 6)
@@ -176,7 +186,27 @@ function AdminEquiposPage({ user }) {
         .some((value) => normalizeText(value).includes(needle)))
       .slice(0, 6)
   }, [activeUserProfiles, userSearch])
-  const filteredAssets = useMemo(() => assets.filter((asset) => assetMatchesSearch(asset, assetSearch)), [assets, assetSearch])
+  const assetCategories = useMemo(
+    () => Array.from(new Set(assets.map((asset) => String(asset.category || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [assets],
+  )
+  const filteredAssets = useMemo(
+    () => assets.filter((asset) => {
+      const matchesSearch = assetMatchesSearch(asset, assetSearch)
+      const matchesStatus = assetFilters.status === 'all' || asset.status === assetFilters.status
+      const matchesLab = !assetFilters.laboratory_id || String(asset.laboratory_id || '') === String(assetFilters.laboratory_id)
+      const matchesCategory = assetFilters.category === 'all' || String(asset.category || '') === assetFilters.category
+      return matchesSearch && matchesStatus && matchesLab && matchesCategory
+    }),
+    [assetFilters.category, assetFilters.laboratory_id, assetFilters.status, assetSearch, assets],
+  )
+  const paginatedAssets = useMemo(() => {
+    const start = assetPage * ASSET_PAGE_SIZE
+    return filteredAssets.slice(start, start + ASSET_PAGE_SIZE)
+  }, [assetPage, filteredAssets])
+  const assetTotalPages = Math.max(Math.ceil(filteredAssets.length / ASSET_PAGE_SIZE), 1)
+  const assetVisibleStart = filteredAssets.length === 0 ? 0 : assetPage * ASSET_PAGE_SIZE + 1
+  const assetVisibleEnd = Math.min((assetPage + 1) * ASSET_PAGE_SIZE, filteredAssets.length)
   const canSubmitAssetForm = useMemo(() => {
     const nameOk = String(form.name || '').trim().length >= 3
     const categoryOk = String(form.category || '').trim().length >= 3
@@ -504,13 +534,77 @@ function AdminEquiposPage({ user }) {
     setReturnModalLoan(loan)
   }
 
+  const handleOpenManageAsset = (asset) => {
+    setSelectedManagedAssetId(asset.id)
+    setActiveModal('manage')
+  }
+
+  const handleOpenAssetEditor = (asset) => {
+    setEditingId(asset.id)
+    setForm({
+      name: asset.name,
+      category: asset.category,
+      location: asset.location || '',
+      description: asset.description || '',
+      serial_number: asset.serial_number || '',
+      laboratory_id: asset.laboratory_id ? String(asset.laboratory_id) : '',
+      status: asset.status,
+    })
+    setSelectedManagedAssetId(asset.id)
+    setActiveModal('asset')
+  }
+
+  const handleOpenTicketForAsset = (assetId) => {
+    setTicketForm((previous) => ({ ...previous, asset_id: assetId }))
+    setSelectedManagedAssetId(assetId)
+    setActiveModal('ticket')
+  }
+
+  const handleOpenLoanForAsset = (assetId) => {
+    setLoanForm((previous) => ({ ...previous, asset_id: assetId }))
+    setError('')
+    setMessage('')
+    setSelectedManagedAssetId(assetId)
+    setActiveModal('loan')
+  }
+
+  const handleResetAssetFilters = () => {
+    setAssetSearch('')
+    setAssetFilters(defaultAssetFilters)
+    setAssetPage(0)
+  }
+
+  const handleAssetPageChange = (nextPage) => {
+    if (nextPage < 0 || nextPage >= assetTotalPages) {
+      return
+    }
+    setAssetPage(nextPage)
+  }
+
   const handleCloseWorkflowModal = () => {
     if (activeModal === 'asset') resetForm()
     if (activeModal === 'ticket') resetTicketForm()
     if (activeModal === 'loan') resetLoanForm()
     if (activeModal === 'history') setSelectedAssetHistoryId(null)
+    if (activeModal === 'manage') setSelectedManagedAssetId(null)
     setActiveModal(null)
   }
+
+  useEffect(() => {
+    if (!activeModal) {
+      document.body.classList.remove('infra-workflow-open')
+      return undefined
+    }
+
+    document.body.classList.add('infra-workflow-open')
+    return () => {
+      document.body.classList.remove('infra-workflow-open')
+    }
+  }, [activeModal])
+
+  useEffect(() => {
+    setAssetPage(0)
+  }, [assetSearch, assetFilters])
 
   const handleSubmitReturn = async (event) => {
     event.preventDefault()
@@ -570,7 +664,7 @@ function AdminEquiposPage({ user }) {
         />
       ) : null}
 
-      {activeModal ? (
+      {activeModal ? createPortal(
         <div className="infra-workflow-backdrop" role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget) handleCloseWorkflowModal()
         }}>
@@ -579,12 +673,14 @@ function AdminEquiposPage({ user }) {
               <div>
                 <p className="infra-kicker">{activeModal === 'history' ? 'Historial tecnico' : 'Inventario guiado'}</p>
                 <h3>
+                  {activeModal === 'manage' ? (selectedManagedAsset ? `Gestionar ${selectedManagedAsset.name}` : 'Gestionar equipo') : null}
                   {activeModal === 'asset' ? (editingId ? 'Editar equipo' : 'Nuevo equipo') : null}
                   {activeModal === 'ticket' ? 'Registrar ticket tecnico' : null}
                   {activeModal === 'loan' ? 'Registrar prestamo' : null}
                   {activeModal === 'history' ? (selectedHistoryAsset ? `Bitacora de ${selectedHistoryAsset.name}` : 'Historial del equipo') : null}
                 </h3>
                 <p>
+                  {activeModal === 'manage' ? 'Desde aqui puedes revisar el estado del equipo y elegir una sola accion sin saturar la tabla.' : null}
                   {activeModal === 'asset' ? 'Completa la informacion esencial para mantener el catalogo claro y actualizado.' : null}
                   {activeModal === 'ticket' ? 'Documenta el mantenimiento o dano para que el historial tecnico quede trazable.' : null}
                   {activeModal === 'loan' ? 'Identifica al usuario, selecciona el equipo y registra la salida de forma segura.' : null}
@@ -595,6 +691,77 @@ function AdminEquiposPage({ user }) {
             </header>
 
             {error ? <p className="infra-alert infra-error">{error}</p> : null}
+
+            {activeModal === 'manage' ? (
+              <div className="infra-manage-shell">
+                <section className="infra-manage-hero">
+                  <div className="infra-manage-copy">
+                    <span className={`infra-status-badge ${assetStatusBadgeClass(selectedManagedAsset?.status || 'neutral')}`}>
+                      {assetStatusLabel(selectedManagedAsset?.status || 'Sin estado')}
+                    </span>
+                    <h4>{selectedManagedAsset?.name || 'Equipo sin seleccionar'}</h4>
+                    <p>{selectedManagedAsset?.serial_number ? `Serie ${selectedManagedAsset.serial_number}` : 'Sin numero de serie registrado'}</p>
+                  </div>
+                  <div className="infra-manage-meta">
+                    <span><strong>Categoria:</strong> {selectedManagedAsset?.category || 'Sin categoria'}</span>
+                    <span><strong>Ubicacion:</strong> {selectedManagedAsset?.location || 'Sin ubicacion'}</span>
+                    <span><strong>Laboratorio:</strong> {selectedManagedAsset?.laboratory_id ? labNameById[String(selectedManagedAsset.laboratory_id)] || `Lab ${selectedManagedAsset.laboratory_id}` : 'General'}</span>
+                    <span><strong>Ultimo cambio:</strong> {selectedManagedAsset?.status_updated_at ? formatDateTime(selectedManagedAsset.status_updated_at) : 'Sin cambios registrados'}</span>
+                  </div>
+                </section>
+
+                <div className="infra-manage-grid">
+                  <button type="button" className="infra-manage-card" onClick={() => {
+                    if (!selectedManagedAsset) return
+                    handleToggleHistory(selectedManagedAsset.id)
+                  }}>
+                    <strong>Ver historial</strong>
+                    <span>Revisa prestamos, tickets y cambios de estado del equipo.</span>
+                  </button>
+                  {canManageLoans ? (
+                    <button type="button" className="infra-manage-card" onClick={() => {
+                      if (!selectedManagedAsset) return
+                      handleOpenLoanForAsset(selectedManagedAsset.id)
+                    }}>
+                      <strong>Registrar prestamo</strong>
+                      <span>Asigna este equipo a un usuario del directorio institucional.</span>
+                    </button>
+                  ) : null}
+                  {canManageStatus ? (
+                    <button type="button" className="infra-manage-card" onClick={() => {
+                      if (!selectedManagedAsset) return
+                      handleOpenTicketForAsset(selectedManagedAsset.id)
+                    }}>
+                      <strong>Reportar ticket</strong>
+                      <span>Documenta mantenimiento o dano sin buscar el equipo otra vez.</span>
+                    </button>
+                  ) : null}
+                  {canManage ? (
+                    <button type="button" className="infra-manage-card" onClick={() => {
+                      if (!selectedManagedAsset) return
+                      handleOpenAssetEditor(selectedManagedAsset)
+                    }}>
+                      <strong>Editar equipo</strong>
+                      <span>Actualiza nombre, serie, ubicacion, laboratorio o estado.</span>
+                    </button>
+                  ) : null}
+                  {canManage ? (
+                    <button type="button" className="infra-manage-card danger" onClick={() => {
+                      if (!selectedManagedAsset) return
+                      handleCloseWorkflowModal()
+                      handleDelete(selectedManagedAsset.id)
+                    }}>
+                      <strong>Eliminar equipo</strong>
+                      <span>Quita este registro del inventario si ya no corresponde conservarlo.</span>
+                    </button>
+                  ) : null}
+                </div>
+
+                <div className="infra-actions infra-workflow-actions">
+                  <button type="button" className="infra-secondary" onClick={handleCloseWorkflowModal}>Cerrar</button>
+                </div>
+              </div>
+            ) : null}
 
             {activeModal === 'asset' ? (
               <form className="infra-form infra-workflow-form" onSubmit={handleSubmit}>
@@ -867,7 +1034,8 @@ function AdminEquiposPage({ user }) {
               </div>
             ) : null}
           </section>
-        </div>
+        </div>,
+        document.body,
       ) : null}
 
       <header className="infra-header">
@@ -1190,15 +1358,68 @@ function AdminEquiposPage({ user }) {
             <div className="infra-section-head">
               <div>
                 <h3>Equipos</h3>
-                <p>Busca por codigo o serie, revisa el estado actual y abre el detalle de mantenimiento y prestamos.</p>
+                <p>Filtra primero y luego abre cada equipo en una ventana para gestionarlo con calma.</p>
+              </div>
+              <div className="infra-equipment-results">
+                <strong>{filteredAssets.length}</strong>
+                <span>{filteredAssets.length === 1 ? 'equipo encontrado' : 'equipos encontrados'}</span>
               </div>
             </div>
 
-            <div className="infra-form-grid">
-              <label>
-                <span>Buscar equipo por codigo, serie o nombre</span>
-                <input value={assetSearch} onChange={(event) => setAssetSearch(event.target.value)} placeholder="Ej. OSC-01, SN-2004, osciloscopio" />
-              </label>
+            <section className="infra-filter-panel" aria-label="Filtros de equipos">
+              <div className="infra-filter-primary">
+                <label>
+                  <span>Buscar</span>
+                  <input value={assetSearch} onChange={(event) => setAssetSearch(event.target.value)} placeholder="Ej. OSC-01, SN-2004, osciloscopio" />
+                </label>
+              </div>
+              <div className="infra-filter-row">
+                <label>
+                  <span>Estado</span>
+                  <select
+                    value={assetFilters.status}
+                    onChange={(event) => setAssetFilters((previous) => ({ ...previous, status: event.target.value }))}
+                  >
+                    <option value="all">Todos</option>
+                    <option value="available">Disponible</option>
+                    <option value="loaned">Prestado</option>
+                    <option value="maintenance">Mantenimiento</option>
+                    <option value="damaged">Danado</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Laboratorio</span>
+                  <select
+                    value={assetFilters.laboratory_id}
+                    onChange={(event) => setAssetFilters((previous) => ({ ...previous, laboratory_id: event.target.value }))}
+                  >
+                    <option value="">Todos</option>
+                    {labs.map((lab) => <option key={lab.id} value={lab.id}>{lab.name}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Categoria</span>
+                  <select
+                    value={assetFilters.category}
+                    onChange={(event) => setAssetFilters((previous) => ({ ...previous, category: event.target.value }))}
+                  >
+                    <option value="all">Todas</option>
+                    {assetCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+                  </select>
+                </label>
+                <button type="button" className="infra-secondary" onClick={handleResetAssetFilters}>
+                  Limpiar
+                </button>
+              </div>
+            </section>
+
+            <div className="infra-table-meta">
+              <span>
+                Mostrando {assetVisibleStart}-{assetVisibleEnd} de {filteredAssets.length} equipos
+              </span>
+              <span>
+                Pagina {filteredAssets.length === 0 ? 0 : assetPage + 1} de {filteredAssets.length === 0 ? 0 : assetTotalPages}
+              </span>
             </div>
 
             <div className="infra-table-wrap">
@@ -1214,7 +1435,13 @@ function AdminEquiposPage({ user }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAssets.map((asset) => (
+                  {filteredAssets.length === 0 ? (
+                    <tr>
+                      <td colSpan="6">
+                        <p className="infra-empty">No hay equipos para este filtro.</p>
+                      </td>
+                    </tr>
+                  ) : paginatedAssets.map((asset) => (
                     <tr key={asset.id}>
                       <td>
                         <strong>{asset.name}</strong>
@@ -1231,46 +1458,9 @@ function AdminEquiposPage({ user }) {
                       </td>
                       <td>
                         <div className="infra-actions compact">
-                          <button type="button" className="infra-secondary" onClick={() => handleToggleHistory(asset.id)}>Ver historial</button>
-                          {canManageLoans ? (
-                            <button
-                              type="button"
-                              className="infra-secondary"
-                              onClick={() => {
-                                setLoanForm((previous) => ({ ...previous, asset_id: asset.id }))
-                                setError('')
-                                setMessage('')
-                                setActiveModal('loan')
-                              }}
-                            >
-                              Registrar prestamo
-                            </button>
-                          ) : null}
-                          {canManageStatus ? <button type="button" className="infra-secondary" onClick={() => { setTicketForm((previous) => ({ ...previous, asset_id: asset.id })); setActiveModal('ticket') }}>Reportar ticket</button> : null}
-                          {canManage ? (
-                            <>
-                              <button
-                                type="button"
-                                className="infra-secondary"
-                                onClick={() => {
-                                  setEditingId(asset.id)
-                                  setForm({
-                                    name: asset.name,
-                                    category: asset.category,
-                                    location: asset.location || '',
-                                    description: asset.description || '',
-                                    serial_number: asset.serial_number || '',
-                                    laboratory_id: asset.laboratory_id ? String(asset.laboratory_id) : '',
-                                    status: asset.status,
-                                  })
-                                  setActiveModal('asset')
-                                }}
-                              >
-                                Editar
-                              </button>
-                              <button type="button" className="infra-danger" onClick={() => handleDelete(asset.id)}>Eliminar</button>
-                            </>
-                          ) : null}
+                          <button type="button" className="infra-secondary infra-secondary-strong" onClick={() => handleOpenManageAsset(asset)}>
+                            Gestionar
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1278,6 +1468,39 @@ function AdminEquiposPage({ user }) {
                 </tbody>
               </table>
             </div>
+
+            {filteredAssets.length > 0 ? (
+              <div className="infra-pagination">
+                <button
+                  type="button"
+                  className="infra-secondary"
+                  onClick={() => handleAssetPageChange(assetPage - 1)}
+                  disabled={assetPage <= 0}
+                >
+                  Anterior
+                </button>
+                <div className="infra-pagination-pages">
+                  {Array.from({ length: assetTotalPages }, (_, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      className={`infra-page-chip ${assetPage === index ? 'is-active' : ''}`}
+                      onClick={() => handleAssetPageChange(index)}
+                    >
+                      {index + 1}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="infra-secondary"
+                  onClick={() => handleAssetPageChange(assetPage + 1)}
+                  disabled={assetPage >= assetTotalPages - 1}
+                >
+                  Siguiente
+                </button>
+              </div>
+            ) : null}
           </section>
         </div>
       )}
