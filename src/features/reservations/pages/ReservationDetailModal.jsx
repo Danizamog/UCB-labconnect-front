@@ -61,6 +61,16 @@ function ReservationDetailModal({
             <div className="reservation-focus-copy">
               <p><strong>Motivo:</strong> {reservation.purpose || 'Sin motivo registrado'}</p>
               {reservation.notes ? <p><strong>Notas:</strong> {reservation.notes}</p> : null}
+              {Array.isArray(reservation.reserved_assets) && reservation.reserved_assets.length > 0 ? (
+                <p>
+                  <strong>Equipos apartados:</strong> {reservation.reserved_assets.map((asset) => asset.name || asset.id).join(', ')}
+                </p>
+              ) : null}
+              {Array.isArray(reservation.reserved_materials) && reservation.reserved_materials.length > 0 ? (
+                <p>
+                  <strong>Materiales apartados:</strong> {reservation.reserved_materials.map((material) => `${material.name || material.id} x${material.quantity}`).join(', ')}
+                </p>
+              ) : null}
               {reservation.cancel_reason ? <p><strong>Motivo de rechazo:</strong> {reservation.cancel_reason}</p> : null}
             </div>
 

@@ -1,4 +1,5 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { listAssets, listMaterials } from '../../admin/services/infrastructureService'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import TutorialSessionDetailModal from '../../tutorials/pages/TutorialSessionDetailModal'
 import { getTutorialSessionById } from '../../tutorials/services/tutorialSessionsService'
@@ -228,10 +229,16 @@ function isCreatableSlot(slot) {
   return Boolean(slot) && slot.state === 'available'
 }
 
+function normalizeLabId(value) {
+  return value === null || value === undefined || value === '' ? '' : String(value)
+}
+
 function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead }) {
   const [labs, setLabs] = useState([])
   const [reservations, setReservations] = useState([])
   const [penalties, setPenalties] = useState([])
+  const [assets, setAssets] = useState([])
+  const [materials, setMaterials] = useState([])
   const [slots, setSlots] = useState([])
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
   const [form, setForm] = useState(() => createDefaultForm())
@@ -250,6 +257,8 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
   const [focusedTutorial, setFocusedTutorial] = useState(null)
+  const [selectedAssetIds, setSelectedAssetIds] = useState([])
+  const [selectedMaterials, setSelectedMaterials] = useState({})
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const todayIso = todayLocalDateString()
@@ -269,14 +278,18 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
 
   const loadData = useCallback(async () => {
     try {
-      const [labsData, reservationsData, penaltiesData] = await Promise.all([
+      const [labsData, reservationsData, penaltiesData, assetsData, materialsData] = await Promise.all([
         listAvailableLabs(user),
         listReservations(),
         listMyPenalties(),
+        listAssets(),
+        listMaterials(),
       ])
       setLabs(labsData)
       setReservations(reservationsData)
       setPenalties(penaltiesData)
+      setAssets(Array.isArray(assetsData) ? assetsData : [])
+      setMaterials(Array.isArray(materialsData) ? materialsData : [])
       setForm((prev) => (prev.laboratory_id || labsData.length === 0 ? prev : { ...prev, laboratory_id: labsData[0].id }))
       setError(labsData.length === 0 ? 'No tienes permisos para reservar en los laboratorios disponibles actualmente.' : '')
     } catch (err) {
@@ -352,11 +365,49 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     () => labs.find((lab) => String(lab.id) === String(form.laboratory_id)) || null,
     [form.laboratory_id, labs],
   )
+  const availableAssets = useMemo(
+    () =>
+      assets.filter(
+        (asset) =>
+          asset?.status === 'available' &&
+          normalizeLabId(asset?.laboratory_id) === normalizeLabId(form.laboratory_id),
+      ),
+    [assets, form.laboratory_id],
+  )
+  const availableMaterials = useMemo(
+    () =>
+      materials.filter(
+        (material) =>
+          Number(material?.quantity_available || 0) > 0 &&
+          normalizeLabId(material?.laboratory_id) === normalizeLabId(form.laboratory_id),
+      ),
+    [form.laboratory_id, materials],
+  )
 
   const selectedLabIsAccessible = useMemo(
     () => (selectedLab ? isLabAccessibleToUser(selectedLab, user) : false),
     [selectedLab, user],
   )
+
+  useEffect(() => {
+    setSelectedAssetIds((previous) =>
+      previous.filter((assetId) => availableAssets.some((asset) => String(asset.id) === String(assetId))),
+    )
+  }, [availableAssets])
+
+  useEffect(() => {
+    setSelectedMaterials((previous) => {
+      const next = {}
+      availableMaterials.forEach((material) => {
+        const materialId = String(material.id)
+        const requested = Number(previous[materialId] || 0)
+        if (requested > 0) {
+          next[materialId] = Math.min(requested, Number(material.quantity_available || 0))
+        }
+      })
+      return next
+    })
+  }, [availableMaterials])
 
   useEffect(() => {
     let mounted = true
@@ -422,6 +473,20 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
   const selectedSlot = useMemo(
     () => slots.find((slot) => getSlotKey(slot) === selectedSlotKey) || null,
     [selectedSlotKey, slots],
+  )
+  const selectedAssetRecords = useMemo(
+    () => availableAssets.filter((asset) => selectedAssetIds.includes(String(asset.id))),
+    [availableAssets, selectedAssetIds],
+  )
+  const selectedMaterialRecords = useMemo(
+    () =>
+      availableMaterials
+        .map((material) => ({
+          ...material,
+          requested_quantity: Number(selectedMaterials[String(material.id)] || 0),
+        }))
+        .filter((material) => material.requested_quantity > 0),
+    [availableMaterials, selectedMaterials],
   )
 
   const selectedSlotIsValid = Boolean(
@@ -732,6 +797,38 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     setIsLoadingReservationDetails(false)
   }
 
+  const handleAssetToggle = (assetId) => {
+    const normalizedId = String(assetId || '')
+    if (!normalizedId) {
+      return
+    }
+
+    setSelectedAssetIds((previous) => (
+      previous.includes(normalizedId)
+        ? previous.filter((item) => item !== normalizedId)
+        : [...previous, normalizedId]
+    ))
+  }
+
+  const handleMaterialQuantityChange = (materialId, value) => {
+    const normalizedId = String(materialId || '')
+    const requestedQuantity = Math.max(Number(value || 0), 0)
+    const material = availableMaterials.find((item) => String(item.id) === normalizedId)
+    const maxAvailable = Number(material?.quantity_available || 0)
+
+    setSelectedMaterials((previous) => {
+      if (!normalizedId || requestedQuantity <= 0 || !material) {
+        const { [normalizedId]: _removed, ...rest } = previous
+        return rest
+      }
+
+      return {
+        ...previous,
+        [normalizedId]: Math.min(requestedQuantity, maxAvailable),
+      }
+    })
+  }
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
@@ -754,11 +851,24 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
           laboratory_name: selectedLab?.name || '',
           area_id: selectedLab?.area_id || '',
           area_name: selectedLab?.area_name || '',
+          selected_assets: selectedAssetRecords.map((asset) => ({
+            id: asset.id,
+            name: asset.name,
+            serial_number: asset.serial_number,
+          })),
+          selected_materials: selectedMaterialRecords.map((material) => ({
+            id: material.id,
+            name: material.name,
+            quantity: material.requested_quantity,
+            unit: material.unit,
+          })),
         },
         user,
       )
       setMessage('Reserva enviada correctamente. Queda pendiente de aprobacion.')
       setSelectedSlotKey('')
+      setSelectedAssetIds([])
+      setSelectedMaterials({})
       setForm((prev) => ({
         ...createDefaultForm(),
         laboratory_id: prev.laboratory_id || '',
@@ -1319,7 +1429,96 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
           </div>
 
           <div className="reservations-form-section">
-            <span className="reservations-form-section-label">3 - Motivo</span>
+            <span className="reservations-form-section-label">3 - Equipos y Materiales</span>
+            <div className="reservation-resource-section">
+              <div className="reservation-resource-card">
+                <div className="reservation-resource-head">
+                  <strong>Equipos disponibles</strong>
+                  <span>{availableAssets.length} opcion{availableAssets.length === 1 ? '' : 'es'}</span>
+                </div>
+                {!form.laboratory_id ? (
+                  <p className="reservation-inline-hint">Selecciona primero un laboratorio para ver sus equipos disponibles.</p>
+                ) : availableAssets.length === 0 ? (
+                  <p className="reservation-inline-hint">No hay equipos disponibles para este laboratorio en este momento.</p>
+                ) : (
+                  <div className="reservation-resource-list">
+                    {availableAssets.map((asset) => {
+                      const assetId = String(asset.id)
+                      const isSelected = selectedAssetIds.includes(assetId)
+                      return (
+                        <label key={assetId} className={`reservation-resource-option${isSelected ? ' is-selected' : ''}`}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleAssetToggle(assetId)}
+                            disabled={Boolean(activePenalty)}
+                          />
+                          <div>
+                            <strong>{asset.name}</strong>
+                            <small>{asset.serial_number ? `Serie ${asset.serial_number}` : 'Sin serie registrada'}</small>
+                          </div>
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="reservation-resource-card">
+                <div className="reservation-resource-head">
+                  <strong>Materiales disponibles</strong>
+                  <span>{availableMaterials.length} opcion{availableMaterials.length === 1 ? '' : 'es'}</span>
+                </div>
+                {!form.laboratory_id ? (
+                  <p className="reservation-inline-hint">Selecciona primero un laboratorio para ver sus materiales con stock.</p>
+                ) : availableMaterials.length === 0 ? (
+                  <p className="reservation-inline-hint">No hay materiales disponibles para este laboratorio en este momento.</p>
+                ) : (
+                  <div className="reservation-resource-list">
+                    {availableMaterials.map((material) => {
+                      const materialId = String(material.id)
+                      const requestedQuantity = Number(selectedMaterials[materialId] || 0)
+                      return (
+                        <div key={materialId} className={`reservation-resource-option${requestedQuantity > 0 ? ' is-selected' : ''}`}>
+                          <div>
+                            <strong>{material.name}</strong>
+                            <small>{material.quantity_available} {material.unit} disponibles</small>
+                          </div>
+                          <input
+                            type="number"
+                            min="0"
+                            max={Math.max(Number(material.quantity_available || 0), 0)}
+                            value={requestedQuantity || ''}
+                            onChange={(event) => handleMaterialQuantityChange(materialId, event.target.value)}
+                            placeholder="0"
+                            disabled={Boolean(activePenalty)}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {(selectedAssetRecords.length > 0 || selectedMaterialRecords.length > 0) ? (
+              <div className="reservation-resource-summary">
+                {selectedAssetRecords.length > 0 ? (
+                  <p><strong>Equipos apartados:</strong> {selectedAssetRecords.map((asset) => asset.name).join(', ')}</p>
+                ) : null}
+                {selectedMaterialRecords.length > 0 ? (
+                  <p><strong>Materiales apartados:</strong> {selectedMaterialRecords.map((material) => `${material.name} x${material.requested_quantity}`).join(', ')}</p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="reservation-inline-hint">
+                Esta parte es opcional. Si eliges equipos o materiales, quedaran apartados junto con tu reserva.
+              </p>
+            )}
+          </div>
+
+          <div className="reservations-form-section">
+            <span className="reservations-form-section-label">4 - Motivo</span>
             <label>
               <span>Motivo de la reserva</span>
               <textarea

@@ -1,6 +1,7 @@
 import { listAdminLabs } from '../../admin/services/infrastructureService'
 import { getAuthToken } from '../../../shared/utils/storage'
 import { clearStoredSession } from '../../auth/services/authService'
+import { buildReservationResourceNotes, parseReservationResourceNotes } from '../utils/reservationResourceNotes'
 
 const gatewayBase = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
 const reservationsBase = gatewayBase.endsWith('/v1') ? gatewayBase : `${gatewayBase}/v1`
@@ -115,6 +116,7 @@ function mapReservation(record) {
   const { date: endDate, time: endTime } = splitDateTime(record?.end_at)
   const { time: checkInTime } = splitDateTime(record?.check_in_at)
   const { time: checkOutTime } = splitDateTime(record?.check_out_at)
+  const resourcePlan = parseReservationResourceNotes(record?.notes || '')
 
   return {
     id: record?.id,
@@ -131,7 +133,8 @@ function mapReservation(record) {
     end_time: endTime,
     date: startDate || endDate,
     status: record?.status || 'pending',
-    notes: record?.notes || '',
+    notes: resourcePlan.user_notes || '',
+    raw_notes: record?.notes || '',
     cancel_reason: record?.cancel_reason || '',
     is_active: record?.is_active !== false,
     created: record?.created || '',
@@ -143,6 +146,8 @@ function mapReservation(record) {
     check_out_time: checkOutTime || '',
     is_walk_in: Boolean(record?.is_walk_in),
     user_modification_count: Number(record?.user_modification_count || 0),
+    reserved_assets: resourcePlan.assets,
+    reserved_materials: resourcePlan.materials,
   }
 }
 
@@ -369,6 +374,11 @@ export async function listReservationsPage(filters = {}) {
 }
 
 export async function createReservation(payload, user) {
+  const notes = buildReservationResourceNotes({
+    assets: payload.selected_assets || payload.assets || [],
+    materials: payload.selected_materials || payload.materials || [],
+    userNotes: payload.notes || '',
+  })
   const normalized = {
     laboratory_id: String(payload.laboratory_id || ''),
     area_id: String(payload.area_id || ''),
@@ -377,7 +387,7 @@ export async function createReservation(payload, user) {
     start_at: `${payload.date}T${payload.start_time}:00`,
     end_at: `${payload.date}T${payload.end_time}:00`,
     attendees_count: Number(payload.attendees_count || 0) || 0,
-    notes: String(payload.notes || ''),
+    notes,
   }
 
   if (!normalized.laboratory_id || !payload.date || !payload.start_time || !payload.end_time) {
@@ -399,7 +409,18 @@ export async function updateReservation(reservationId, payload) {
     purpose: String(payload.purpose || '').trim(),
     start_at: `${payload.date}T${payload.start_time}:00`,
     end_at: `${payload.date}T${payload.end_time}:00`,
-    notes: String(payload.notes || ''),
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(payload || {}, 'notes') ||
+    Object.prototype.hasOwnProperty.call(payload || {}, 'selected_assets') ||
+    Object.prototype.hasOwnProperty.call(payload || {}, 'selected_materials')
+  ) {
+    normalized.notes = buildReservationResourceNotes({
+      assets: payload.selected_assets || payload.assets || [],
+      materials: payload.selected_materials || payload.materials || [],
+      userNotes: payload.notes || '',
+    })
   }
 
   if (!reservationId || !normalized.laboratory_id || !payload.date || !payload.start_time || !payload.end_time) {

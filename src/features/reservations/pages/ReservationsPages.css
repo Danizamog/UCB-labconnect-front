@@ -1148,6 +1148,92 @@
   display: block;
 }
 
+.reservation-resource-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.reservation-resource-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line-300);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(248, 251, 255, 0.96), rgba(255, 255, 255, 0.98));
+}
+
+.reservation-resource-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reservation-resource-head strong {
+  color: var(--ink-900);
+}
+
+.reservation-resource-head span {
+  font-size: 0.8rem;
+  color: var(--ink-700);
+}
+
+.reservation-resource-list {
+  display: grid;
+  gap: 10px;
+}
+
+.reservation-resource-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(10, 53, 89, 0.12);
+  background: #fff;
+}
+
+.reservation-resource-option.is-selected {
+  border-color: rgba(6, 77, 144, 0.24);
+  box-shadow: 0 10px 18px rgba(10, 53, 89, 0.08);
+}
+
+.reservation-resource-option strong,
+.reservation-resource-option small {
+  display: block;
+}
+
+.reservation-resource-option small {
+  margin-top: 4px;
+  color: var(--ink-700);
+}
+
+.reservation-resource-option input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+}
+
+.reservation-resource-option input[type='number'] {
+  width: 92px;
+  text-align: center;
+}
+
+.reservation-resource-summary {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(6, 77, 144, 0.12);
+  background: rgba(6, 77, 144, 0.05);
+}
+
+.reservation-resource-summary p {
+  margin: 0;
+  color: var(--ink-800);
+}
+
 /* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 860px) {
   .reservations-header {
