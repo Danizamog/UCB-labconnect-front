@@ -60,6 +60,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const canManageProfiles = hasAnyPermission(user, ['gestionar_roles_permisos', 'reactivar_cuentas'])
   const canManageStructure = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
   const canManagePenalties = hasAnyPermission(user, ['gestionar_penalizaciones'])
+  const canViewPenalties = Boolean(user?.user_id)
   const canManageEquipos = hasAnyPermission(user, ['gestionar_inventario', 'gestionar_estado_equipos', 'gestionar_mantenimiento'])
   const canManageMateriales = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos'])
   const canManageTutorials = hasAnyPermission(user, ['gestionar_tutorias'])
@@ -105,7 +106,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
       (activeSection === 'tutorials_manage' && canManageTutorials) ||
       (activeSection === 'profiles' && canManageProfiles) ||
       (activeSection === 'roles' && canManageRoles) ||
-      (activeSection === 'penalties' && canManagePenalties) ||
+      (activeSection === 'penalties' && canViewPenalties) ||
       (activeSection === 'areas' && canManageStructure) ||
       (activeSection === 'laboratorios' && canManageStructure) ||
       (activeSection === 'equipos' && canManageEquipos) ||
@@ -127,6 +128,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     canManageEquipos,
     canManageMateriales,
     canManagePenalties,
+    canViewPenalties,
     canManageProfiles,
     canManageRoles,
     canManageStructure,
@@ -255,7 +257,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
         <section className="content-window" aria-label="Ventana principal">
           {canManageProfiles && activeSection === 'profiles' ? <AdminProfilesPage user={user} /> : null}
           {canManageRoles && activeSection === 'roles' ? <AdminRolesPage user={user} onSessionRefresh={onRefreshSession} /> : null}
-          {canManagePenalties && activeSection === 'penalties' ? <AdminPenaltiesPage user={user} /> : null}
+          {canViewPenalties && activeSection === 'penalties' ? <AdminPenaltiesPage user={user} /> : null}
           {canManageStructure && activeSection === 'admin_reservas' ? (
             <AdminReservationsPage user={user} currentHash={currentHash} onNavigate={onNavigate} />
           ) : null}

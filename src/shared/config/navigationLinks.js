@@ -7,7 +7,7 @@ export const NAVIGATION_LINKS = [
   { id: 'tutorials_manage', label: 'Publicar Tutorias', icon: 'tutorials_manage', path: '/app/tutorias/publicar', requiredAnyPermission: ['*', 'gestionar_tutorias'] },
   { id: 'profiles', label: 'Perfiles', icon: 'profiles', path: '/app/admin/perfiles', requiredAnyPermission: ['*', 'gestionar_roles_permisos', 'reactivar_cuentas'] },
   { id: 'roles', label: 'Roles', icon: 'roles', path: '/app/admin/roles', requiredAnyPermission: ['*', 'gestionar_roles_permisos'] },
-  { id: 'penalties', label: 'Penalizaciones', icon: 'penalties', path: '/app/admin/penalizaciones', requiredAnyPermission: ['*', 'gestionar_penalizaciones'] },
+  { id: 'penalties', label: 'Penalizaciones', icon: 'penalties', path: '/app/admin/penalizaciones' },
   { id: 'areas', label: 'Areas', icon: 'areas', path: '/app/admin/areas', requiredAnyPermission: ['*', 'gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'] },
   { id: 'laboratorios', label: 'Laboratorios', icon: 'laboratorios', path: '/app/admin/laboratorios', requiredAnyPermission: ['*', 'gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'] },
   { id: 'equipos', label: 'Equipos', icon: 'equipos', path: '/app/admin/equipos', requiredAnyPermission: ['*', 'gestionar_inventario', 'gestionar_estado_equipos', 'gestionar_mantenimiento'] },
