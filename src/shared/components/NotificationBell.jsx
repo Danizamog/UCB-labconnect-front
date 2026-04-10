@@ -83,11 +83,17 @@ function renderReminderDetails(notification) {
     return null
   }
 
-  const startsAt = [notification.reminder_date, notification.reminder_time].filter(Boolean).join(' | ')
+  const startsAtParts = [notification.reminder_date, notification.reminder_time].filter(Boolean)
+  const startsAt = startsAtParts.length > 0 ? startsAtParts.join(' | ') : 'Sin horario confirmado'
   const location =
     notification.type === 'tutorial_reminder'
       ? notification.reminder_location || notification.reminder_laboratory_id || 'Sin ubicacion'
       : notification.reminder_location || notification.reminder_laboratory_id || 'Sin laboratorio'
+  const reminderWindow = notification.reminder_kind === '30m'
+    ? 'Faltan 30 minutos'
+    : notification.reminder_kind === '24h'
+      ? 'Faltan 24 horas'
+      : 'Recordatorio programado'
 
   return (
     <div className="notification-bell-change-card">
@@ -101,7 +107,7 @@ function renderReminderDetails(notification) {
       ) : null}
       <NotificationChangePreview
         label="Ventana"
-        newValue={notification.reminder_kind === '30m' ? 'Faltan 30 minutos' : 'Faltan 24 horas'}
+        newValue={reminderWindow}
       />
     </div>
   )

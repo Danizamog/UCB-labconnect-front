@@ -980,6 +980,14 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                 'Sin laboratorio'
               const reminderLocation = notification.reminder_location || reminderLabName
               const reminderToneClass = notification.reminder_kind === '30m' ? ' is-reminder-urgent' : ' is-reminder'
+              const reminderStartsAt = [notification.reminder_date, notification.reminder_time]
+                .filter(Boolean)
+                .join(' | ') || 'Sin horario confirmado'
+              const reminderWindow = notification.reminder_kind === '30m'
+                ? 'Faltan 30 minutos'
+                : notification.reminder_kind === '24h'
+                  ? 'Faltan 24 horas'
+                  : 'Recordatorio programado'
 
               return (
                 <article
@@ -1003,9 +1011,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                     <div className="reservation-notification-diff">
                       <div className="reservation-notification-change">
                         <span>Comienza</span>
-                        <strong className="reservation-notification-new">
-                          {notification.reminder_date} | {notification.reminder_time}
-                        </strong>
+                        <strong className="reservation-notification-new">{reminderStartsAt}</strong>
                       </div>
                       <div className="reservation-notification-change">
                         <span>{isTutorialReminder ? 'Ubicacion' : 'Laboratorio'}</span>
@@ -1019,7 +1025,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                       ) : null}
                       <div className="reservation-notification-change">
                         <span>Ventana</span>
-                        <strong>{notification.reminder_kind === '30m' ? 'Faltan 30 minutos' : 'Faltan 24 horas'}</strong>
+                        <strong>{reminderWindow}</strong>
                       </div>
                     </div>
                   ) : isPenaltyNotification ? (
