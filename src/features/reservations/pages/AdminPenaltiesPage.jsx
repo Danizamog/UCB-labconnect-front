@@ -167,21 +167,19 @@ function AdminPenaltiesPage({ user }) {
 
   const canManage = hasAnyPermission(user, ['gestionar_penalizaciones'])
 
-  const loadData = useCallback(async () => {
-    const [penaltiesResult, reservationsResult, assetsResult, ticketsResult, profilesResult, labsResult] = await Promise.allSettled([
-      listPenalties(),
+  const loadPenalties = useCallback(async () => {
+    const data = await listPenalties()
+    setPenalties(Array.isArray(data) ? data : [])
+  }, [])
+
+  const loadSupportData = useCallback(async () => {
+    const [reservationsResult, assetsResult, ticketsResult, profilesResult, labsResult] = await Promise.allSettled([
       listReservations(),
       listAssets(),
       listAssetMaintenanceTickets(),
       listUserProfiles(),
       listAdminLabs(),
     ])
-
-    if (penaltiesResult.status === 'fulfilled') {
-      setPenalties(penaltiesResult.value)
-    } else {
-      setPenalties([])
-    }
 
     if (reservationsResult.status === 'fulfilled') {
       setReservations(reservationsResult.value)
@@ -212,25 +210,21 @@ function AdminPenaltiesPage({ user }) {
     } else {
       setLabs([])
     }
-
-    if (penaltiesResult.status === 'rejected') {
-      throw penaltiesResult.reason
-    }
   }, [])
 
   useEffect(() => {
-    loadData().catch((err) => {
+    Promise.all([loadPenalties(), loadSupportData()]).catch((err) => {
       setError(err?.message || 'No se pudo cargar el panel de penalizaciones.')
     })
 
     const unsubscribe = subscribeReservationsRealtime((event) => {
-      if (event?.topic === 'user_penalty' || event?.topic === 'lab_reservation') {
-        loadData().catch(() => {})
+      if (event?.topic === 'user_penalty') {
+        loadPenalties().catch(() => {})
       }
     })
 
     return () => unsubscribe?.()
-  }, [loadData])
+  }, [loadPenalties, loadSupportData])
 
   const assetById = useMemo(() => {
     const mapped = new Map()
@@ -493,7 +487,7 @@ function AdminPenaltiesPage({ user }) {
           : 'Penalizacion registrada. Revisa la configuracion SMTP si el correo no se envio.',
       )
       closeModal()
-      await loadData()
+      await loadPenalties()
     } catch (err) {
       setError(err.message || 'No se pudo guardar la penalizacion.')
       setIsSubmitting(false)
@@ -513,7 +507,7 @@ function AdminPenaltiesPage({ user }) {
       await liftPenalty(penaltyToLift.id)
       setMessage('La penalizacion fue levantada. Si no existen otros bloqueos o restricciones del laboratorio, el usuario ya puede volver a reservar.')
       setPenaltyToLift(null)
-      await loadData()
+      await loadPenalties()
     } catch (err) {
       setError(err.message || 'No se pudo levantar la penalizacion.')
     } finally {
