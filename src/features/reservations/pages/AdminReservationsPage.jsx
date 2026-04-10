@@ -245,6 +245,7 @@ function AdminReservationsPage({ user }) {
   const approvedCount = reservations.filter((item) => item.status === 'approved').length
   const inProgressCount = reservations.filter((item) => item.status === 'in_progress').length
   const selectedWalkInLab = labById[String(walkInForm.laboratory_id)] || null
+  const selectedWalkInProfile = profileById[String(walkInForm.requested_by)] || null
   const selectedWalkInLabOccupancy =
     occupancy.lab_breakdown.find((entry) => String(entry.laboratory_id) === String(walkInForm.laboratory_id))?.occupancy_count || 0
   const selectedWalkInLabRemainingCapacity =
@@ -255,9 +256,11 @@ function AdminReservationsPage({ user }) {
   const isWalkInChronologyValid = minutesFromClock(walkInForm.end_time) > minutesFromClock(walkInCurrentStartTime)
   const isWalkInCapacityAvailable =
     selectedWalkInLab && Number(selectedWalkInLab.capacity || 0) > 0 ? selectedWalkInLabRemainingCapacity > 0 : true
+  const isWalkInRequesterValid = profiles.length === 0 || Boolean(selectedWalkInProfile)
   const isWalkInFormValid =
     String(walkInForm.laboratory_id || '').trim().length > 0 &&
     walkInForm.requested_by.trim().length >= 4 &&
+    isWalkInRequesterValid &&
     walkInForm.occupant_name.trim().length >= 5 &&
     walkInForm.occupant_email.trim().length > 0 &&
     walkInForm.purpose.trim().length >= 8 &&
@@ -585,13 +588,37 @@ function AdminReservationsPage({ user }) {
             </label>
             <label>
               <span>ID estudiante/docente</span>
-              <input
-                value={walkInForm.requested_by}
-                onChange={(event) => setWalkInForm((prev) => ({ ...prev, requested_by: event.target.value }))}
-                placeholder="Codigo o identificador"
-                minLength={4}
-                required
-              />
+              {profiles.length > 0 ? (
+                <select
+                  value={walkInForm.requested_by}
+                  onChange={(event) => {
+                    const nextRequestedBy = event.target.value
+                    const profile = profileById[String(nextRequestedBy)]
+                    setWalkInForm((prev) => ({
+                      ...prev,
+                      requested_by: nextRequestedBy,
+                      occupant_name: profile?.name || profile?.username || '',
+                      occupant_email: profile?.email || '',
+                    }))
+                  }}
+                  required
+                >
+                  <option value="">Selecciona un usuario</option>
+                  {profiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {(profile.name || profile.username || profile.id) + (profile.email ? ` (${profile.email})` : '')}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  value={walkInForm.requested_by}
+                  onChange={(event) => setWalkInForm((prev) => ({ ...prev, requested_by: event.target.value }))}
+                  placeholder="ID real del usuario"
+                  minLength={4}
+                  required
+                />
+              )}
             </label>
             <label>
               <span>Nombre</span>
@@ -651,6 +678,9 @@ function AdminReservationsPage({ user }) {
           </p>
           {!isWalkInChronologyValid ? (
             <p className="reservation-inline-hint">La hora estimada de salida debe ser mayor a la hora actual.</p>
+          ) : null}
+          {!isWalkInRequesterValid ? (
+            <p className="reservation-inline-hint">Selecciona un usuario valido para evitar errores al guardar el walk-in.</p>
           ) : null}
           {selectedWalkInLab && Number(selectedWalkInLab.capacity || 0) > 0 && !isWalkInCapacityAvailable ? (
             <p className="reservation-inline-hint">No hay cupos disponibles para registrar un nuevo walk-in en este laboratorio.</p>
