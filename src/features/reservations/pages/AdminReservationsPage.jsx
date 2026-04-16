@@ -330,7 +330,6 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
 
   const pendingCount = reservations.filter((item) => item.status === 'pending').length
   const walkInCount = reservations.filter((item) => item.is_walk_in).length
-  const inProgressCount = reservations.filter((item) => item.status === 'in_progress').length
   const selectedWalkInLab = labById[String(walkInForm.laboratory_id)] || null
   const selectedWalkInProfile = profileById[String(walkInForm.requested_by)] || null
   const selectedWalkInLabOccupancy =

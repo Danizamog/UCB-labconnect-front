@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import './SectionHelpModal.css'
 
-function SectionHelpModal({ isOpen = false, title = 'Ayuda', description = '', questions = [], onClose }) {
+function SectionHelpModalContent({ title = 'Ayuda', description = '', questions = [], onClose }) {
   const [expandedItems, setExpandedItems] = useState({})
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearchOpen, setIsSearchOpen] = useState(false)
@@ -28,34 +28,6 @@ function SectionHelpModal({ isOpen = false, title = 'Ayuda', description = '', q
       return question.includes(normalizedSearchQuery) || answer.includes(normalizedSearchQuery)
     })
   }, [normalizedQuestions, normalizedSearchQuery])
-
-  useEffect(() => {
-    if (!isOpen) {
-      return undefined
-    }
-
-    const handleEscape = (event) => {
-      if (event.key === 'Escape') {
-        onClose?.()
-      }
-    }
-
-    window.addEventListener('keydown', handleEscape)
-    return () => window.removeEventListener('keydown', handleEscape)
-  }, [isOpen, onClose])
-
-  useEffect(() => {
-    if (!isOpen) {
-      return
-    }
-    setExpandedItems({})
-    setSearchQuery('')
-    setIsSearchOpen(false)
-  }, [isOpen, title])
-
-  if (!isOpen) {
-    return null
-  }
 
   const toggleItem = (questionKey) => {
     setExpandedItems((previous) => ({ ...previous, [questionKey]: !previous[questionKey] }))
@@ -141,6 +113,37 @@ function SectionHelpModal({ isOpen = false, title = 'Ayuda', description = '', q
         </div>
       </section>
     </div>
+  )
+}
+
+function SectionHelpModal({ isOpen = false, title = 'Ayuda', description = '', questions = [], onClose }) {
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined
+    }
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        onClose?.()
+      }
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [isOpen, onClose])
+
+  if (!isOpen) {
+    return null
+  }
+
+  return (
+    <SectionHelpModalContent
+      key={`${title}-${isOpen}`}
+      title={title}
+      description={description}
+      questions={questions}
+      onClose={onClose}
+    />
   )
 }
 

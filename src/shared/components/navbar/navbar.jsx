@@ -18,7 +18,6 @@ import {
 } from 'lucide-react'
 import { NAVIGATION_LINKS } from '../../config/navigationLinks'
 import { hasAnyPermission } from '../../lib/permissions'
-import ucbLapazLogo from '../../../assets/branding/ucb-san-pablo-lapaz.png'
 import ucbShieldLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
 import './navbar.css'
 
