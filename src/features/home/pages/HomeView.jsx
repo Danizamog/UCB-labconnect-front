@@ -8,6 +8,8 @@ import {
   FlaskConical,
   GraduationCap,
   Microscope,
+  Clock3,
+  MapPin,
   Settings,
   ShieldCheck,
   Wrench,
@@ -35,21 +37,91 @@ import {
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import {
   getOccupancyDashboard,
+  getMyAgendaSummary,
   listReservationNotifications,
   markAllReservationNotificationsAsRead,
   markReservationNotificationAsRead,
   subscribeReservationsRealtime,
 } from '../../reservations/services/reservationsService'
 import './HomeView.css'
+import { formatDateTime, formatStatus } from '../../../shared/utils/formatters'
 
 const FOCUSED_RESERVATION_KEY = 'labconnect.focus_reservation_id'
 const OPEN_RESERVATION_EVENT = 'labconnect:open-reservation-details'
 const FOCUSED_TUTORIAL_KEY = 'labconnect.focus_tutorial_session_id'
 const OPEN_TUTORIAL_EVENT = 'labconnect:open-tutorial-session'
 const OPERATIONS_RECIPIENT_ID = '__operations__'
+const EMPTY_AGENDA_SUMMARY = {
+  generated_at: '',
+  reservation_count: 0,
+  tutorial_count: 0,
+  total_count: 0,
+  upcoming_reservations: [],
+  upcoming_tutorials: [],
+}
+
+function formatAgendaTimeRange(startAt, endAt) {
+  if (!startAt || !endAt) {
+    return 'Horario por confirmar'
+  }
+
+  try {
+    const timeFormatter = new Intl.DateTimeFormat('es-BO', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+    return `${timeFormatter.format(new Date(startAt))} - ${timeFormatter.format(new Date(endAt))}`
+  } catch {
+    return `${startAt} - ${endAt}`
+  }
+}
+
+function buildAgendaItems(summary) {
+  const reservationItems = Array.isArray(summary?.upcoming_reservations)
+    ? summary.upcoming_reservations.map((reservation) => ({
+      kind: 'reservation',
+      id: reservation.id,
+      title: reservation.purpose || 'Reserva de laboratorio',
+      subtitle: reservation.laboratory_name || reservation.laboratory_id || 'Laboratorio',
+      location: reservation.laboratory_name || reservation.laboratory_id || 'Sin laboratorio',
+      start_at: reservation.start_at,
+      end_at: reservation.end_at,
+      status: formatStatus(reservation.status),
+      details: reservation.requested_by_name || 'Reserva propia',
+    }))
+    : []
+
+  const tutorialItems = Array.isArray(summary?.upcoming_tutorials)
+    ? summary.upcoming_tutorials.map((tutorial) => ({
+      kind: 'tutorial',
+      id: tutorial.id,
+      title: tutorial.topic || 'Tutoria',
+      subtitle: tutorial.tutor_name || 'Tutor',
+      location: tutorial.location || tutorial.laboratory_id || 'Sin ubicacion',
+      start_at: tutorial.start_at,
+      end_at: tutorial.end_at,
+      status: tutorial.is_published ? 'Publicada' : 'Borrador',
+      details: tutorial.enrolled_count > 0
+        ? `${tutorial.enrolled_count} inscrito${tutorial.enrolled_count === 1 ? '' : 's'}`
+        : 'Sin inscritos',
+    }))
+    : []
+
+  return [...reservationItems, ...tutorialItems]
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.start_at || '') || 0
+      const rightTime = Date.parse(right.start_at || '') || 0
+      if (leftTime === rightTime) {
+        return String(left.id || '').localeCompare(String(right.id || ''))
+      }
+      return leftTime - rightTime
+    })
+}
 
 function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession, onLogout }) {
   const [notifications, setNotifications] = useState([])
+  const [agendaSummary, setAgendaSummary] = useState(EMPTY_AGENDA_SUMMARY)
+  const [agendaLoading, setAgendaLoading] = useState(false)
   const [operationsSnapshot, setOperationsSnapshot] = useState({
     current_occupancy: 0,
     active_sessions: [],
@@ -67,8 +139,10 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const hasManagementModules =
     canManageRoles || canManageProfiles || canManageStructure || canManagePenalties || canManageEquipos || canManageMateriales || canManageTutorials
   const activeSection = getSectionIdFromPath(currentPath) || 'home'
+  const shouldTrackAgenda = !isAdmin && activeSection === 'home'
   const shouldTrackOperationsSnapshot = canManageStructure && activeSection === 'home'
   const unreadNotificationsCount = notifications.filter((notification) => !notification.is_read).length
+  const agendaItems = buildAgendaItems(agendaSummary).slice(0, 6)
 
   const loadNotifications = useCallback(async (options = {}) => {
     try {
@@ -96,6 +170,27 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
       setOperationsSnapshot({ current_occupancy: 0, active_sessions: [], lab_breakdown: [] })
     }
   }, [shouldTrackOperationsSnapshot])
+
+  const loadAgendaSummary = useCallback(async (options = {}) => {
+    if (!shouldTrackAgenda) {
+      setAgendaSummary(EMPTY_AGENDA_SUMMARY)
+      setAgendaLoading(false)
+      return
+    }
+
+    setAgendaLoading(true)
+    try {
+      const summary = await getMyAgendaSummary({ limit: 6, skipCache: options.skipCache })
+      setAgendaSummary({
+        ...EMPTY_AGENDA_SUMMARY,
+        ...summary,
+      })
+    } catch {
+      setAgendaSummary(EMPTY_AGENDA_SUMMARY)
+    } finally {
+      setAgendaLoading(false)
+    }
+  }, [shouldTrackAgenda])
 
   useEffect(() => {
     const normalizedPath = normalizePath(currentPath)
@@ -153,6 +248,13 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   }, [loadOperationsSnapshot])
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      loadAgendaSummary()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadAgendaSummary, user?.user_id])
+
+  useEffect(() => {
     const unsubscribe = subscribeReservationsRealtime((event) => {
       if (event?.topic === 'user_notification') {
         const recipients = Array.isArray(event?.recipients) ? event.recipients : []
@@ -169,13 +271,17 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
         }
       }
 
+      if (shouldTrackAgenda && (event?.topic === 'lab_reservation' || event?.topic === 'tutorial_session')) {
+        loadAgendaSummary({ skipCache: true })
+      }
+
       if (shouldTrackOperationsSnapshot && (event?.topic === 'lab_access' || event?.topic === 'lab_reservation')) {
         loadOperationsSnapshot()
       }
     })
 
     return () => unsubscribe?.()
-  }, [canManageStructure, loadNotifications, loadOperationsSnapshot, shouldTrackOperationsSnapshot, user?.user_id])
+  }, [canManageStructure, loadAgendaSummary, loadNotifications, loadOperationsSnapshot, shouldTrackAgenda, shouldTrackOperationsSnapshot, user?.user_id])
 
   const handleMarkNotificationAsRead = async (notificationId) => {
     const updatedNotification = await markReservationNotificationAsRead(notificationId)
@@ -330,6 +436,81 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
               ) : (
                 <>
                   <div className="home-showcase">
+                    <section className="home-agenda-panel" aria-label="Resumen de agenda">
+                      <div className="home-agenda-head">
+                        <div className="home-agenda-copy">
+                          <p className="home-modern-kicker">Mi agenda</p>
+                          <h2>Reservas y tutorías próximas en una sola pantalla.</h2>
+                          <p>
+                            Organiza tu tiempo con un resumen directo de lo que viene en los próximos días.
+                          </p>
+                        </div>
+                        <div className="home-agenda-stats" aria-label="Indicadores de agenda">
+                          <article>
+                            <span>Reservas</span>
+                            <strong>{agendaSummary.reservation_count}</strong>
+                            <p>Compromisos por iniciar o en curso.</p>
+                          </article>
+                          <article>
+                            <span>Tutorías</span>
+                            <strong>{agendaSummary.tutorial_count}</strong>
+                            <p>Sesiones que siguen vigentes para ti.</p>
+                          </article>
+                          <article>
+                            <span>Total</span>
+                            <strong>{agendaSummary.total_count}</strong>
+                            <p>Resumen de tus próximos movimientos.</p>
+                          </article>
+                        </div>
+                      </div>
+
+                      {agendaLoading ? (
+                        <p className="home-role-note home-empty-note home-agenda-empty-note">
+                          Cargando tu agenda...
+                        </p>
+                      ) : agendaItems.length > 0 ? (
+                        <div className="home-agenda-list">
+                          {agendaItems.map((item) => (
+                            <article key={`${item.kind}-${item.id}`} className={`home-agenda-item is-${item.kind}`}>
+                              <div className="home-agenda-item-top">
+                                <span className="home-agenda-pill">{item.kind === 'reservation' ? 'Reserva' : 'Tutoria'}</span>
+                                <span className="home-agenda-status">{item.status}</span>
+                              </div>
+                              <strong>{item.title}</strong>
+                              <p>{item.subtitle}</p>
+                              <div className="home-agenda-meta">
+                                <span>
+                                  <Clock3 size={14} aria-hidden="true" />
+                                  {formatDateTime(item.start_at)}
+                                </span>
+                                <span>
+                                  <MapPin size={14} aria-hidden="true" />
+                                  {item.location}
+                                </span>
+                              </div>
+                              <div className="home-agenda-foot">
+                                <span>{formatAgendaTimeRange(item.start_at, item.end_at)}</span>
+                                <span>{item.details}</span>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="home-role-note home-empty-note home-agenda-empty-note">
+                          No tienes reservas ni tutorías próximas por ahora.
+                        </p>
+                      )}
+
+                      <div className="home-agenda-actions">
+                        <button type="button" className="home-modern-primary" onClick={() => onNavigate?.('/app/reservas/calendario')}>
+                          Ver calendario <ArrowRight size={18} />
+                        </button>
+                        <button type="button" className="home-modern-secondary" onClick={() => onNavigate?.('/app/tutorias')}>
+                          Ir a tutorías
+                        </button>
+                      </div>
+                    </section>
+
                     <section className="home-modern-hero">
                       <div className="home-modern-hero-copy">
                         <div className="home-modern-brand">

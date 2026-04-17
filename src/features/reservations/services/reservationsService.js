@@ -368,6 +368,32 @@ export async function listReservationsPage(filters = {}) {
   return mapReservationPage(data || {})
 }
 
+export async function getMyAgendaSummary(options = {}) {
+  const search = new URLSearchParams()
+  const normalizedLimit = Math.max(Number(options.limit || 5), 1)
+  search.set('limit', String(normalizedLimit))
+
+  const skipCache = Boolean(options?.skipCache)
+  const query = search.toString() ? `?${search.toString()}` : ''
+  const data = await request(`${reservationsBase}/reservations/summary${query}`, {
+    cacheTtlMs: skipCache ? 0 : 1500,
+    skipCache,
+  })
+
+  return {
+    generated_at: data?.generated_at || '',
+    reservation_count: Number(data?.reservation_count || 0),
+    tutorial_count: Number(data?.tutorial_count || 0),
+    total_count: Number(data?.total_count || 0),
+    upcoming_reservations: Array.isArray(data?.upcoming_reservations)
+      ? data.upcoming_reservations.map(mapReservation)
+      : [],
+    upcoming_tutorials: Array.isArray(data?.upcoming_tutorials)
+      ? data.upcoming_tutorials.map(mapTutorialSession)
+      : [],
+  }
+}
+
 export async function createReservation(payload, user) {
   const normalized = {
     laboratory_id: String(payload.laboratory_id || ''),
