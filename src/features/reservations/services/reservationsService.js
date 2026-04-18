@@ -368,6 +368,21 @@ export async function listReservationsPage(filters = {}) {
   return mapReservationPage(data || {})
 }
 
+export async function listMyReservationHistoryPage(filters = {}, options = {}) {
+  const search = new URLSearchParams()
+  search.set('pageNumber', String(Math.max(Number(filters.pageNumber || 0), 0)))
+  search.set('pageSize', String(Math.max(Number(filters.pageSize || 8), 1)))
+  search.set('sortBy', String(filters.sortBy || 'start_at'))
+  search.set('sortType', String(filters.sortType || 'DESC').toUpperCase())
+
+  const skipCache = Boolean(options?.skipCache)
+  const data = await request(`${reservationsBase}/reservations/mine/history/search?${search.toString()}`, {
+    cacheTtlMs: skipCache ? 0 : 1500,
+    skipCache,
+  })
+  return mapReservationPage(data || {})
+}
+
 export async function createReservation(payload, user) {
   const normalized = {
     laboratory_id: String(payload.laboratory_id || ''),
