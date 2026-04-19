@@ -277,6 +277,19 @@ export function listMaterials() {
   return request(`${inventoryBase}/stock-items`, { cacheTtlMs: 5000 })
 }
 
+export function getStockItemsReport({ laboratoryId = null, onlyLowOrOut = false } = {}) {
+  const search = new URLSearchParams()
+  if (laboratoryId) {
+    search.set('laboratory_id', String(laboratoryId))
+  }
+  if (onlyLowOrOut) {
+    search.set('only_low_or_out', 'true')
+  }
+
+  const query = search.toString()
+  return request(`${inventoryBase}/reports/stock-items${query ? `?${query}` : ''}`, { cacheTtlMs: 3000 })
+}
+
 export function createMaterial(payload) {
   return request(`${inventoryBase}/stock-items`, {
     method: 'POST',

@@ -3,6 +3,7 @@ import {
   createMaterial,
   createMaterialMovement,
   deleteMaterial,
+  getStockItemsReport,
   listAdminLabs,
   listMaterialMovements,
   listMaterials,
@@ -23,6 +24,7 @@ function normalizeLabId(value) {
 function AdminMaterialesPage({ user }) {
   const [labs, setLabs] = useState([])
   const [materials, setMaterials] = useState([])
+  const [stockReport, setStockReport] = useState(null)
   const [materialMovements, setMaterialMovements] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -39,12 +41,18 @@ function AdminMaterialesPage({ user }) {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [labsData, materialsData] = await Promise.all([listAdminLabs(), listMaterials()])
+      const [labsData, materialsData, reportData] = await Promise.all([
+        listAdminLabs(),
+        listMaterials(),
+        getStockItemsReport({ onlyLowOrOut: true }).catch(() => null),
+      ])
       setLabs(labsData)
       setMaterials(materialsData)
+      setStockReport(reportData)
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudieron cargar los materiales')
+      setStockReport(null)
     } finally {
       setLoading(false)
     }
@@ -83,6 +91,16 @@ function AdminMaterialesPage({ user }) {
     if (!selectedMovementMaterial || movementForm.movement_type !== 'consumption') return false
     return Number(movementForm.quantity || 0) > Number(selectedMovementMaterial.quantity_available || 0)
   }, [movementForm.movement_type, movementForm.quantity, selectedMovementMaterial])
+
+  const outOfStockCount = useMemo(
+    () => (stockReport ? Number(stockReport.out_of_stock || 0) : materials.filter((m) => Number(m.quantity_available) <= 0).length),
+    [materials, stockReport],
+  )
+
+  const stockAlertsCount = useMemo(
+    () => (stockReport ? Number(stockReport.low_stock || 0) + outOfStockCount : lowStockMaterials.length),
+    [lowStockMaterials.length, outOfStockCount, stockReport],
+  )
 
   const resetMaterialForm = () => {
     setEditingId(null)
@@ -406,7 +424,8 @@ function AdminMaterialesPage({ user }) {
         </div>
         <div className="infra-summary">
           <div><span>Total</span><strong>{materials.length}</strong></div>
-          <div><span>Alertas de stock</span><strong>{lowStockMaterials.length}</strong></div>
+          <div><span>Alertas de stock</span><strong>{stockAlertsCount}</strong></div>
+          <div><span>Sin stock</span><strong>{outOfStockCount}</strong></div>
         </div>
       </header>
 
