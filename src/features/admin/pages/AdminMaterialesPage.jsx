@@ -92,6 +92,11 @@ function AdminMaterialesPage({ user }) {
     return Number(movementForm.quantity || 0) > Number(selectedMovementMaterial.quantity_available || 0)
   }, [movementForm.movement_type, movementForm.quantity, selectedMovementMaterial])
 
+  const handleRefreshData = async () => {
+    setError('')
+    await loadData()
+  }
+
   const outOfStockCount = useMemo(
     () => (stockReport ? Number(stockReport.out_of_stock || 0) : materials.filter((m) => Number(m.quantity_available) <= 0).length),
     [materials, stockReport],
@@ -614,6 +619,9 @@ function AdminMaterialesPage({ user }) {
                   <div className="infra-stock-alert-count">
                     <span>Alertas de stock</span>
                     <strong>{lowStockMaterials.length}</strong>
+                    <button type="button" className="infra-secondary" onClick={handleRefreshData} disabled={loading}>
+                      Actualizar datos
+                    </button>
                   </div>
                 </div>
 
