@@ -43,10 +43,14 @@ function createDefaultForm(overrides = {}) {
 
 function maxReservableDateString() {
   const value = new Date()
-  value.setMonth(value.getMonth() + 1)
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
+  const currentDay = value.getDate()
+  const targetMonth = value.getMonth() + 1
+  const targetYear = value.getFullYear() + Math.floor(targetMonth / 12)
+  const normalizedMonth = targetMonth % 12
+  const lastDayOfTargetMonth = new Date(targetYear, normalizedMonth + 1, 0).getDate()
+  const year = targetYear
+  const month = String(normalizedMonth + 1).padStart(2, '0')
+  const day = String(Math.min(currentDay, lastDayOfTargetMonth)).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
 
@@ -412,7 +416,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     return () => {
       mounted = false
     }
-  }, [availabilityRefreshNonce, form.date, form.laboratory_id, selectedLabIsAccessible])
+  }, [availabilityRefreshNonce, form.date, form.end_time, form.laboratory_id, form.start_time, selectedLabIsAccessible])
 
   const labNameById = useMemo(
     () => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])),
@@ -654,7 +658,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     return () => {
       mounted = false
     }
-  }, [editingReservation, editForm.date, editForm.laboratory_id, isEditSlotSelectable])
+  }, [editingReservation, editForm.date, editForm.end_time, editForm.laboratory_id, editForm.start_time, isEditSlotSelectable])
 
   const selectedEditSlot = useMemo(
     () => editSlots.find((slot) => getSlotKey(slot) === editSelectedSlotKey) || null,

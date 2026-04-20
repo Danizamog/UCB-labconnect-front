@@ -482,6 +482,54 @@ export async function getOccupancyDashboard(laboratoryId = '') {
   return request(`${reservationsBase}/reservations/occupancy${query}`, { cacheTtlMs: 1500 })
 }
 
+function mapLaboratoryUsageStat(record) {
+  return {
+    laboratory_id: record?.laboratory_id || '',
+    laboratory_name: record?.laboratory_name || '',
+    laboratory_location: record?.laboratory_location || '',
+    area_id: record?.area_id || '',
+    area_name: record?.area_name || '',
+    available_blocks: Number(record?.available_blocks || 0),
+    blocked_blocks: Number(record?.blocked_blocks || 0),
+    used_blocks: Number(record?.used_blocks || 0),
+    reserved_blocks: Number(record?.reserved_blocks || 0),
+    in_progress_blocks: Number(record?.in_progress_blocks || 0),
+    completed_blocks: Number(record?.completed_blocks || 0),
+    occupancy_percentage: Number(record?.occupancy_percentage || 0),
+  }
+}
+
+export async function getLaboratoryUsageAnalytics(period = 'daily') {
+  const normalizedPeriod = ['daily', 'weekly', 'monthly'].includes(String(period || '').trim().toLowerCase())
+    ? String(period).trim().toLowerCase()
+    : 'daily'
+  const data = await request(
+    `${reservationsBase}/reservations/analytics/laboratory-usage?period=${encodeURIComponent(normalizedPeriod)}`,
+    { cacheTtlMs: 1500 },
+  )
+
+  return {
+    period: data?.period || normalizedPeriod,
+    period_label: data?.period_label || '',
+    start_date: data?.start_date || '',
+    end_date: data?.end_date || '',
+    generated_at: data?.generated_at || '',
+    labs: Array.isArray(data?.labs) ? data.labs.map(mapLaboratoryUsageStat) : [],
+    totals: {
+      laboratories_count: Number(data?.totals?.laboratories_count || 0),
+      available_blocks: Number(data?.totals?.available_blocks || 0),
+      blocked_blocks: Number(data?.totals?.blocked_blocks || 0),
+      used_blocks: Number(data?.totals?.used_blocks || 0),
+      reserved_blocks: Number(data?.totals?.reserved_blocks || 0),
+      in_progress_blocks: Number(data?.totals?.in_progress_blocks || 0),
+      completed_blocks: Number(data?.totals?.completed_blocks || 0),
+      occupancy_percentage: Number(data?.totals?.occupancy_percentage || 0),
+    },
+    highest_usage_laboratory: data?.highest_usage_laboratory ? mapLaboratoryUsageStat(data.highest_usage_laboratory) : null,
+    lowest_usage_laboratory: data?.lowest_usage_laboratory ? mapLaboratoryUsageStat(data.lowest_usage_laboratory) : null,
+  }
+}
+
 export async function getLabAvailability(laboratoryId, day) {
   if (!laboratoryId || !day) {
     return { slots: [], slot_minutes: 60 }
