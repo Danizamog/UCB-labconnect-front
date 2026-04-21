@@ -104,7 +104,7 @@ const defaultTableFilters = {
   where: '',
   sortBy: 'start_at',
   sortType: 'DESC',
-  pageSize: 5,
+  pageSize: 20,
 }
 
 function todayDate() {
@@ -1119,6 +1119,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                       <option value="10">10</option>
                       <option value="20">20</option>
                       <option value="50">50</option>
+                      <option value="100">100</option>
                     </select>
                   </label>
                 </div>
@@ -1170,6 +1171,19 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
             <span>
               Pagina {tableMeta.totalPages === 0 ? 0 : tableMeta.pageNumber + 1} de {tableMeta.totalPages}
             </span>
+            {tableMeta.totalElements > tableMeta.pageSize ? (
+              <button
+                type="button"
+                className="reservations-secondary"
+                onClick={() => {
+                  const nextPageSize = Math.min(tableMeta.totalElements, 100)
+                  setTableFilters((previous) => ({ ...previous, pageSize: nextPageSize }))
+                  setTableQuery((previous) => ({ ...previous, pageSize: nextPageSize, pageNumber: 0 }))
+                }}
+              >
+                Ver mas reservas
+              </button>
+            ) : null}
           </div>
 
           {tableLoading ? (
@@ -1183,6 +1197,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                   <tr>
                     <th>Laboratorio</th>
                     <th>Solicitante</th>
+                    <th>Motivo</th>
                     <th>Fecha</th>
                     <th>Horario</th>
                     <th>Estado</th>
@@ -1199,6 +1214,10 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                       <td>
                         <strong>{getReservationRequesterName(item)}</strong>
                         <div>{getReservationRequesterEmail(item)}</div>
+                      </td>
+                      <td>
+                        <strong>{item.purpose || 'Sin motivo registrado'}</strong>
+                        <div>{item.is_walk_in ? 'Ingreso rapido' : 'Reserva programada'}</div>
                       </td>
                       <td>{formatDate(item.date)}</td>
                       <td>{item.start_time} - {item.end_time}</td>
