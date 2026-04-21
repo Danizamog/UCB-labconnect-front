@@ -16,6 +16,7 @@ export const NAVIGATION_LINKS = [
   { id: 'calendar', label: 'Calendario', icon: 'calendar', path: '/app/reservas/calendario', userOnly: true },
   { id: 'tutorials_public', label: 'Tutorias', icon: 'tutorials_public', path: '/app/tutorias', userOnly: true },
   { id: 'reserve', label: 'Reservar', icon: 'reserve', path: '/app/reservas/nueva', userOnly: true },
+  { id: 'reserve_history', label: 'Mi Historial', icon: 'reserve_history', path: '/app/reservas/historial', userOnly: true },
   { id: 'logout', label: 'Salir', action: 'logout', icon: 'logout' },
 ]
 

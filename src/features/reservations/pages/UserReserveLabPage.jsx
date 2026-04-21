@@ -232,7 +232,7 @@ function isCreatableSlot(slot) {
   return Boolean(slot) && slot.state === 'available'
 }
 
-function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead }) {
+function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead, onNavigate }) {
   const [labs, setLabs] = useState([])
   const [reservations, setReservations] = useState([])
   const [penalties, setPenalties] = useState([])
@@ -1460,6 +1460,17 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
               <p className="reservations-panel-subtitle">
                 Las reservas ya transcurridas se muestran como referencia y sin acciones disponibles.
               </p>
+              {onNavigate ? (
+                <div className="reservation-user-card-actions">
+                  <button
+                    type="button"
+                    className="reservations-secondary"
+                    onClick={() => onNavigate('/app/reservas/historial')}
+                  >
+                    Ver historial completo
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             {reservationHistory.length === 0 ? (

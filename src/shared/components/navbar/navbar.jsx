@@ -4,6 +4,7 @@ import {
   BarChart3,
   BookOpenCheck,
   CalendarPlus,
+  ClipboardList,
   FlaskConical,
   House,
   Layers,
@@ -37,6 +38,7 @@ const iconMap = {
   tutorials_manage: CalendarPlus,
   tutorials_public: BookOpenCheck,
   reserve: FlaskConical,
+  reserve_history: ClipboardList,
   mapa: Map,
   logout: LogOut,
 }
@@ -60,6 +62,7 @@ const NAV_SEARCH_META = {
   tutorials_public: { group: 'Estudiantes', aliases: ['tutorias', 'inscripcion'] },
   reserve_reactivos: { group: 'Estudiantes', aliases: ['reactivos', 'reservar', 'materiales'] },
   reserve: { group: 'Estudiantes', aliases: ['reservar', 'laboratorio', 'nueva reserva'] },
+  reserve_history: { group: 'Estudiantes', aliases: ['historial', 'mis reservas', 'reservas pasadas', 'laboratorios usados'] },
 }
 
 const NAV_SUBSECTIONS_META = {
@@ -131,6 +134,10 @@ const NAV_SUBSECTIONS_META = {
     { id: 'mis-reservas-cambios', label: 'Mis reservas y cambios', aliases: ['reservas futuras', 'reservas vigentes'] },
     { id: 'historial-reservas', label: 'Historial reciente', aliases: ['mis ultimas reservas', 'historial reservas'] },
   ],
+  reserve_history: [
+    { id: 'resumen-historial', label: 'Resumen del historial', aliases: ['metricas', 'historial'] },
+    { id: 'mis-reservas-pasadas', label: 'Mis reservas pasadas', aliases: ['laboratorios usados', 'reservas antiguas'] },
+  ],
   calendar: [
     { id: 'calendario-disponibilidad', label: 'Calendario de disponibilidad', aliases: ['horarios'] },
     { id: 'bloques-por-fecha', label: 'Bloques por fecha', aliases: ['slots', 'horarios del dia'] },
@@ -165,25 +172,28 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const isAdmin = user?.role === 'admin'
-  const navPriority = {
-    home: 0,
-    admin_reservas: 1,
-    analytics: 2,
-    reserve: 1,
-    calendar: 3,
-    tutorials_public: 3,
-    tutorials_manage: 3,
-    equipos: 4,
-    materiales: 5,
-    laboratorios: 6,
-    areas: 7,
-    penalties: 8,
-    profiles: 9,
-    roles: 10,
-  }
+  const canViewOwnReservationHistory = Boolean(user?.user_id)
+ const navPriority = {
+  home: 0,
+  admin_reservas: 1,
+  analytics: 2,
+  reserve: 1,
+  reserve_history: 2,
+  calendar: 3,
+  tutorials_public: 3,
+  tutorials_manage: 3,
+  equipos: 4,
+  materiales: 5,
+  laboratorios: 6,
+  areas: 7,
+  penalties: 8,
+  profiles: 9,
+  roles: 10,
+}
 
   const visibleLinks = NAVIGATION_LINKS.filter((link) => {
     if (link.id === 'mapa') return false
+    if (link.id === 'reserve_history') return canViewOwnReservationHistory
     if (link.requiredAnyPermission) return hasAnyPermission(user, link.requiredAnyPermission)
     if (link.userOnly) return !isAdmin
     return true

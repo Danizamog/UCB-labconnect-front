@@ -22,6 +22,7 @@ import AdminRolesPage from '../../admin/pages/AdminRolesPage'
 import AdminPenaltiesPage from '../../reservations/pages/AdminPenaltiesPage'
 import AdminReservationsPage from '../../reservations/pages/AdminReservationsPage'
 import UserAvailabilityCalendarPage from '../../reservations/pages/UserAvailabilityCalendarPage'
+import UserReservationHistoryPage from '../../reservations/pages/UserReservationHistoryPage'
 import UserReserveLabPage from '../../reservations/pages/UserReserveLabPage'
 import StudentTutorialSessionsPage from '../../tutorials/pages/StudentTutorialSessionsPage'
 import TutorTutorialSessionsPage from '../../tutorials/pages/TutorTutorialSessionsPage'
@@ -68,6 +69,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const hasManagementModules =
     canManageRoles || canManageProfiles || canManageStructure || canManagePenalties || canManageEquipos || canManageMateriales || canManageTutorials
   const activeSection = getSectionIdFromPath(currentPath) || 'home'
+  const canViewOwnReservationHistory = Boolean(user?.user_id)
   const shouldTrackOperationsSnapshot = canManageStructure && activeSection === 'home'
   const unreadNotificationsCount = notifications.filter((notification) => !notification.is_read).length
 
@@ -115,7 +117,8 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
       (activeSection === 'materiales' && canManageMateriales) ||
       (activeSection === 'calendar' && !isAdmin) ||
       (activeSection === 'tutorials_public' && !isAdmin) ||
-      (activeSection === 'reserve' && !isAdmin)
+      (activeSection === 'reserve' && !isAdmin) ||
+      (activeSection === 'reserve_history' && canViewOwnReservationHistory)
 
     const isUnknownApplicationRoute =
       normalizedPath !== APP_ROOT_PATH &&
@@ -136,6 +139,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     canManageStructure,
     canManageTutorials,
     currentPath,
+    canViewOwnReservationHistory,
     isAdmin,
     onNavigate,
   ])
@@ -276,8 +280,10 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
               user={user}
               notifications={notifications}
               onMarkNotificationAsRead={handleMarkNotificationAsRead}
+              onNavigate={onNavigate}
             />
           ) : null}
+          {canViewOwnReservationHistory && activeSection === 'reserve_history' ? <UserReservationHistoryPage user={user} /> : null}
 
           {activeSection === 'home' ? (
             <section className={isAdmin ? 'home-placeholder' : 'home-dashboard'} aria-label="Panel de inicio">
