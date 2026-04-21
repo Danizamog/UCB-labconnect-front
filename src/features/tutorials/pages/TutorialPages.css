@@ -344,12 +344,10 @@
   width: min(760px, 100%);
   max-height: 90vh;
   overflow: auto;
-  border-radius: 24px;
-  background:
-    radial-gradient(circle at top right, rgba(252, 208, 37, 0.18), transparent 22%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 248, 252, 0.98));
+  border-radius: 18px;
+  background: #fff;
   border: 1px solid rgba(10, 53, 89, 0.1);
-  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 22px 40px rgba(15, 23, 42, 0.18);
   padding: 22px;
   display: grid;
   gap: 18px;
@@ -359,7 +357,6 @@
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  align-items: flex-start;
 }
 
 .tutorial-detail-header h3,
@@ -370,7 +367,6 @@
 .tutorial-detail-header h3 {
   margin-top: 6px;
   color: var(--ink-900);
-  font-size: clamp(1.6rem, 2vw, 2rem);
 }
 
 .tutorial-detail-header p {
@@ -391,13 +387,12 @@
   border: none;
   background: rgba(10, 53, 89, 0.08);
   color: var(--ink-900);
-  border-radius: 999px;
+  border-radius: 10px;
   width: 40px;
   height: 40px;
   cursor: pointer;
   font: inherit;
   font-weight: 800;
-  box-shadow: 0 8px 18px rgba(10, 53, 89, 0.08);
 }
 
 .tutorial-detail-grid {
@@ -411,39 +406,11 @@
   grid-template-columns: minmax(0, 1.7fr) minmax(200px, 0.9fr);
   gap: 16px;
   align-items: start;
-  padding: 18px;
-  border-radius: 24px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(232, 241, 248, 0.84)),
-    linear-gradient(135deg, rgba(10, 53, 89, 0.06), rgba(252, 208, 37, 0.08));
-  border: 1px solid rgba(10, 53, 89, 0.08);
 }
 
 .tutorial-detail-hero-copy {
   display: grid;
-  gap: 10px;
-}
-
-.tutorial-detail-hero-tags {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.tutorial-detail-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: rgba(10, 53, 89, 0.08);
-  color: #0a3559;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.tutorial-detail-tag.muted {
-  background: rgba(252, 208, 37, 0.18);
-  color: #7a5500;
+  gap: 6px;
 }
 
 .tutorial-detail-hero-badges {
@@ -476,10 +443,9 @@
   display: grid;
   gap: 6px;
   padding: 14px 16px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(10, 53, 89, 0.1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  border-radius: 14px;
+  background: rgba(10, 53, 89, 0.05);
+  border: 1px solid rgba(10, 53, 89, 0.12);
 }
 
 .tutorial-detail-card span {
@@ -491,7 +457,7 @@
 }
 
 .tutorial-detail-card.emphasis {
-  background: linear-gradient(180deg, rgba(10, 53, 89, 0.08), rgba(18, 85, 160, 0.03));
+  background: linear-gradient(180deg, rgba(10, 53, 89, 0.08), rgba(18, 85, 160, 0.04));
 }
 
 .tutorial-detail-card strong {
@@ -499,93 +465,13 @@
   font-size: 0.94rem;
 }
 
-.tutorial-detail-capacity-panel {
-  display: grid;
-  gap: 12px;
-  padding: 16px 18px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, rgba(10, 53, 89, 0.06), rgba(252, 208, 37, 0.12));
-  border: 1px solid rgba(10, 53, 89, 0.08);
-}
-
-.tutorial-detail-capacity-copy {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.tutorial-detail-capacity-copy span {
-  color: var(--ink-700);
-  font-size: 0.8rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.tutorial-detail-capacity-copy strong {
-  color: var(--ink-900);
-}
-
-.tutorial-detail-capacity-bar {
-  width: 100%;
-  height: 12px;
-  border-radius: 999px;
-  background: rgba(10, 53, 89, 0.08);
-  overflow: hidden;
-}
-
-.tutorial-detail-capacity-bar span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #0a3559, #f2c94c);
-}
-
 .tutorial-detail-enrolled {
   display: grid;
   gap: 10px;
 }
 
-.tutorial-detail-enrolled.empty {
-  padding: 16px 18px;
-  border-radius: 16px;
-  background: rgba(10, 53, 89, 0.04);
-  border: 1px dashed rgba(10, 53, 89, 0.14);
-}
-
-.tutorial-detail-enrolled-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.tutorial-detail-enrolled-header-copy {
-  display: grid;
-  gap: 4px;
-}
-
 .tutorial-detail-enrolled strong {
   color: var(--ink-900);
-}
-
-.tutorial-detail-enrolled-header span {
-  color: var(--ink-700);
-  font-size: 0.83rem;
-  font-weight: 700;
-}
-
-.tutorial-detail-export-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.tutorial-detail-export-button {
-  min-width: 132px;
 }
 
 .tutorial-detail-enrolled-list {
@@ -594,100 +480,12 @@
   flex-wrap: wrap;
 }
 
-.tutorial-detail-enrolled-list.detailed {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-
 .tutorial-detail-enrolled-list span {
   padding: 8px 12px;
   border-radius: 999px;
   background: rgba(10, 53, 89, 0.06);
   color: var(--ink-800);
   font-size: 0.84rem;
-}
-
-.tutorial-detail-enrolled-card {
-  display: grid;
-  gap: 12px;
-  padding: 16px 18px;
-  border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(10, 53, 89, 0.04)),
-    linear-gradient(135deg, rgba(10, 53, 89, 0.03), rgba(252, 208, 37, 0.06));
-  border: 1px solid rgba(10, 53, 89, 0.08);
-  box-shadow: 0 10px 24px rgba(10, 53, 89, 0.06);
-}
-
-.tutorial-detail-enrolled-card strong {
-  font-size: 0.92rem;
-}
-
-.tutorial-detail-student-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.tutorial-detail-student-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  background: linear-gradient(135deg, #0a3559, #1b669f);
-  color: #fff;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-}
-
-.tutorial-detail-student-head div {
-  display: grid;
-  gap: 3px;
-}
-
-.tutorial-detail-student-meta {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.tutorial-detail-student-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 7px 10px;
-  border-radius: 999px;
-  background: rgba(10, 53, 89, 0.08);
-  color: #0a3559;
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.tutorial-detail-student-chip.subtle {
-  background: rgba(242, 201, 76, 0.18);
-  color: #7a5500;
-}
-
-.tutorial-detail-enrolled-card span,
-.tutorial-detail-enrolled-card small,
-.tutorial-detail-empty-copy {
-  color: var(--ink-700);
-}
-
-.tutorial-detail-enrolled-card span {
-  font-size: 0.84rem;
-}
-
-.tutorial-detail-enrolled-card small {
-  font-size: 0.78rem;
-}
-
-.tutorial-detail-empty-copy {
-  margin: 0;
-  line-height: 1.6;
 }
 
 .tutorial-detail-story {
@@ -734,29 +532,6 @@
   align-items: center;
   gap: 10px;
   justify-content: flex-end;
-}
-
-@media (max-width: 760px) {
-  .tutorial-detail-modal {
-    padding: 18px;
-    border-radius: 20px;
-  }
-
-  .tutorial-detail-hero,
-  .tutorial-detail-story {
-    grid-template-columns: 1fr;
-  }
-
-  .tutorial-detail-hero-badges,
-  .tutorial-detail-capacity-copy,
-  .tutorial-detail-enrolled-header,
-  .tutorial-detail-actions {
-    justify-content: flex-start;
-  }
-
-  .tutorial-detail-header {
-    gap: 12px;
-  }
 }
 
 .tutorial-detail-primary {
