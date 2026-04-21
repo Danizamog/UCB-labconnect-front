@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Wrench,
 } from 'lucide-react'
+import AdminLabAnalyticsPage from '../../analytics/pages/AdminLabAnalyticsPage'
 import AdminAreasPage from '../../admin/pages/AdminAreasPage'
 import AdminEquiposPage from '../../admin/pages/AdminEquiposPage'
 import AdminLaboratoriosPage from '../../admin/pages/AdminLaboratoriosPage'
@@ -105,6 +106,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     const canAccessCurrentSection =
       activeSection === 'home' ||
       (activeSection === 'admin_reservas' && canManageStructure) ||
+      (activeSection === 'analytics' && canManageStructure) ||
       (activeSection === 'tutorials_manage' && canManageTutorials) ||
       (activeSection === 'profiles' && canManageProfiles) ||
       (activeSection === 'roles' && canManageRoles) ||
@@ -265,6 +267,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
           {canManageStructure && activeSection === 'admin_reservas' ? (
             <AdminReservationsPage user={user} currentHash={currentHash} onNavigate={onNavigate} />
           ) : null}
+          {canManageStructure && activeSection === 'analytics' ? <AdminLabAnalyticsPage user={user} /> : null}
           {canManageTutorials && activeSection === 'tutorials_manage' ? <TutorTutorialSessionsPage /> : null}
           {canManageStructure && activeSection === 'areas' ? <AdminAreasPage user={user} /> : null}
           {canManageStructure && activeSection === 'laboratorios' ? <AdminLaboratoriosPage user={user} /> : null}

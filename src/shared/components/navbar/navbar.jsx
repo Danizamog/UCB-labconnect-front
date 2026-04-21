@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   AlertOctagon,
+  BarChart3,
   BookOpenCheck,
   CalendarPlus,
   ClipboardList,
@@ -25,6 +26,7 @@ import './navbar.css'
 const iconMap = {
   home: House,
   admin_reservas: Users,
+  analytics: BarChart3,
   profiles: UserRound,
   roles: Users,
   penalties: AlertOctagon,
@@ -47,6 +49,7 @@ const NAV_SEARCH_META = {
   home: { group: 'General', aliases: ['inicio', 'panel', 'principal'] },
   mapa: { group: 'General', aliases: ['mapa', 'campus', 'ubicacion'] },
   admin_reservas: { group: 'Gestion operativa', aliases: ['reservas', 'admin', 'laboratorio'] },
+  analytics: { group: 'Gestion operativa', aliases: ['analisis', 'estadisticas', 'ocupacion', 'uso laboratorios'] },
   tutorials_manage: { group: 'Gestion academica', aliases: ['tutorias', 'publicar', 'sesiones'] },
   profiles: { group: 'Gestion academica', aliases: ['perfiles', 'usuarios', 'cuentas'] },
   roles: { group: 'Gestion academica', aliases: ['roles', 'permisos', 'accesos'] },
@@ -147,6 +150,11 @@ const NAV_SUBSECTIONS_META = {
     { id: 'solicitudes-reserva', label: 'Solicitudes de reserva', aliases: ['reservas pendientes'] },
     { id: 'editar-reserva', label: 'Editar reserva', aliases: ['actualizar reserva'] },
   ],
+  analytics: [
+    { id: 'ranking-ocupacion', label: 'Ranking de ocupacion', aliases: ['top laboratorios', 'mas usados'] },
+    { id: 'filtros-periodo', label: 'Filtros por periodo', aliases: ['diario', 'semanal', 'mensual'] },
+    { id: 'formula-uso', label: 'Formula de uso', aliases: ['porcentaje', 'bloques disponibles'] },
+  ],
   mapa: [
     { id: 'molde-3d', label: 'Molde 3D de bloques', aliases: ['mapa 3d', 'bloques'] },
   ],
@@ -165,22 +173,23 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
   const [searchQuery, setSearchQuery] = useState('')
   const isAdmin = user?.role === 'admin'
   const canViewOwnReservationHistory = Boolean(user?.user_id)
-  const navPriority = {
-    home: 0,
-    admin_reservas: 1,
-    reserve: 1,
-    reserve_history: 2,
-    calendar: 2,
-    tutorials_public: 3,
-    tutorials_manage: 3,
-    equipos: 4,
-    materiales: 5,
-    laboratorios: 6,
-    areas: 7,
-    penalties: 8,
-    profiles: 9,
-    roles: 10,
-  }
+ const navPriority = {
+  home: 0,
+  admin_reservas: 1,
+  analytics: 2,
+  reserve: 1,
+  reserve_history: 2,
+  calendar: 3,
+  tutorials_public: 3,
+  tutorials_manage: 3,
+  equipos: 4,
+  materiales: 5,
+  laboratorios: 6,
+  areas: 7,
+  penalties: 8,
+  profiles: 9,
+  roles: 10,
+}
 
   const visibleLinks = NAVIGATION_LINKS.filter((link) => {
     if (link.id === 'mapa') return false
