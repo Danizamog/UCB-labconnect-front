@@ -277,16 +277,27 @@ export function listMaterials() {
   return request(`${inventoryBase}/stock-items`, { cacheTtlMs: 5000 })
 }
 
-export function getStockItemsReport({ laboratoryId = null, onlyLowOrOut = false } = {}) {
-  const search = new URLSearchParams()
+export function getStockItemsReport({
+  laboratoryId = null,
+  onlyLowOrOut = false,
+  statusFilter = null,
+  search = null,
+} = {}) {
+  const params = new URLSearchParams()
   if (laboratoryId) {
-    search.set('laboratory_id', String(laboratoryId))
+    params.set('laboratory_id', String(laboratoryId))
   }
   if (onlyLowOrOut) {
-    search.set('only_low_or_out', 'true')
+    params.set('only_low_or_out', 'true')
+  }
+  if (statusFilter) {
+    params.set('status_filter', String(statusFilter))
+  }
+  if (search) {
+    params.set('search', String(search))
   }
 
-  const query = search.toString()
+  const query = params.toString()
   return request(`${inventoryBase}/reports/stock-items${query ? `?${query}` : ''}`, { cacheTtlMs: 3000 })
 }
 

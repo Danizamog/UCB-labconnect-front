@@ -16,6 +16,13 @@ import './AdminAssetsPage.css'
 
 const defaultMaterialForm = { name: '', category: '', unit: 'unidad', quantity_available: 0, minimum_stock: 0, laboratory_id: '', description: '' }
 const defaultMovementForm = { stock_item_id: '', movement_type: 'entry', quantity: 1, notes: '' }
+const defaultReportFilters = { laboratory_id: '', status_filter: '', search: '', only_low_or_out: false, include_general: true }
+
+const reportStatusMeta = {
+  out_of_stock: { label: 'Sin stock', chipClass: 'danger' },
+  low_stock: { label: 'Stock bajo', chipClass: 'warning' },
+  ok: { label: 'Stock suficiente', chipClass: '' },
+}
 
 function normalizeLabId(value) {
   return value === '' ? '' : String(value)
@@ -25,6 +32,9 @@ function AdminMaterialesPage({ user }) {
   const [labs, setLabs] = useState([])
   const [materials, setMaterials] = useState([])
   const [stockReport, setStockReport] = useState(null)
+  const [reportFilters, setReportFilters] = useState(defaultReportFilters)
+  const [reportLoading, setReportLoading] = useState(false)
+  const [reportError, setReportError] = useState('')
   const [materialMovements, setMaterialMovements] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -38,24 +48,40 @@ function AdminMaterialesPage({ user }) {
 
   const canManage = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos'])
 
+  const fetchReportData = async () => {
+    setReportLoading(true)
+    try {
+      const reportData = await getStockItemsReport()
+      setStockReport(reportData)
+      setReportError('')
+      return reportData
+    } catch (err) {
+      setStockReport(null)
+      setReportError(err.message || 'No se pudo cargar el reporte de insumos')
+      return null
+    } finally {
+      setReportLoading(false)
+    }
+  }
+
   const loadData = async () => {
     setLoading(true)
     try {
-      const [labsData, materialsData, reportData] = await Promise.all([
+      const [labsData, materialsData] = await Promise.all([
         listAdminLabs(),
         listMaterials(),
-        getStockItemsReport({ onlyLowOrOut: true }).catch(() => null),
       ])
       setLabs(labsData)
       setMaterials(materialsData)
-      setStockReport(reportData)
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudieron cargar los materiales')
-      setStockReport(null)
     } finally {
       setLoading(false)
     }
+
+    await fetchReportData()
+
     try {
       const movementsData = await listMaterialMovements(null, 25)
       setMaterialMovements(movementsData)
@@ -98,14 +124,90 @@ function AdminMaterialesPage({ user }) {
   }
 
   const outOfStockCount = useMemo(
-    () => (stockReport ? Number(stockReport.out_of_stock || 0) : materials.filter((m) => Number(m.quantity_available) <= 0).length),
-    [materials, stockReport],
+    () => materials.filter((m) => Number(m.quantity_available) <= 0).length,
+    [materials],
   )
 
   const stockAlertsCount = useMemo(
-    () => (stockReport ? Number(stockReport.low_stock || 0) + outOfStockCount : lowStockMaterials.length),
-    [lowStockMaterials.length, outOfStockCount, stockReport],
+    () => lowStockMaterials.length,
+    [lowStockMaterials.length],
   )
+
+  const reportItems = useMemo(() => (Array.isArray(stockReport?.items) ? stockReport.items : []), [stockReport])
+
+  const filteredReportItems = useMemo(() => {
+    const selectedLaboratory = String(reportFilters.laboratory_id || '').trim()
+    const selectedStatus = String(reportFilters.status_filter || '').trim()
+    const normalizedSearch = String(reportFilters.search || '').trim().toLowerCase()
+    const includeGeneral = Boolean(reportFilters.include_general)
+
+    return reportItems.filter((item) => {
+      const itemLaboratoryId = String(item.laboratory_id || '').trim()
+      const isGeneralItem = !itemLaboratoryId
+
+      if (selectedLaboratory) {
+        if (selectedLaboratory === '__GENERAL__') {
+          if (!isGeneralItem) {
+            return false
+          }
+        } else if (itemLaboratoryId !== selectedLaboratory && !(includeGeneral && isGeneralItem)) {
+          return false
+        }
+      }
+
+      if (selectedStatus && item.status !== selectedStatus) {
+        return false
+      }
+
+      if (reportFilters.only_low_or_out && item.status === 'ok') {
+        return false
+      }
+
+      if (normalizedSearch) {
+        const searchableValues = [
+          String(item.name || ''),
+          String(item.category || ''),
+          String(item.laboratory_name || ''),
+          isGeneralItem ? 'general' : '',
+        ].join(' ').toLowerCase()
+
+        if (!searchableValues.includes(normalizedSearch)) {
+          return false
+        }
+      }
+
+      return true
+    })
+  }, [reportFilters, reportItems])
+
+  const reportSummary = useMemo(() => {
+    const outOfStock = filteredReportItems.filter((item) => item.status === 'out_of_stock').length
+    const lowStock = filteredReportItems.filter((item) => item.status === 'low_stock').length
+    return {
+      total: filteredReportItems.length,
+      outOfStock,
+      lowStock,
+    }
+  }, [filteredReportItems])
+
+  const handleReportFilterChange = (key, value) => {
+    const nextValue = key === 'laboratory_id' && value === '__GENERAL__' ? false : reportFilters.include_general
+    setReportFilters((prev) => ({
+      ...prev,
+      [key]: value,
+      ...(key === 'laboratory_id' ? { include_general: nextValue } : {}),
+    }))
+  }
+
+  const handleReportSubmit = async (event) => {
+    event.preventDefault()
+    await fetchReportData()
+  }
+
+  const handleReportReset = async () => {
+    setReportFilters(defaultReportFilters)
+    await fetchReportData()
+  }
 
   const resetMaterialForm = () => {
     setEditingId(null)
@@ -674,6 +776,134 @@ function AdminMaterialesPage({ user }) {
                 </div>
               </div>
             </section>
+          </section>
+
+          <section className="infra-card">
+            <div className="infra-section-head">
+              <div>
+                <h3>Reporte de estado y stock</h3>
+                <p>Usa filtros para planificar reposicion por laboratorio, estado o nombre del insumo.</p>
+              </div>
+            </div>
+
+            <form className="infra-form" onSubmit={handleReportSubmit}>
+              <div className="infra-form-grid">
+                <label>
+                  <span>Laboratorio</span>
+                  <select
+                    value={reportFilters.laboratory_id}
+                    onChange={(e) => handleReportFilterChange('laboratory_id', e.target.value)}
+                  >
+                    <option value="">Todos los laboratorios</option>
+                    <option value="__GENERAL__">Solo General</option>
+                    {labs.map((lab) => (
+                      <option key={lab.id} value={lab.id}>{lab.name}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  <span>Estado</span>
+                  <select
+                    value={reportFilters.status_filter}
+                    onChange={(e) => handleReportFilterChange('status_filter', e.target.value)}
+                  >
+                    <option value="">Todos</option>
+                    <option value="out_of_stock">Sin stock</option>
+                    <option value="low_stock">Stock bajo</option>
+                    <option value="ok">Stock suficiente</option>
+                  </select>
+                </label>
+
+                <label>
+                  <span>Buscar</span>
+                  <input
+                    value={reportFilters.search}
+                    onChange={(e) => handleReportFilterChange('search', e.target.value)}
+                    placeholder="Nombre, categoria o laboratorio"
+                  />
+                </label>
+              </div>
+
+              {reportFilters.laboratory_id && reportFilters.laboratory_id !== '__GENERAL__' ? (
+                <label className="infra-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={reportFilters.include_general}
+                    onChange={(e) => handleReportFilterChange('include_general', e.target.checked)}
+                  />
+                  <span>Incluir tambien insumos generales</span>
+                </label>
+              ) : null}
+
+              <label className="infra-checkbox">
+                <input
+                  type="checkbox"
+                  checked={reportFilters.only_low_or_out}
+                  onChange={(e) => handleReportFilterChange('only_low_or_out', e.target.checked)}
+                />
+                <span>Mostrar solo insumos con alerta (sin stock o stock bajo)</span>
+              </label>
+
+              <div className="infra-actions">
+                <button type="submit" className="infra-primary" disabled={reportLoading}>
+                  {reportLoading ? 'Consultando...' : 'Actualizar reporte'}
+                </button>
+                <button type="button" className="infra-secondary" onClick={handleReportReset} disabled={reportLoading}>
+                  Limpiar filtros
+                </button>
+              </div>
+            </form>
+
+            {reportError ? <p className="infra-alert infra-error">{reportError}</p> : null}
+
+            <div className="infra-summary" style={{ marginTop: '8px', justifyContent: 'flex-start' }}>
+              <div><span>Total reporte</span><strong>{reportSummary.total}</strong></div>
+              <div><span>Sin stock</span><strong>{reportSummary.outOfStock}</strong></div>
+              <div><span>Stock bajo</span><strong>{reportSummary.lowStock}</strong></div>
+              <div>
+                <span>Generado</span>
+                <strong style={{ fontSize: '0.95rem', marginTop: '8px' }}>
+                  {stockReport?.generated_at ? formatDateTime(stockReport.generated_at) : '--'}
+                </strong>
+              </div>
+            </div>
+
+            <div className="infra-table-wrap">
+              <table className="infra-table">
+                <thead>
+                  <tr>
+                    <th>Material</th>
+                    <th>Categoria</th>
+                    <th>Laboratorio</th>
+                    <th>Disponible</th>
+                    <th>Minimo</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredReportItems.length === 0 ? (
+                    <tr><td colSpan="6">No hay resultados para los filtros aplicados.</td></tr>
+                  ) : (
+                    filteredReportItems.map((item) => {
+                      const statusMeta = reportStatusMeta[item.status] || { label: item.status, chipClass: '' }
+                      return (
+                        <tr key={item.item_id}>
+                          <td>{item.name}</td>
+                          <td>{item.category}</td>
+                          <td>{item.laboratory_name || 'General'}</td>
+                          <td>{item.quantity_available} {item.unit}</td>
+                          <td>{item.minimum_stock}</td>
+                          <td>
+                            <span className={`infra-chip ${statusMeta.chipClass}`.trim()}>{statusMeta.label}</span>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <section className="infra-card infra-materials-catalog">
