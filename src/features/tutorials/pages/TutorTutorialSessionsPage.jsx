@@ -742,13 +742,23 @@ function TutorTutorialSessionsPage() {
                   {session.enrolled_students.length === 0 ? (
                     <p>Aun no hay estudiantes registrados.</p>
                   ) : (
-                    session.enrolled_students.map((student) => (
+                    session.enrolled_students.slice(0, 3).map((student) => (
                       <span key={`${session.id}-${student.student_id}`}>{student.student_name}</span>
                     ))
                   )}
+                  {session.enrolled_students.length > 3 ? (
+                    <p>y {session.enrolled_students.length - 3} mas...</p>
+                  ) : null}
                 </div>
 
                 <div className="tutorials-actions">
+                  <button
+                    type="button"
+                    className="tutorials-secondary"
+                    onClick={() => handleOpenTutorialDetails(session.id)}
+                  >
+                    Ver inscritos
+                  </button>
                   <button
                     type="button"
                     className="tutorials-secondary"
@@ -774,7 +784,9 @@ function TutorTutorialSessionsPage() {
       {focusedSession || isLoadingFocusedSession ? (
         <TutorialSessionDetailModal
           session={focusedSession}
-          title="Bloque de tutoria"
+          title="Listado de estudiantes inscritos"
+          enrolledSectionTitle="Estudiantes inscritos"
+          allowStudentExports
           onClose={() => {
             if (!isLoadingFocusedSession) {
               setFocusedSession(null)
