@@ -669,33 +669,6 @@
   margin-top: 24px;
 }
 
-.reservation-history-page-copy {
-  max-width: 72ch;
-}
-
-.reservation-history-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.reservation-history-pagination-copy {
-  margin: 0;
-  color: var(--ink-700);
-  font-size: 0.86rem;
-}
-
-.reservation-history-card-foot {
-  display: grid;
-  gap: 6px;
-}
-
-.reservation-history-card-foot .reservation-inline-hint {
-  margin: 0;
-}
-
 .reservation-focus-panel {
   border-color: rgba(6, 77, 144, 0.18);
   box-shadow: 0 16px 34px rgba(6, 77, 144, 0.08);
