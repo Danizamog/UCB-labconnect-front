@@ -5,6 +5,7 @@ import {
   CalendarPlus,
   FlaskConical,
   House,
+  History,
   Layers,
   LogOut,
   Menu,
@@ -34,6 +35,7 @@ const iconMap = {
   calendar: Layers,
   tutorials_manage: CalendarPlus,
   tutorials_public: BookOpenCheck,
+  history: History,
   reserve: FlaskConical,
   mapa: Map,
   logout: LogOut,
@@ -55,6 +57,7 @@ const NAV_SEARCH_META = {
   materiales: { group: 'Gestion operativa', aliases: ['materiales', 'reactivos', 'stock'] },
   calendar: { group: 'Estudiantes', aliases: ['calendario', 'disponibilidad', 'horarios'] },
   tutorials_public: { group: 'Estudiantes', aliases: ['tutorias', 'inscripcion'] },
+  history: { group: 'Estudiantes', aliases: ['historial', 'pasadas', 'actividad'] },
   reserve_reactivos: { group: 'Estudiantes', aliases: ['reactivos', 'reservar', 'materiales'] },
   reserve: { group: 'Estudiantes', aliases: ['reservar', 'laboratorio', 'nueva reserva'] },
 }
@@ -118,6 +121,10 @@ const NAV_SUBSECTIONS_META = {
     { id: 'mis-tutorias', label: 'Mis tutorias', aliases: ['inscripciones', 'sesiones inscritas'] },
     { id: 'cartelera-publica', label: 'Cartelera publica', aliases: ['tutorias disponibles', 'sesiones', 'inscripcion'] },
   ],
+  history: [
+    { id: 'historial-reservas', label: 'Historial de reservas', aliases: ['reservas pasadas'] },
+    { id: 'historial-tutorias', label: 'Historial de tutorias', aliases: ['tutorias finalizadas'] },
+  ],
   reserve_reactivos: [
     { id: 'nueva-solicitud', label: 'Nueva solicitud', aliases: ['reservar reactivos'] },
     { id: 'mis-solicitudes', label: 'Mis solicitudes', aliases: ['historial solicitudes'] },
@@ -163,6 +170,7 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
     reserve: 1,
     calendar: 2,
     tutorials_public: 3,
+    history: 4,
     tutorials_manage: 3,
     equipos: 4,
     materiales: 5,

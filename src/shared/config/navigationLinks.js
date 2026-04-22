@@ -14,6 +14,7 @@ export const NAVIGATION_LINKS = [
   { id: 'materiales', label: 'Materiales', icon: 'materiales', path: '/app/admin/materiales', requiredAnyPermission: ['*', 'gestionar_stock', 'gestionar_reactivos_quimicos'] },
   { id: 'calendar', label: 'Calendario', icon: 'calendar', path: '/app/reservas/calendario', userOnly: true },
   { id: 'tutorials_public', label: 'Tutorias', icon: 'tutorials_public', path: '/app/tutorias', userOnly: true },
+  { id: 'history', label: 'Historial', icon: 'history', path: '/app/historial', userOnly: true },
   { id: 'reserve', label: 'Reservar', icon: 'reserve', path: '/app/reservas/nueva', userOnly: true },
   { id: 'logout', label: 'Salir', action: 'logout', icon: 'logout' },
 ]

@@ -22,6 +22,7 @@ import AdminProfilesPage from '../../admin/pages/AdminProfilesPage'
 import AdminRolesPage from '../../admin/pages/AdminRolesPage'
 import AdminPenaltiesPage from '../../reservations/pages/AdminPenaltiesPage'
 import AdminReservationsPage from '../../reservations/pages/AdminReservationsPage'
+import UserHistoryPage from '../../reservations/pages/UserHistoryPage'
 import UserAvailabilityCalendarPage from '../../reservations/pages/UserAvailabilityCalendarPage'
 import UserReserveLabPage from '../../reservations/pages/UserReserveLabPage'
 import StudentTutorialSessionsPage from '../../tutorials/pages/StudentTutorialSessionsPage'
@@ -208,6 +209,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
       (activeSection === 'materiales' && canManageMateriales) ||
       (activeSection === 'calendar' && !isAdmin) ||
       (activeSection === 'tutorials_public' && !isAdmin) ||
+      (activeSection === 'history' && !isAdmin) ||
       (activeSection === 'reserve' && !isAdmin)
 
     const isUnknownApplicationRoute =
@@ -374,6 +376,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
           {canManageMateriales && activeSection === 'materiales' ? <AdminMaterialesPage user={user} /> : null}
           {!isAdmin && activeSection === 'calendar' ? <UserAvailabilityCalendarPage user={user} /> : null}
           {!isAdmin && activeSection === 'tutorials_public' ? <StudentTutorialSessionsPage user={user} /> : null}
+          {!isAdmin && activeSection === 'history' ? <UserHistoryPage user={user} /> : null}
           {!isAdmin && activeSection === 'reserve' ? (
             <UserReserveLabPage
               user={user}
