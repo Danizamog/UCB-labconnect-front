@@ -482,6 +482,37 @@ export async function getOccupancyDashboard(laboratoryId = '') {
   return request(`${reservationsBase}/reservations/occupancy${query}`, { cacheTtlMs: 1500 })
 }
 
+export async function getReservationStatsHourly(options = {}) {
+  const search = new URLSearchParams()
+  if (options.laboratory_id) search.set('laboratory_id', options.laboratory_id)
+  if (options.from) search.set('from', options.from)
+  if (options.to) search.set('to', options.to)
+  const query = search.toString() ? `?${search.toString()}` : ''
+  const url = `${reservationsBase}/reservations/stats/hourly${query}`
+  return request(url, { cacheTtlMs: options.cacheTtlMs || 60_000 })
+}
+
+export async function getReservationStatsTopSlots(options = {}) {
+  const search = new URLSearchParams()
+  if (options.laboratory_id) search.set('laboratory_id', options.laboratory_id)
+  if (options.from) search.set('from', options.from)
+  if (options.to) search.set('to', options.to)
+  if (options.limit) search.set('limit', String(options.limit))
+  const query = search.toString() ? `?${search.toString()}` : ''
+  const url = `${reservationsBase}/reservations/stats/top-slots${query}`
+  return request(url, { cacheTtlMs: options.cacheTtlMs || 60_000 })
+}
+
+export async function getReservationStatsHeatmap(options = {}) {
+  const search = new URLSearchParams()
+  if (options.laboratory_id) search.set('laboratory_id', options.laboratory_id)
+  if (options.from) search.set('from', options.from)
+  if (options.to) search.set('to', options.to)
+  const query = search.toString() ? `?${search.toString()}` : ''
+  const url = `${reservationsBase}/reservations/stats/heatmap${query}`
+  return request(url, { cacheTtlMs: options.cacheTtlMs || 60_000 })
+}
+
 export async function getLabAvailability(laboratoryId, day) {
   if (!laboratoryId || !day) {
     return { slots: [], slot_minutes: 60 }
