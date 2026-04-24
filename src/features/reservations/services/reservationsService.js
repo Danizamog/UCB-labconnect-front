@@ -318,6 +318,62 @@ function mapPenalty(record) {
   }
 }
 
+function mapPenaltyRegularization(record) {
+  return {
+    is_regularized: Boolean(record?.is_regularized),
+    has_open_damage_flags: Boolean(record?.has_open_damage_flags),
+    active_damage_count: Number(record?.active_damage_count || 0),
+    summary: record?.summary || '',
+    latest_ticket_id: record?.latest_ticket_id || '',
+    latest_ticket_title: record?.latest_ticket_title || '',
+    latest_asset_name: record?.latest_asset_name || '',
+    latest_reported_at: record?.latest_reported_at || '',
+  }
+}
+
+function mapPenaltyReactivationHistory(record) {
+  return {
+    id: record?.id || '',
+    penalty_id: record?.penalty_id || '',
+    user_id: record?.user_id || '',
+    user_name: record?.user_name || '',
+    user_email: record?.user_email || '',
+    actor_user_id: record?.actor_user_id || '',
+    actor_name: record?.actor_name || '',
+    executed_at: record?.executed_at || '',
+    lift_reason: record?.lift_reason || '',
+    resolution_notes: record?.resolution_notes || '',
+    action_source: record?.action_source || 'admin_profile',
+    user_was_inactive: Boolean(record?.user_was_inactive),
+    user_is_active_after: Boolean(record?.user_is_active_after),
+    privileges_restored: Boolean(record?.privileges_restored),
+    active_penalty_count_after: Number(record?.active_penalty_count_after || 0),
+    active_damage_count_at_validation: Number(record?.active_damage_count_at_validation || 0),
+    regularization_confirmed: Boolean(record?.regularization_confirmed),
+    regularization_summary: record?.regularization_summary || '',
+    notification_sent: Boolean(record?.notification_sent),
+    email_sent: Boolean(record?.email_sent),
+    created: record?.created || '',
+    updated: record?.updated || '',
+  }
+}
+
+function mapPenaltyReactivationContext(record) {
+  return {
+    user_id: record?.user_id || '',
+    user_name: record?.user_name || '',
+    user_email: record?.user_email || '',
+    user_is_active: Boolean(record?.user_is_active),
+    block_status: record?.block_status || 'active',
+    active_penalty: record?.active_penalty ? mapPenalty(record.active_penalty) : null,
+    active_penalty_count: Number(record?.active_penalty_count || 0),
+    can_reactivate: Boolean(record?.can_reactivate),
+    privileges_restored_if_confirmed: Boolean(record?.privileges_restored_if_confirmed),
+    regularization: mapPenaltyRegularization(record?.regularization || {}),
+    history: Array.isArray(record?.history) ? record.history.map(mapPenaltyReactivationHistory) : [],
+  }
+}
+
 export async function listAvailableLabs(user = null) {
   const labs = await listAdminLabs()
   return labs.filter((lab) => isLabAccessibleToUser(lab, user))
@@ -566,6 +622,40 @@ export async function liftPenalty(penaltyId, options = {}) {
   })
   clearReservationsCache()
   return mapPenalty(data?.penalty || {})
+}
+
+export async function getPenaltyReactivationContext(userId) {
+  if (!userId) {
+    throw new Error('No se pudo identificar al usuario para revisar su bloqueo.')
+  }
+
+  const data = await request(`${reservationsBase}/penalties/reactivation-context/${userId}`, { cacheTtlMs: 1000 })
+  return mapPenaltyReactivationContext(data || {})
+}
+
+export async function reactivateUserAccount(penaltyId, payload = {}) {
+  if (!penaltyId) {
+    throw new Error('No se pudo identificar la penalizacion activa del usuario.')
+  }
+
+  const data = await request(`${reservationsBase}/penalties/${penaltyId}/reactivate`, {
+    method: 'POST',
+    body: JSON.stringify({
+      lift_reason: String(payload.lift_reason || '').trim(),
+      resolution_notes: String(payload.resolution_notes || '').trim(),
+      action_source: String(payload.action_source || 'admin_profile').trim() || 'admin_profile',
+    }),
+  })
+  clearReservationsCache()
+
+  return {
+    penalty: mapPenalty(data?.penalty || {}),
+    reactivation: mapPenaltyReactivationHistory(data?.reactivation || {}),
+    regularization: mapPenaltyRegularization(data?.regularization || {}),
+    privileges_restored: Boolean(data?.privileges_restored),
+    active_block_removed: Boolean(data?.active_block_removed),
+    user_status: data?.user_status || 'active',
+  }
 }
 
 export function subscribeReservationsRealtime(onMessage) {
