@@ -57,6 +57,7 @@ const NAV_SEARCH_META = {
   materiales: { group: 'Gestion operativa', aliases: ['materiales', 'reactivos', 'stock'] },
   calendar: { group: 'Estudiantes', aliases: ['calendario', 'disponibilidad', 'horarios'] },
   tutorials_public: { group: 'Estudiantes', aliases: ['tutorias', 'inscripcion'] },
+  tutorials_history: { group: 'Estudiantes', aliases: ['historial tutorias', 'tutorias atendidas', 'sesiones atendidas'] },
   history: { group: 'Estudiantes', aliases: ['historial', 'pasadas', 'actividad'] },
   reserve_reactivos: { group: 'Estudiantes', aliases: ['reactivos', 'reservar', 'materiales'] },
   reserve: { group: 'Estudiantes', aliases: ['reservar', 'laboratorio', 'nueva reserva'] },
@@ -121,6 +122,10 @@ const NAV_SUBSECTIONS_META = {
     { id: 'mis-tutorias', label: 'Mis tutorias', aliases: ['inscripciones', 'sesiones inscritas'] },
     { id: 'cartelera-publica', label: 'Cartelera publica', aliases: ['tutorias disponibles', 'sesiones', 'inscripcion'] },
   ],
+  tutorials_history: [
+    { id: 'sesiones-finalizadas', label: 'Sesiones finalizadas', aliases: ['historial de sesiones'] },
+    { id: 'horas-acumuladas', label: 'Horas acumuladas', aliases: ['resumen academico'] },
+  ],
   history: [
     { id: 'historial-reservas', label: 'Historial de reservas', aliases: ['reservas pasadas'] },
     { id: 'historial-tutorias', label: 'Historial de tutorias', aliases: ['tutorias finalizadas'] },
@@ -170,15 +175,16 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
     reserve: 1,
     calendar: 2,
     tutorials_public: 3,
-    history: 4,
+    tutorials_history: 4,
+    history: 5,
     tutorials_manage: 3,
-    equipos: 4,
-    materiales: 5,
-    laboratorios: 6,
-    areas: 7,
-    penalties: 8,
-    profiles: 9,
-    roles: 10,
+    equipos: 6,
+    materiales: 7,
+    laboratorios: 8,
+    areas: 9,
+    penalties: 10,
+    profiles: 11,
+    roles: 12,
   }
 
   const visibleLinks = NAVIGATION_LINKS.filter((link) => {

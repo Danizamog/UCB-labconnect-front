@@ -27,6 +27,7 @@ import UserAvailabilityCalendarPage from '../../reservations/pages/UserAvailabil
 import UserReserveLabPage from '../../reservations/pages/UserReserveLabPage'
 import StudentTutorialSessionsPage from '../../tutorials/pages/StudentTutorialSessionsPage'
 import TutorTutorialSessionsPage from '../../tutorials/pages/TutorTutorialSessionsPage'
+import UserTutorialAttendanceHistoryPage from '../../tutorials/pages/UserTutorialAttendanceHistoryPage'
 import Navbar from '../../../shared/components/navbar/navbar'
 import NotificationBell from '../../../shared/components/NotificationBell'
 import ucbEscudoLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
@@ -209,6 +210,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
       (activeSection === 'materiales' && canManageMateriales) ||
       (activeSection === 'calendar' && !isAdmin) ||
       (activeSection === 'tutorials_public' && !isAdmin) ||
+      (activeSection === 'tutorials_history' && !isAdmin) ||
       (activeSection === 'history' && !isAdmin) ||
       (activeSection === 'reserve' && !isAdmin)
 
@@ -376,6 +378,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
           {canManageMateriales && activeSection === 'materiales' ? <AdminMaterialesPage user={user} /> : null}
           {!isAdmin && activeSection === 'calendar' ? <UserAvailabilityCalendarPage user={user} /> : null}
           {!isAdmin && activeSection === 'tutorials_public' ? <StudentTutorialSessionsPage user={user} /> : null}
+          {!isAdmin && activeSection === 'tutorials_history' ? <UserTutorialAttendanceHistoryPage user={user} /> : null}
           {!isAdmin && activeSection === 'history' ? <UserHistoryPage user={user} /> : null}
           {!isAdmin && activeSection === 'reserve' ? (
             <UserReserveLabPage
