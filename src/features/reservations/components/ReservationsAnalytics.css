@@ -1,0 +1,127 @@
+.reservations-analytics {
+  display: block;
+  padding: 14px;
+}
+
+.reservations-analytics header h4 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  color: var(--ink-900);
+}
+
+.reservations-analytics .muted {
+  margin: 0;
+  color: var(--ink-700);
+  font-size: 0.86rem;
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.analytics-card {
+  background: var(--surface-100);
+  border: 1px solid var(--line-300);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.analytics-card.small {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.analytics-card h5 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  color: var(--ink-900);
+}
+
+.chart-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.chart-controls select {
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line-300);
+  background: var(--surface-100);
+}
+
+.occupancy-value {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  color: var(--ucb-blue);
+}
+
+.occupancy-meta {
+  color: var(--ink-700);
+  font-size: 0.9rem;
+}
+
+.reservations-analytics.error {
+  color: #b91c1c;
+}
+
+.analytics-card.heatmap-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.simple-heatmap {
+  padding: 8px;
+  background: transparent;
+  border-radius: 8px;
+}
+
+.simple-heatmap > div { }
+
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.heatmap-gradient {
+  width: 160px;
+  height: 10px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(18,85,160,0.08), rgba(18,85,160,1));
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+.heatmap-scale {
+  color: var(--ink-700);
+  font-size: 0.85rem;
+}
+
+.heatmap-toggle {
+  background: transparent;
+  border: 1px solid var(--line-300);
+  color: var(--ink-700);
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.analytics-card.heatmap-card {
+  max-height: 360px;
+  overflow: hidden;
+}
+
+.simple-heatmap {
+  max-height: 260px;
+  overflow: auto;
+  padding-right: 6px;
+}
