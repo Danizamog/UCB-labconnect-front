@@ -23,6 +23,7 @@ import {
   updateReservationStatus,
 } from '../services/reservationsService'
 import ReservationEditModal from './ReservationEditModal'
+import ReservationsAnalytics from '../components/ReservationsAnalytics'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import { formatDate, formatDateTime } from '../../../shared/utils/formatters'
 import './ReservationsPages.css'
@@ -86,6 +87,12 @@ const ADMIN_RESERVATION_SECTIONS = [
     label: 'Solicitudes',
     helper: 'Busca, filtra y edita reservas sin distracciones.',
     tone: 'requests',
+  },
+  {
+    id: 'estadisticas',
+    label: 'Estadísticas',
+    helper: 'Visualiza horas frecuentes y picos de demanda',
+    tone: 'overview',
   },
 ]
 
@@ -839,6 +846,16 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
               ))}
             </div>
           ) : null}
+        </section>
+      ) : null}
+
+      {activeWorkspace === 'estadisticas' ? (
+        <section className="reservations-panel reservations-panel-secondary">
+          <div className="reservations-panel-header">
+            <h3>Estadísticas</h3>
+            <p className="reservations-panel-subtitle">Visualiza horas frecuentes y picos de demanda.</p>
+          </div>
+          <ReservationsAnalytics />
         </section>
       ) : null}
 
