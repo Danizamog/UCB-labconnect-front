@@ -573,6 +573,7 @@ export function subscribeReservationsRealtime(onMessage) {
   let ws = null
   let reconnectTimer = null
   const RECONNECT_DELAY_MS = 3000
+  const INITIAL_CONNECT_DELAY_MS = import.meta.env.DEV ? 40 : 0
 
   function getWsUrl() {
     const configured = (import.meta.env.VITE_RESERVATION_WS_URL || '').replace(/\/$/, '')
@@ -597,19 +598,14 @@ export function subscribeReservationsRealtime(onMessage) {
       }
     }
 
-    console.log('[RealtimeWS] Connecting to', url)
-
     try {
       ws = new WebSocket(url)
-    } catch (err) {
-      console.error('[RealtimeWS] Failed to create WebSocket:', err)
+    } catch {
       scheduleReconnect()
       return
     }
 
-    ws.onopen = () => {
-      console.log('[RealtimeWS] Connected')
-    }
+    ws.onopen = () => {}
 
     ws.onmessage = (event) => {
       if (!isActive) return
@@ -623,13 +619,11 @@ export function subscribeReservationsRealtime(onMessage) {
     }
 
     ws.onclose = () => {
-      console.log('[RealtimeWS] Disconnected')
       ws = null
       scheduleReconnect()
     }
 
-    ws.onerror = (err) => {
-      console.error('[RealtimeWS] Error:', err)
+    ws.onerror = () => {
       ws?.close()
     }
   }
@@ -639,10 +633,9 @@ export function subscribeReservationsRealtime(onMessage) {
     reconnectTimer = setTimeout(connect, RECONNECT_DELAY_MS)
   }
 
-  connect()
+  reconnectTimer = setTimeout(connect, INITIAL_CONNECT_DELAY_MS)
 
   return () => {
-    console.log('[RealtimeWS] Unsubscribing')
     isActive = false
     clearTimeout(reconnectTimer)
     if (ws) {
