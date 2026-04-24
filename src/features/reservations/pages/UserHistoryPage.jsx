@@ -52,11 +52,33 @@ function mapTutorialAudience(session, currentUserId) {
   return session?.tutor_id === currentUserId ? 'Tutoria brindada' : 'Tutoria inscrita'
 }
 
+function normalizeKeyword(value) {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+function formatTutorialExactDate(session) {
+  if (session?.start_at) {
+    return formatDateTime(session.start_at)
+  }
+
+  if (session?.session_date) {
+    return session.session_date
+  }
+
+  return 'Fecha no disponible'
+}
+
 function UserHistoryPage({ user }) {
   const [reservations, setReservations] = useState([])
   const [tutorials, setTutorials] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [activeFilter, setActiveFilter] = useState('all')
+  const [keyword, setKeyword] = useState('')
 
   const loadHistory = useCallback(async (options = {}) => {
     setIsLoading(true)
@@ -168,6 +190,56 @@ function UserHistoryPage({ user }) {
       }))
   }, [tutorials, user?.user_id])
 
+  const normalizedKeyword = useMemo(() => normalizeKeyword(keyword), [keyword])
+
+  const filteredReservationHistory = useMemo(() => {
+    if (!normalizedKeyword) {
+      return reservationHistory
+    }
+
+    return reservationHistory.filter((reservation) => {
+      const searchableText = [
+        reservation?.laboratory_name,
+        reservation?.laboratory_id,
+        reservation?.purpose,
+        reservation?.status,
+        reservation?.start_at,
+        reservation?.start_time,
+        reservation?.end_time,
+      ]
+        .map((value) => normalizeKeyword(value))
+        .join(' ')
+
+      return searchableText.includes(normalizedKeyword)
+    })
+  }, [normalizedKeyword, reservationHistory])
+
+  const filteredTutorialHistory = useMemo(() => {
+    if (!normalizedKeyword) {
+      return tutorialHistory
+    }
+
+    return tutorialHistory.filter((session) => {
+      const searchableText = [
+        session?.topic,
+        session?.description,
+        session?.tutor_name,
+        session?.location,
+        session?.laboratory_id,
+        session?.session_date,
+        session?.start_at,
+        session?.end_at,
+      ]
+        .map((value) => normalizeKeyword(value))
+        .join(' ')
+
+      return searchableText.includes(normalizedKeyword)
+    })
+  }, [normalizedKeyword, tutorialHistory])
+
+  const shouldShowReservations = activeFilter === 'all' || activeFilter === 'reservations'
+  const shouldShowTutorials = activeFilter === 'all' || activeFilter === 'tutorials'
+
   return (
     <section className="history-page" aria-label="Historial de actividad">
       <header className="history-header">
@@ -186,27 +258,70 @@ function UserHistoryPage({ user }) {
       <div className="history-summary">
         <article>
           <span>Reservas en historial</span>
-          <strong>{reservationHistory.length}</strong>
+          <strong>{filteredReservationHistory.length}</strong>
         </article>
         <article>
           <span>Tutorias finalizadas</span>
-          <strong>{tutorialHistory.length}</strong>
+          <strong>{filteredTutorialHistory.length}</strong>
         </article>
       </div>
 
+      <div className="history-controls" aria-label="Filtros del historial">
+        <div className="history-tabs" role="tablist" aria-label="Filtrar historial por tipo">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeFilter === 'all'}
+            className={`history-tab ${activeFilter === 'all' ? 'is-active' : ''}`}
+            onClick={() => setActiveFilter('all')}
+          >
+            Todo
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeFilter === 'reservations'}
+            className={`history-tab ${activeFilter === 'reservations' ? 'is-active' : ''}`}
+            onClick={() => setActiveFilter('reservations')}
+          >
+            Reservas
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeFilter === 'tutorials'}
+            className={`history-tab ${activeFilter === 'tutorials' ? 'is-active' : ''}`}
+            onClick={() => setActiveFilter('tutorials')}
+          >
+            Tutorias
+          </button>
+        </div>
+
+        <label className="history-keyword">
+          <span>Buscar por palabra clave</span>
+          <input
+            type="search"
+            placeholder="Tutor, tema, materia, fecha, laboratorio..."
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+          />
+        </label>
+      </div>
+
+      {shouldShowReservations ? (
       <section className="history-panel" aria-label="Historial de reservas">
         <div className="history-panel-head">
           <h3>Reservas</h3>
           <p>Incluye reservas pasadas, canceladas o rechazadas.</p>
         </div>
 
-        {isLoading && reservationHistory.length === 0 ? (
+        {isLoading && filteredReservationHistory.length === 0 ? (
           <p className="history-empty">Cargando historial de reservas...</p>
-        ) : reservationHistory.length === 0 ? (
+        ) : filteredReservationHistory.length === 0 ? (
           <p className="history-empty">Aun no tienes reservas en historial.</p>
         ) : (
           <div className="history-list">
-            {reservationHistory.map((reservation) => (
+            {filteredReservationHistory.map((reservation) => (
               <article key={reservation.id} className="history-card">
                 <div className="history-card-top">
                   <span className="history-chip">Reserva</span>
@@ -226,20 +341,22 @@ function UserHistoryPage({ user }) {
           </div>
         )}
       </section>
+      ) : null}
 
+      {shouldShowTutorials ? (
       <section className="history-panel" aria-label="Historial de tutorias">
         <div className="history-panel-head">
           <h3>Tutorias</h3>
           <p>Sesiones inscritas o impartidas que ya finalizaron.</p>
         </div>
 
-        {isLoading && tutorialHistory.length === 0 ? (
+        {isLoading && filteredTutorialHistory.length === 0 ? (
           <p className="history-empty">Cargando historial de tutorias...</p>
-        ) : tutorialHistory.length === 0 ? (
+        ) : filteredTutorialHistory.length === 0 ? (
           <p className="history-empty">Aun no tienes tutorias finalizadas en historial.</p>
         ) : (
           <div className="history-list">
-            {tutorialHistory.map((session) => (
+            {filteredTutorialHistory.map((session) => (
               <article key={session.id} className="history-card">
                 <div className="history-card-top">
                   <span className="history-chip">{session.audience}</span>
@@ -248,7 +365,9 @@ function UserHistoryPage({ user }) {
                 <h4>{session.topic || 'Tutoria'}</h4>
                 <p>{session.description || 'Sesion academica finalizada.'}</p>
                 <div className="history-meta">
-                  <span>{formatDateTime(session.start_at)}</span>
+                  <span><strong>Tutor:</strong> {session.tutor_name || 'No disponible'}</span>
+                  <span><strong>Tema/Materia:</strong> {session.topic || 'No definido'}</span>
+                  <span><strong>Fecha exacta:</strong> {formatTutorialExactDate(session)}</span>
                   <span>{session.location || session.laboratory_id || 'Sin ubicacion'}</span>
                 </div>
               </article>
@@ -256,6 +375,7 @@ function UserHistoryPage({ user }) {
           </div>
         )}
       </section>
+      ) : null}
     </section>
   )
 }
