@@ -12,40 +12,36 @@ import { formatDateTime, formatStatus } from '../../../shared/utils/formatters'
 import './UserHistoryPage.css'
 
 const RESERVATION_HISTORY_STATUSES = new Set(['rejected', 'cancelled', 'completed', 'absent'])
+const FILTER_TYPES = {
+  ALL: 'all',
+  RESERVATIONS: 'reservations',
+  TUTORIALS: 'tutorials',
+}
 
 function parseDateTimeValue(value) {
   const parsed = new Date(String(value || '').replace(' ', 'T'))
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
-function parseReservationStart(reservation) {
-  if (reservation?.start_at) {
-    const parsed = parseDateTimeValue(reservation.start_at)
-    if (parsed) {
-      return parsed
-    }
+function parseDateTime(obj, dateField, timeField, datetimeField) {
+  if (obj?.[datetimeField]) {
+    const parsed = parseDateTimeValue(obj[datetimeField])
+    if (parsed) return parsed
   }
 
-  if (reservation?.date && reservation?.start_time) {
-    return parseDateTimeValue(`${reservation.date}T${reservation.start_time}:00`)
+  if (obj?.[dateField] && obj?.[timeField]) {
+    return parseDateTimeValue(`${obj[dateField]}T${obj[timeField]}:00`)
   }
 
   return null
 }
 
+function parseReservationStart(reservation) {
+  return parseDateTime(reservation, 'date', 'start_time', 'start_at')
+}
+
 function parseTutorialEnd(session) {
-  if (session?.end_at) {
-    const parsed = parseDateTimeValue(session.end_at)
-    if (parsed) {
-      return parsed
-    }
-  }
-
-  if (session?.session_date && session?.end_time) {
-    return parseDateTimeValue(`${session.session_date}T${session.end_time}:00`)
-  }
-
-  return null
+  return parseDateTime(session, 'session_date', 'end_time', 'end_at')
 }
 
 function mapTutorialAudience(session, currentUserId) {
@@ -58,6 +54,23 @@ function normalizeKeyword(value) {
     .trim()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+}
+
+function buildSearchableText(fields) {
+  return fields
+    .map((value) => normalizeKeyword(value))
+    .join(' ')
+}
+
+function filterByKeyword(items, normalizedKeyword, fieldsExtractor) {
+  if (!normalizedKeyword) {
+    return items
+  }
+
+  return items.filter((item) => {
+    const searchableText = buildSearchableText(fieldsExtractor(item))
+    return searchableText.includes(normalizedKeyword)
+  })
 }
 
 function formatTutorialExactDate(session) {
@@ -77,7 +90,7 @@ function UserHistoryPage({ user }) {
   const [tutorials, setTutorials] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const [activeFilter, setActiveFilter] = useState('all')
+  const [activeFilter, setActiveFilter] = useState(FILTER_TYPES.ALL)
   const [keyword, setKeyword] = useState('')
 
   const loadHistory = useCallback(async (options = {}) => {
@@ -105,14 +118,14 @@ function UserHistoryPage({ user }) {
         mergedTutorials.push(...taughtResult.value)
       }
 
-      const uniqueTutorials = Array.from(
-        mergedTutorials.reduce((acc, item) => {
-          if (item?.id) {
-            acc.set(item.id, item)
-          }
-          return acc
-        }, new Map()),
-      ).map(([, value]) => value)
+      const seenIds = new Set()
+      const uniqueTutorials = mergedTutorials.filter((item) => {
+        if (!item?.id || seenIds.has(item.id)) {
+          return false
+        }
+        seenIds.add(item.id)
+        return true
+      })
 
       setTutorials(uniqueTutorials)
 
@@ -193,52 +206,32 @@ function UserHistoryPage({ user }) {
   const normalizedKeyword = useMemo(() => normalizeKeyword(keyword), [keyword])
 
   const filteredReservationHistory = useMemo(() => {
-    if (!normalizedKeyword) {
-      return reservationHistory
-    }
-
-    return reservationHistory.filter((reservation) => {
-      const searchableText = [
-        reservation?.laboratory_name,
-        reservation?.laboratory_id,
-        reservation?.purpose,
-        reservation?.status,
-        reservation?.start_at,
-        reservation?.start_time,
-        reservation?.end_time,
-      ]
-        .map((value) => normalizeKeyword(value))
-        .join(' ')
-
-      return searchableText.includes(normalizedKeyword)
-    })
+    return filterByKeyword(reservationHistory, normalizedKeyword, (reservation) => [
+      reservation?.laboratory_name,
+      reservation?.laboratory_id,
+      reservation?.purpose,
+      reservation?.status,
+      reservation?.start_at,
+      reservation?.start_time,
+      reservation?.end_time,
+    ])
   }, [normalizedKeyword, reservationHistory])
 
   const filteredTutorialHistory = useMemo(() => {
-    if (!normalizedKeyword) {
-      return tutorialHistory
-    }
-
-    return tutorialHistory.filter((session) => {
-      const searchableText = [
-        session?.topic,
-        session?.description,
-        session?.tutor_name,
-        session?.location,
-        session?.laboratory_id,
-        session?.session_date,
-        session?.start_at,
-        session?.end_at,
-      ]
-        .map((value) => normalizeKeyword(value))
-        .join(' ')
-
-      return searchableText.includes(normalizedKeyword)
-    })
+    return filterByKeyword(tutorialHistory, normalizedKeyword, (session) => [
+      session?.topic,
+      session?.description,
+      session?.tutor_name,
+      session?.location,
+      session?.laboratory_id,
+      session?.session_date,
+      session?.start_at,
+      session?.end_at,
+    ])
   }, [normalizedKeyword, tutorialHistory])
 
-  const shouldShowReservations = activeFilter === 'all' || activeFilter === 'reservations'
-  const shouldShowTutorials = activeFilter === 'all' || activeFilter === 'tutorials'
+  const shouldShowReservations = activeFilter === FILTER_TYPES.ALL || activeFilter === FILTER_TYPES.RESERVATIONS
+  const shouldShowTutorials = activeFilter === FILTER_TYPES.ALL || activeFilter === FILTER_TYPES.TUTORIALS
 
   return (
     <section className="history-page" aria-label="Historial de actividad">
@@ -271,27 +264,27 @@ function UserHistoryPage({ user }) {
           <button
             type="button"
             role="tab"
-            aria-selected={activeFilter === 'all'}
-            className={`history-tab ${activeFilter === 'all' ? 'is-active' : ''}`}
-            onClick={() => setActiveFilter('all')}
+            aria-selected={activeFilter === FILTER_TYPES.ALL}
+            className={`history-tab ${activeFilter === FILTER_TYPES.ALL ? 'is-active' : ''}`}
+            onClick={() => setActiveFilter(FILTER_TYPES.ALL)}
           >
             Todo
           </button>
           <button
             type="button"
             role="tab"
-            aria-selected={activeFilter === 'reservations'}
-            className={`history-tab ${activeFilter === 'reservations' ? 'is-active' : ''}`}
-            onClick={() => setActiveFilter('reservations')}
+            aria-selected={activeFilter === FILTER_TYPES.RESERVATIONS}
+            className={`history-tab ${activeFilter === FILTER_TYPES.RESERVATIONS ? 'is-active' : ''}`}
+            onClick={() => setActiveFilter(FILTER_TYPES.RESERVATIONS)}
           >
             Reservas
           </button>
           <button
             type="button"
             role="tab"
-            aria-selected={activeFilter === 'tutorials'}
-            className={`history-tab ${activeFilter === 'tutorials' ? 'is-active' : ''}`}
-            onClick={() => setActiveFilter('tutorials')}
+            aria-selected={activeFilter === FILTER_TYPES.TUTORIALS}
+            className={`history-tab ${activeFilter === FILTER_TYPES.TUTORIALS ? 'is-active' : ''}`}
+            onClick={() => setActiveFilter(FILTER_TYPES.TUTORIALS)}
           >
             Tutorias
           </button>
