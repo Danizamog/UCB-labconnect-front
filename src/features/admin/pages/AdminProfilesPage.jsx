@@ -201,7 +201,6 @@ function AdminProfilesPage({ user }) {
   }, [penalties, profiles, responsibilityFlags])
 
   const selectedPenalty = editingUser ? activePenaltyByUserId[editingUser.id] || null : null
-  const selectedFlag = editingUser ? flagsByEmail[normalizeEmail(editingUser.username)] || null : null
   const selectedProfileState = editingUser ? getProfileState(editingUser, selectedPenalty) : null
 
   const loadReactivationContext = async (userId, { silent = false } = {}) => {
@@ -371,9 +370,9 @@ function AdminProfilesPage({ user }) {
       <header className="profiles-header">
         <div className="profiles-header-copy">
           <p className="profiles-kicker">Gestion de usuarios</p>
-          <h2>Perfiles, bloqueos y reactivaciones</h2>
+          <h2>Cuentas de usuarios</h2>
           <p>
-            Revisa el estado operativo de cada usuario, valida su regularizacion y reactiva la cuenta con trazabilidad completa.
+            Revisa datos, bloqueos y reactivaciones con una vista clara del estado de cada persona.
           </p>
         </div>
 

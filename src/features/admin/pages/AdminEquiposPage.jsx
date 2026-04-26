@@ -1041,8 +1041,8 @@ function AdminEquiposPage({ user }) {
       <header className="infra-header">
         <div>
           <p className="infra-kicker">Inventario</p>
-          <h2>Equipos</h2>
-          <p>Gestiona el inventario, registra prestamos, procesa devoluciones y sigue el historial tecnico de cada equipo.</p>
+          <h2>Equipos y prestamos</h2>
+          <p>Controla disponibilidad, prestamos, devoluciones e incidentes desde un tablero operativo.</p>
         </div>
         <div className="infra-summary">
           <div><span>Total</span><strong>{assets.length}</strong></div>
@@ -1062,8 +1062,8 @@ function AdminEquiposPage({ user }) {
           <section className="infra-command-panel infra-card-full">
             <div className="infra-command-copy">
               <p className="infra-kicker">Centro de operaciones</p>
-              <h3>Que necesitas hacer ahora?</h3>
-              <p>Usa acciones guiadas para crear equipos, registrar incidentes o prestar recursos sin mostrar todos los formularios al mismo tiempo.</p>
+              <h3>Elige una tarea</h3>
+              <p>Abre solo el flujo que necesitas: crear equipo, registrar incidente o prestar recursos.</p>
             </div>
             <div className="infra-action-grid">
               {canManage ? (

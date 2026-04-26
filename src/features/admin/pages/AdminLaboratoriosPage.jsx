@@ -139,8 +139,8 @@ function AdminLaboratoriosPage({ user }) {
       <header className="infra-header">
         <div>
           <p className="infra-kicker">Estructura academica</p>
-          <h2>Laboratorios</h2>
-          <p>Asocia cada laboratorio a un area y define su capacidad y ubicacion.</p>
+          <h2>Espacios de laboratorio</h2>
+          <p>Define capacidad, ubicacion y area para que cada reserva use datos confiables.</p>
         </div>
         <div className="infra-summary">
           <div><span>Total</span><strong>{labs.length}</strong></div>

@@ -6,6 +6,7 @@ const gatewayBase = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localh
 const reservationsBase = gatewayBase.endsWith('/v1') ? gatewayBase : `${gatewayBase}/v1`
 const requestCache = new Map()
 const inFlightRequests = new Map()
+const AVAILABILITY_CACHE_TTL_MS = 15 * 1000
 
 
 
@@ -538,13 +539,27 @@ export async function getOccupancyDashboard(laboratoryId = '') {
   return request(`${reservationsBase}/reservations/occupancy${query}`, { cacheTtlMs: 1500 })
 }
 
-export async function getLabAvailability(laboratoryId, day) {
+export async function getLabAvailability(laboratoryId, day, options = {}) {
   if (!laboratoryId || !day) {
     return { slots: [], slot_minutes: 60 }
   }
 
   const search = new URLSearchParams({ day })
-  return request(`${reservationsBase}/availability/labs/${laboratoryId}?${search.toString()}`, { cacheTtlMs: 1500 })
+  return request(`${reservationsBase}/availability/labs/${laboratoryId}?${search.toString()}`, {
+    cacheTtlMs: options.cacheTtlMs ?? AVAILABILITY_CACHE_TTL_MS,
+    skipCache: Boolean(options.skipCache),
+  })
+}
+
+export async function prefetchLabAvailability(laboratoryId, days = []) {
+  if (!laboratoryId || !Array.isArray(days) || days.length === 0) {
+    return []
+  }
+
+  const uniqueDays = [...new Set(days.filter(Boolean))]
+  return Promise.allSettled(
+    uniqueDays.map((day) => getLabAvailability(laboratoryId, day)),
+  )
 }
 
 export async function listReservationNotifications(options = {}) {
@@ -662,6 +677,7 @@ export function subscribeReservationsRealtime(onMessage) {
   let isActive = true
   let ws = null
   let reconnectTimer = null
+  let hasLoggedConnectionError = false
   const RECONNECT_DELAY_MS = 3000
 
   function getWsUrl() {
@@ -687,18 +703,26 @@ export function subscribeReservationsRealtime(onMessage) {
       }
     }
 
-    console.log('[RealtimeWS] Connecting to', url)
+    if (import.meta.env.DEV && !hasLoggedConnectionError) {
+      console.debug('[RealtimeWS] Connecting')
+    }
 
     try {
       ws = new WebSocket(url)
-    } catch (err) {
-      console.error('[RealtimeWS] Failed to create WebSocket:', err)
+    } catch {
+      if (!hasLoggedConnectionError) {
+        console.warn('[RealtimeWS] No se pudo crear la conexion en tiempo real. Se reintentara cuando el backend este disponible.')
+        hasLoggedConnectionError = true
+      }
       scheduleReconnect()
       return
     }
 
     ws.onopen = () => {
-      console.log('[RealtimeWS] Connected')
+      hasLoggedConnectionError = false
+      if (import.meta.env.DEV) {
+        console.debug('[RealtimeWS] Connected')
+      }
     }
 
     ws.onmessage = (event) => {
@@ -713,13 +737,15 @@ export function subscribeReservationsRealtime(onMessage) {
     }
 
     ws.onclose = () => {
-      console.log('[RealtimeWS] Disconnected')
       ws = null
       scheduleReconnect()
     }
 
-    ws.onerror = (err) => {
-      console.error('[RealtimeWS] Error:', err)
+    ws.onerror = () => {
+      if (!hasLoggedConnectionError) {
+        console.warn('[RealtimeWS] Backend realtime no disponible. Reintentando en segundo plano.')
+        hasLoggedConnectionError = true
+      }
       ws?.close()
     }
   }
@@ -732,7 +758,9 @@ export function subscribeReservationsRealtime(onMessage) {
   connect()
 
   return () => {
-    console.log('[RealtimeWS] Unsubscribing')
+    if (import.meta.env.DEV) {
+      console.debug('[RealtimeWS] Unsubscribing')
+    }
     isActive = false
     clearTimeout(reconnectTimer)
     if (ws) {

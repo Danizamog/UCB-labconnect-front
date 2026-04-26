@@ -641,3 +641,318 @@ button:disabled {
   background: rgba(6, 63, 119, 0.36);
   background-clip: padding-box;
 }
+
+/* Production workspace refresh */
+body {
+  background: #f4f7fb;
+}
+
+.content-window > :is(.infra-page, .profiles-page, .roles-page, .reservations-page, .tutorials-page, .ucb-map-page) {
+  min-height: 100%;
+  background: #f4f7fb;
+  font-family: var(--font-ui);
+}
+
+:is(.infra-header, .profiles-header, .roles-header, .reservations-header, .tutorials-header, .ucb-map-header) {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 22px;
+  margin: 18px 22px 0;
+  padding: clamp(18px, 2.5vw, 28px);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 12px;
+  color: #fff;
+  background:
+    linear-gradient(120deg, rgba(11, 39, 68, 0.96), rgba(13, 91, 116, 0.92)),
+    url('./assets/hero.png') center/cover;
+  box-shadow: 0 18px 38px rgba(13, 34, 61, 0.16);
+}
+
+:is(.infra-header, .profiles-header, .roles-header, .reservations-header, .tutorials-header, .ucb-map-header)::before,
+:is(.infra-header, .profiles-header, .roles-header, .reservations-header, .tutorials-header, .ucb-map-header)::after {
+  display: none;
+}
+
+:is(.infra-kicker, .profiles-kicker, .roles-header-kicker, .reservations-kicker, .tutorials-kicker, .ucb-map-kicker) {
+  margin: 0 0 7px;
+  color: #f4c542;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase;
+}
+
+:is(.infra-header h2, .profiles-header h2, .roles-header h2, .reservations-header h2, .tutorials-header h2, .ucb-map-header h2) {
+  margin: 0;
+  max-width: 760px;
+  color: #fff;
+  font-size: clamp(1.45rem, 2.3vw, 2.15rem);
+  font-weight: 800;
+  line-height: 1.1 !important;
+  letter-spacing: 0 !important;
+}
+
+:is(.infra-header p, .profiles-header p, .roles-header p, .reservations-header p, .tutorials-header p, .ucb-map-header p):not(:is(.infra-kicker, .profiles-kicker, .roles-header-kicker, .reservations-kicker, .tutorials-kicker, .ucb-map-kicker)) {
+  max-width: 760px;
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+:is(.infra-summary, .profiles-summary, .reservations-summary, .tutorials-summary) {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+:is(.infra-summary div, .profiles-summary div, .reservations-summary div, .tutorials-summary div, .reservations-summary-card) {
+  min-width: 104px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.13);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+:is(.infra-summary span, .profiles-summary span, .reservations-summary span, .tutorials-summary span) {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+:is(.infra-summary strong, .profiles-summary strong, .reservations-summary strong, .tutorials-summary strong) {
+  color: #fff;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+:is(.infra-grid, .infra-body, .profiles-grid, .roles-body, .reservations-page, .tutorials-page, .ucb-map-layout) {
+  padding: 20px 22px 28px;
+}
+
+:is(.infra-card, .profiles-card, .roles-form-card, .roles-permissions-panel, .roles-matrix-container, .reservations-panel, .tutorials-panel, .home-modern-section, .home-role-panel, .ucb-map-frame-card, .ucb-map-buildings) {
+  border: 1px solid #dce6f0;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(13, 34, 61, 0.07);
+  backdrop-filter: none;
+}
+
+:is(.infra-card:hover, .profiles-card:hover, .roles-form-card:hover, .reservations-panel:hover, .tutorials-panel:hover) {
+  border-color: #cbd9e7;
+  box-shadow: 0 16px 32px rgba(13, 34, 61, 0.09);
+  transform: none;
+}
+
+:is(.infra-section-head, .profiles-card-head, .profiles-section-head, .roles-section-head, .reservations-panel-header, .tutorials-panel-header) {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #edf2f7;
+}
+
+:is(.infra-section-head h3, .profiles-card-head h3, .profiles-section-head h3, .roles-section-head h3, .reservations-panel-header h3, .tutorials-panel-header h3) {
+  margin: 0;
+  color: #10233d;
+  font-size: 1.08rem;
+  font-weight: 800;
+}
+
+:is(.infra-section-head p, .profiles-card-head p, .profiles-section-head p, .roles-section-head p, .reservations-panel-subtitle, .tutorials-panel-subtitle) {
+  margin: 4px 0 0;
+  color: #5f7898;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+:is(.infra-form-section, .profiles-form-section, .roles-permission-section, .reservations-form-section, .tutorials-form-section) {
+  border: 1px solid #e3ebf4;
+  border-radius: 10px;
+  padding: 14px;
+  background: #f8fbfe;
+}
+
+:is(.infra-form-section-label, .profiles-form-section-label, .roles-permission-section-title) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: #eef6ff;
+  color: #0b4b78;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+:is(.infra-form input, .infra-form select, .infra-form textarea, .profiles-form input, .profiles-form select, .roles-input, .reservations-controls input, .reservations-controls select, .reservations-form input, .reservations-form select, .reservations-form textarea, .reservation-modal-form input, .reservation-modal-form select, .reservation-modal-form textarea, .tutorials-form input, .tutorials-form select, .tutorials-form textarea, .login-form input) {
+  min-height: 44px;
+  border-radius: 8px;
+  border: 1px solid #d8e2ee;
+  background: #fff;
+  box-shadow: none;
+}
+
+:is(.infra-form input:focus, .infra-form select:focus, .infra-form textarea:focus, .profiles-form input:focus, .profiles-form select:focus, .roles-input:focus, .reservations-controls input:focus, .reservations-controls select:focus, .reservations-form input:focus, .reservations-form select:focus, .reservations-form textarea:focus, .reservation-modal-form input:focus, .reservation-modal-form select:focus, .reservation-modal-form textarea:focus, .tutorials-form input:focus, .tutorials-form select:focus, .tutorials-form textarea:focus, .login-form input:focus) {
+  border-color: #0d5b74;
+  box-shadow: 0 0 0 3px rgba(13, 91, 116, 0.12);
+}
+
+:is(.infra-primary, .profiles-primary, .roles-save-button, .reservations-primary, .reservation-modal-primary, .tutorials-primary, .login-button, .home-modern-primary) {
+  min-height: 42px;
+  border-radius: 8px;
+  background: #0b4b78;
+  color: #fff;
+  box-shadow: none;
+}
+
+:is(.infra-secondary, .profiles-secondary, .roles-tab-button, .reservations-secondary, .reservation-modal-secondary, .tutorials-secondary, .home-modern-secondary) {
+  min-height: 42px;
+  border-radius: 8px;
+  border: 1px solid #cfdbe8;
+  background: #fff;
+  color: #17324f;
+  box-shadow: none;
+}
+
+:is(.infra-danger, .profiles-danger, .reservations-danger, .tutorials-danger) {
+  min-height: 42px;
+  border-radius: 8px;
+  background: #fff1f2;
+  color: #9f1239;
+  border: 1px solid #fecdd3;
+  box-shadow: none;
+}
+
+:is(.infra-primary:hover, .profiles-primary:hover, .roles-save-button:hover:not(:disabled), .reservations-primary:hover, .reservation-modal-primary:hover, .tutorials-primary:hover, .login-button:hover, .home-modern-primary:hover) {
+  background: #083b61;
+  box-shadow: 0 10px 20px rgba(8, 59, 97, 0.18);
+  transform: translateY(-1px);
+}
+
+:is(.infra-secondary:hover, .profiles-secondary:hover, .roles-tab-button:hover, .reservations-secondary:hover, .reservation-modal-secondary:hover, .tutorials-secondary:hover, .home-modern-secondary:hover) {
+  border-color: #aac0d7;
+  background: #f8fbfe;
+  box-shadow: none;
+  transform: none;
+}
+
+:is(.reservations-workspace-nav, .roles-tabs, .admin-tabs) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+:is(.reservations-workspace-tab, .roles-tab-button, .tab-btn) {
+  min-height: 74px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  border: 1px solid #dce6f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #17324f;
+  text-align: left;
+}
+
+:is(.reservations-workspace-tab.is-active, .roles-tab-button.active, .tab-btn.active) {
+  border-color: #0b4b78;
+  background: #eef7fb;
+  color: #0b4b78;
+  box-shadow: inset 4px 0 0 #f4c542;
+}
+
+:is(.infra-table-wrap, .profiles-list, .roles-matrix-container, .reservations-table, .tutorials-grid) {
+  border-radius: 10px;
+  border: 1px solid #dce6f0;
+  overflow: auto;
+}
+
+:is(.infra-table, .reservations-table table) th,
+.infra-table th,
+.reservations-table th {
+  background: #f1f6fb;
+  color: #17324f;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+:is(.infra-table, .reservations-table table) td,
+.infra-table td,
+.reservations-table td {
+  background: #fff;
+}
+
+:is(.infra-item, .profiles-item, .roles-role-card, .tutorial-card, .reservation-user-card, .penalty-card, .infra-action-card, .reservations-task-card, .reservations-insight-card, .reservations-step-card, .tutorial-focus-card, .tutorial-detail-card) {
+  border-radius: 10px;
+  border: 1px solid #dce6f0;
+  background: #fff;
+  box-shadow: none;
+}
+
+:is(.infra-empty, .profiles-empty, .reservations-empty, .tutorials-empty) {
+  border: 1px dashed #c7d6e5;
+  border-radius: 10px;
+  background: #f8fbfe;
+  color: #5f7898;
+}
+
+.ux-extra-toggle {
+  border: 1px solid #dce6f0;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.ux-extra-toggle > summary {
+  padding: 13px 14px;
+  color: #17324f;
+}
+
+.ux-extra-toggle > summary::after {
+  content: 'Abrir';
+  color: #0b4b78;
+}
+
+.ux-extra-toggle[open] > summary::after {
+  content: 'Cerrar';
+}
+
+:is(.reservation-modal, .tutorial-detail-modal, .penalty-modal, .confirm-modal, .infra-workflow-modal, .loan-return-modal) {
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 30px 80px rgba(7, 19, 34, 0.34);
+}
+
+:is(.reservation-modal-backdrop, .tutorial-detail-backdrop, .penalty-backdrop, .confirm-modal-backdrop, .infra-workflow-backdrop, .loan-return-backdrop) {
+  background: rgba(7, 19, 34, 0.68);
+  backdrop-filter: blur(8px);
+}
+
+@media (max-width: 900px) {
+  :is(.infra-header, .profiles-header, .roles-header, .reservations-header, .tutorials-header, .ucb-map-header) {
+    grid-template-columns: 1fr;
+    margin: 12px;
+  }
+
+  :is(.infra-summary, .profiles-summary, .reservations-summary, .tutorials-summary) {
+    justify-content: stretch;
+  }
+
+  :is(.infra-grid, .infra-body, .profiles-grid, .roles-body, .reservations-page, .tutorials-page, .ucb-map-layout) {
+    padding: 14px;
+  }
+
+  :is(.infra-section-head, .profiles-card-head, .profiles-section-head, .roles-section-head, .reservations-panel-header, .tutorials-panel-header) {
+    display: grid;
+  }
+}
