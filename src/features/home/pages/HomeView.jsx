@@ -27,6 +27,7 @@ import {
 } from '../../reservations/services/reservationsService'
 import './HomeView.css'
 
+const AdminLabAnalyticsPage = lazy(() => import('../../analytics/pages/AdminLabAnalyticsPage'))
 const AdminAreasPage = lazy(() => import('../../admin/pages/AdminAreasPage'))
 const AdminEquiposPage = lazy(() => import('../../admin/pages/AdminEquiposPage'))
 const AdminLaboratoriosPage = lazy(() => import('../../admin/pages/AdminLaboratoriosPage'))
@@ -101,6 +102,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     const canAccessCurrentSection =
       activeSection === 'home' ||
       (activeSection === 'admin_reservas' && canManageStructure) ||
+      (activeSection === 'analytics' && canManageStructure) ||
       (activeSection === 'tutorials_manage' && canManageTutorials) ||
       (activeSection === 'profiles' && canManageProfiles) ||
       (activeSection === 'roles' && canManageRoles) ||
@@ -309,6 +311,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
           {canManageStructure && activeSection === 'admin_reservas' ? (
             <AdminReservationsPage user={user} currentHash={currentHash} onNavigate={onNavigate} />
           ) : null}
+          {canManageStructure && activeSection === 'analytics' ? <AdminLabAnalyticsPage user={user} /> : null}
           {canManageTutorials && activeSection === 'tutorials_manage' ? <TutorTutorialSessionsPage /> : null}
           {canManageStructure && activeSection === 'areas' ? <AdminAreasPage user={user} /> : null}
           {canManageStructure && activeSection === 'laboratorios' ? <AdminLaboratoriosPage user={user} /> : null}

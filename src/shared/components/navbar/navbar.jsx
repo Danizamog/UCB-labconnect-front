@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   AlertOctagon,
+  BarChart3,
   BookOpenCheck,
   CalendarPlus,
   FlaskConical,
@@ -23,6 +24,7 @@ import './navbar.css'
 const iconMap = {
   home: House,
   admin_reservas: Users,
+  analytics: BarChart3,
   profiles: UserRound,
   roles: Users,
   penalties: AlertOctagon,
@@ -42,6 +44,7 @@ const NAV_GROUP_ORDER = ['Inicio', 'Reservas', 'Inventario', 'Personas']
 const NAV_META = {
   home: { group: 'Inicio', aliases: ['inicio', 'panel', 'principal'], hint: 'Vista general' },
   admin_reservas: { group: 'Reservas', aliases: ['reservas', 'admin', 'laboratorio'], hint: 'Aprobar, entrar y salir' },
+  analytics: { group: 'Reservas', aliases: ['analisis', 'estadisticas', 'ocupacion', 'uso laboratorios'], hint: 'Uso y demanda' },
   tutorials_manage: { group: 'Reservas', aliases: ['tutorias', 'publicar', 'sesiones'], hint: 'Crear sesiones' },
   penalties: { group: 'Personas', aliases: ['penalizaciones', 'sanciones'], hint: 'Bloqueos activos' },
   areas: { group: 'Reservas', aliases: ['areas', 'bloques'], hint: 'Organizacion academica' },
@@ -71,6 +74,7 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
     home: 0,
     reserve: 1,
     admin_reservas: 1,
+    analytics: 2,
     calendar: 2,
     tutorials_public: 3,
     tutorials_manage: 3,
