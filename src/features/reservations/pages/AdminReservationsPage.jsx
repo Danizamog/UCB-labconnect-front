@@ -630,8 +630,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
           <p className="reservations-kicker">Gestion paso a paso</p>
           <h2>Reservas de laboratorio</h2>
           <p>
-            Reorganicé esta pantalla para que veas una sola tarea importante a la vez. Usa las secciones de abajo para ir
-            directo a lo que necesitas.
+            Atiende solicitudes, registra ingresos y revisa la ocupacion desde un flujo ordenado por tareas.
           </p>
         </div>
         <div className="reservations-summary">

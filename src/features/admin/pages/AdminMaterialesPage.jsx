@@ -526,8 +526,8 @@ function AdminMaterialesPage({ user }) {
       <header className="infra-header">
         <div>
           <p className="infra-kicker">Inventario</p>
-          <h2>Materiales</h2>
-          <p>Estos materiales son los que el usuario puede reservar junto con su practica.</p>
+          <h2>Materiales y stock</h2>
+          <p>Gestiona materiales, reactivos y alertas de stock para que las practicas tengan insumos disponibles.</p>
         </div>
         <div className="infra-summary">
           <div><span>Total</span><strong>{materials.length}</strong></div>

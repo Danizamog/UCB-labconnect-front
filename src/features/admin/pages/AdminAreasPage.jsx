@@ -92,8 +92,8 @@ function AdminAreasPage({ user }) {
       <header className="infra-header">
         <div>
           <p className="infra-kicker">Estructura academica</p>
-          <h2>Areas</h2>
-          <p>Crea agrupadores como Quimica, Fisica o Tecnologia para organizar los laboratorios.</p>
+          <h2>Areas academicas</h2>
+          <p>Ordena laboratorios por area para que estudiantes y administradores encuentren espacios con facilidad.</p>
         </div>
         <div className="infra-summary">
           <div><span>Total areas</span><strong>{areas.length}</strong></div>

@@ -199,14 +199,15 @@ function OccupancyBadge({ value }) {
   )
 }
 
-function RankingCard({ title, description, lab, tone = 'neutral', icon: Icon }) {
+function RankingCard({ title, description, lab, tone = 'neutral', icon }) {
+  const HighlightIcon = icon
   const occupancyMeta = getOccupancyMeta(lab?.occupancy_percentage)
 
   return (
     <article className={`analytics-highlight-card tone-${tone}`}>
       <div className="analytics-highlight-head">
         <span className={`analytics-highlight-icon tone-${tone}`}>
-          <Icon size={18} />
+          <HighlightIcon size={18} />
         </span>
         <div>
           <p>{title}</p>

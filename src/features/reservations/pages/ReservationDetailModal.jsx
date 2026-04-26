@@ -9,16 +9,6 @@ function ReservationDetailModal({
   onEdit,
   onCancel,
 }) {
-  const statusLabel = {
-    pending: 'Pendiente',
-    approved: 'Aprobada',
-    rejected: 'Rechazada',
-    cancelled: 'Cancelada',
-    in_progress: 'En curso',
-    completed: 'Completada',
-    absent: 'Ausente',
-  }
-
   if (!reservation && !isLoading) {
     return null
   }
@@ -59,7 +49,11 @@ function ReservationDetailModal({
               <div className="reservation-focus-card">
                 <span>Estado</span>
                 <strong className={`reservation-focus-status ${reservation.status}`}>
-                  {statusLabel[reservation.status] || reservation.status}
+                  {reservation.status === 'pending' ? 'Pendiente' : null}
+                  {reservation.status === 'approved' ? 'Aprobada' : null}
+                  {reservation.status === 'rejected' ? 'Rechazada' : null}
+                  {reservation.status === 'cancelled' ? 'Cancelada' : null}
+                  {!['pending', 'approved', 'rejected', 'cancelled'].includes(reservation.status) ? reservation.status : null}
                 </strong>
               </div>
             </div>

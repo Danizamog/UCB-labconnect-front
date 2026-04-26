@@ -6,6 +6,7 @@ const gatewayBase = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localh
 const reservationsBase = gatewayBase.endsWith('/v1') ? gatewayBase : `${gatewayBase}/v1`
 const requestCache = new Map()
 const inFlightRequests = new Map()
+const AVAILABILITY_CACHE_TTL_MS = 15 * 1000
 
 
 
@@ -318,6 +319,62 @@ function mapPenalty(record) {
   }
 }
 
+function mapPenaltyRegularization(record) {
+  return {
+    is_regularized: Boolean(record?.is_regularized),
+    has_open_damage_flags: Boolean(record?.has_open_damage_flags),
+    active_damage_count: Number(record?.active_damage_count || 0),
+    summary: record?.summary || '',
+    latest_ticket_id: record?.latest_ticket_id || '',
+    latest_ticket_title: record?.latest_ticket_title || '',
+    latest_asset_name: record?.latest_asset_name || '',
+    latest_reported_at: record?.latest_reported_at || '',
+  }
+}
+
+function mapPenaltyReactivationHistory(record) {
+  return {
+    id: record?.id || '',
+    penalty_id: record?.penalty_id || '',
+    user_id: record?.user_id || '',
+    user_name: record?.user_name || '',
+    user_email: record?.user_email || '',
+    actor_user_id: record?.actor_user_id || '',
+    actor_name: record?.actor_name || '',
+    executed_at: record?.executed_at || '',
+    lift_reason: record?.lift_reason || '',
+    resolution_notes: record?.resolution_notes || '',
+    action_source: record?.action_source || 'admin_profile',
+    user_was_inactive: Boolean(record?.user_was_inactive),
+    user_is_active_after: Boolean(record?.user_is_active_after),
+    privileges_restored: Boolean(record?.privileges_restored),
+    active_penalty_count_after: Number(record?.active_penalty_count_after || 0),
+    active_damage_count_at_validation: Number(record?.active_damage_count_at_validation || 0),
+    regularization_confirmed: Boolean(record?.regularization_confirmed),
+    regularization_summary: record?.regularization_summary || '',
+    notification_sent: Boolean(record?.notification_sent),
+    email_sent: Boolean(record?.email_sent),
+    created: record?.created || '',
+    updated: record?.updated || '',
+  }
+}
+
+function mapPenaltyReactivationContext(record) {
+  return {
+    user_id: record?.user_id || '',
+    user_name: record?.user_name || '',
+    user_email: record?.user_email || '',
+    user_is_active: Boolean(record?.user_is_active),
+    block_status: record?.block_status || 'active',
+    active_penalty: record?.active_penalty ? mapPenalty(record.active_penalty) : null,
+    active_penalty_count: Number(record?.active_penalty_count || 0),
+    can_reactivate: Boolean(record?.can_reactivate),
+    privileges_restored_if_confirmed: Boolean(record?.privileges_restored_if_confirmed),
+    regularization: mapPenaltyRegularization(record?.regularization || {}),
+    history: Array.isArray(record?.history) ? record.history.map(mapPenaltyReactivationHistory) : [],
+  }
+}
+
 export async function listAvailableLabs(user = null) {
   const labs = await listAdminLabs()
   return labs.filter((lab) => isLabAccessibleToUser(lab, user))
@@ -365,21 +422,6 @@ export async function listReservationsPage(filters = {}) {
   if (filters.where) search.set('where', String(filters.where).trim())
 
   const data = await request(`${reservationsBase}/reservations/search?${search.toString()}`, { cacheTtlMs: 2000 })
-  return mapReservationPage(data || {})
-}
-
-export async function listMyReservationHistoryPage(filters = {}, options = {}) {
-  const search = new URLSearchParams()
-  search.set('pageNumber', String(Math.max(Number(filters.pageNumber || 0), 0)))
-  search.set('pageSize', String(Math.max(Number(filters.pageSize || 8), 1)))
-  search.set('sortBy', String(filters.sortBy || 'start_at'))
-  search.set('sortType', String(filters.sortType || 'DESC').toUpperCase())
-
-  const skipCache = Boolean(options?.skipCache)
-  const data = await request(`${reservationsBase}/reservations/mine/history/search?${search.toString()}`, {
-    cacheTtlMs: skipCache ? 0 : 1500,
-    skipCache,
-  })
   return mapReservationPage(data || {})
 }
 
@@ -545,13 +587,27 @@ export async function getLaboratoryUsageAnalytics(period = 'daily') {
   }
 }
 
-export async function getLabAvailability(laboratoryId, day) {
+export async function getLabAvailability(laboratoryId, day, options = {}) {
   if (!laboratoryId || !day) {
     return { slots: [], slot_minutes: 60 }
   }
 
   const search = new URLSearchParams({ day })
-  return request(`${reservationsBase}/availability/labs/${laboratoryId}?${search.toString()}`, { cacheTtlMs: 1500 })
+  return request(`${reservationsBase}/availability/labs/${laboratoryId}?${search.toString()}`, {
+    cacheTtlMs: options.cacheTtlMs ?? AVAILABILITY_CACHE_TTL_MS,
+    skipCache: Boolean(options.skipCache),
+  })
+}
+
+export async function prefetchLabAvailability(laboratoryId, days = []) {
+  if (!laboratoryId || !Array.isArray(days) || days.length === 0) {
+    return []
+  }
+
+  const uniqueDays = [...new Set(days.filter(Boolean))]
+  return Promise.allSettled(
+    uniqueDays.map((day) => getLabAvailability(laboratoryId, day)),
+  )
 }
 
 export async function listReservationNotifications(options = {}) {
@@ -631,10 +687,45 @@ export async function liftPenalty(penaltyId, options = {}) {
   return mapPenalty(data?.penalty || {})
 }
 
+export async function getPenaltyReactivationContext(userId) {
+  if (!userId) {
+    throw new Error('No se pudo identificar al usuario para revisar su bloqueo.')
+  }
+
+  const data = await request(`${reservationsBase}/penalties/reactivation-context/${userId}`, { cacheTtlMs: 1000 })
+  return mapPenaltyReactivationContext(data || {})
+}
+
+export async function reactivateUserAccount(penaltyId, payload = {}) {
+  if (!penaltyId) {
+    throw new Error('No se pudo identificar la penalizacion activa del usuario.')
+  }
+
+  const data = await request(`${reservationsBase}/penalties/${penaltyId}/reactivate`, {
+    method: 'POST',
+    body: JSON.stringify({
+      lift_reason: String(payload.lift_reason || '').trim(),
+      resolution_notes: String(payload.resolution_notes || '').trim(),
+      action_source: String(payload.action_source || 'admin_profile').trim() || 'admin_profile',
+    }),
+  })
+  clearReservationsCache()
+
+  return {
+    penalty: mapPenalty(data?.penalty || {}),
+    reactivation: mapPenaltyReactivationHistory(data?.reactivation || {}),
+    regularization: mapPenaltyRegularization(data?.regularization || {}),
+    privileges_restored: Boolean(data?.privileges_restored),
+    active_block_removed: Boolean(data?.active_block_removed),
+    user_status: data?.user_status || 'active',
+  }
+}
+
 export function subscribeReservationsRealtime(onMessage) {
   let isActive = true
   let ws = null
   let reconnectTimer = null
+  let hasLoggedConnectionError = false
   const RECONNECT_DELAY_MS = 3000
 
   function getWsUrl() {
@@ -660,18 +751,26 @@ export function subscribeReservationsRealtime(onMessage) {
       }
     }
 
-    console.log('[RealtimeWS] Connecting to', url)
+    if (import.meta.env.DEV && !hasLoggedConnectionError) {
+      console.debug('[RealtimeWS] Connecting')
+    }
 
     try {
       ws = new WebSocket(url)
-    } catch (err) {
-      console.error('[RealtimeWS] Failed to create WebSocket:', err)
+    } catch {
+      if (!hasLoggedConnectionError) {
+        console.warn('[RealtimeWS] No se pudo crear la conexion en tiempo real. Se reintentara cuando el backend este disponible.')
+        hasLoggedConnectionError = true
+      }
       scheduleReconnect()
       return
     }
 
     ws.onopen = () => {
-      console.log('[RealtimeWS] Connected')
+      hasLoggedConnectionError = false
+      if (import.meta.env.DEV) {
+        console.debug('[RealtimeWS] Connected')
+      }
     }
 
     ws.onmessage = (event) => {
@@ -686,13 +785,15 @@ export function subscribeReservationsRealtime(onMessage) {
     }
 
     ws.onclose = () => {
-      console.log('[RealtimeWS] Disconnected')
       ws = null
       scheduleReconnect()
     }
 
-    ws.onerror = (err) => {
-      console.error('[RealtimeWS] Error:', err)
+    ws.onerror = () => {
+      if (!hasLoggedConnectionError) {
+        console.warn('[RealtimeWS] Backend realtime no disponible. Reintentando en segundo plano.')
+        hasLoggedConnectionError = true
+      }
       ws?.close()
     }
   }
@@ -705,7 +806,9 @@ export function subscribeReservationsRealtime(onMessage) {
   connect()
 
   return () => {
-    console.log('[RealtimeWS] Unsubscribing')
+    if (import.meta.env.DEV) {
+      console.debug('[RealtimeWS] Unsubscribing')
+    }
     isActive = false
     clearTimeout(reconnectTimer)
     if (ws) {

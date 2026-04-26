@@ -514,8 +514,8 @@ function TutorTutorialSessionsPage() {
       <header className="tutorials-header">
         <div>
           <p className="tutorials-kicker">Soporte academico</p>
-          <h2>Publicar horarios de tutorias</h2>
-          <p>Configura bloques con dias, horas y cupos. El sistema evita conflictos con tus propias reservas de laboratorio.</p>
+          <h2>Tutorias docentes</h2>
+          <p>Publica sesiones con fecha, hora y cupos. El sistema ayuda a evitar cruces con reservas de laboratorio.</p>
         </div>
         <div className="tutorials-summary">
           <div><span>Sesiones</span><strong>{sessions.length}</strong></div>
@@ -742,23 +742,13 @@ function TutorTutorialSessionsPage() {
                   {session.enrolled_students.length === 0 ? (
                     <p>Aun no hay estudiantes registrados.</p>
                   ) : (
-                    session.enrolled_students.slice(0, 3).map((student) => (
+                    session.enrolled_students.map((student) => (
                       <span key={`${session.id}-${student.student_id}`}>{student.student_name}</span>
                     ))
                   )}
-                  {session.enrolled_students.length > 3 ? (
-                    <p>y {session.enrolled_students.length - 3} mas...</p>
-                  ) : null}
                 </div>
 
                 <div className="tutorials-actions">
-                  <button
-                    type="button"
-                    className="tutorials-secondary"
-                    onClick={() => handleOpenTutorialDetails(session.id)}
-                  >
-                    Ver inscritos
-                  </button>
                   <button
                     type="button"
                     className="tutorials-secondary"
@@ -784,9 +774,7 @@ function TutorTutorialSessionsPage() {
       {focusedSession || isLoadingFocusedSession ? (
         <TutorialSessionDetailModal
           session={focusedSession}
-          title="Listado de estudiantes inscritos"
-          enrolledSectionTitle="Estudiantes inscritos"
-          allowStudentExports
+          title="Bloque de tutoria"
           onClose={() => {
             if (!isLoadingFocusedSession) {
               setFocusedSession(null)
