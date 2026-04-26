@@ -109,7 +109,11 @@ function AdminMaterialesPage({ user }) {
   )
 
   const lowStockMaterials = useMemo(
-    () => materials.filter((m) => Number(m.quantity_available) <= Number(m.minimum_stock || 0)),
+    () => materials.filter((m) => {
+      const qty = Number(m.quantity_available)
+      const min = Number(m.minimum_stock || 0)
+      return min > 0 && qty < min
+    }),
     [materials],
   )
 
