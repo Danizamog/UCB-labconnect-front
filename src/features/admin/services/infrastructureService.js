@@ -412,3 +412,13 @@ export async function returnLoanRecord(loanId, payload) {
   clearInfrastructureCache()
   return mapLoanRecord(data || {})
 }
+
+export function getUsageReport({ borrowerId = null, practice = null, dateFrom = null, dateTo = null } = {}) {
+  const params = new URLSearchParams();
+  if (borrowerId) params.set('borrower_id', String(borrowerId));
+  if (practice) params.set('practice', String(practice));
+  if (dateFrom) params.set('date_from', String(dateFrom));
+  if (dateTo) params.set('date_to', String(dateTo));
+  const query = params.toString();
+  return request(`${inventoryBase}/reports/usage${query ? `?${query}` : ''}`, { cacheTtlMs: 3000 });
+}

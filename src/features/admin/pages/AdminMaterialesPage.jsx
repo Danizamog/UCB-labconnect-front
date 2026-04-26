@@ -4,11 +4,13 @@ import {
   createMaterialMovement,
   deleteMaterial,
   getStockItemsReport,
+  getUsageReport,
   listAdminLabs,
   listMaterialMovements,
   listMaterials,
   updateMaterial,
 } from '../services/infrastructureService'
+import { listUsersWithRoles } from '../services/rolesService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import { formatDateTime, movementTypeLabel } from '../../../shared/utils/formatters'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
@@ -17,6 +19,7 @@ import './AdminAssetsPage.css'
 const defaultMaterialForm = { name: '', category: '', unit: 'unidad', quantity_available: 0, minimum_stock: 0, laboratory_id: '', description: '' }
 const defaultMovementForm = { stock_item_id: '', movement_type: 'entry', quantity: 1, notes: '' }
 const defaultReportFilters = { laboratory_id: '', status_filter: '', search: '', only_low_or_out: false, include_general: true }
+const defaultUsageReportFilters = { borrower_id: '', practice: '', date_from: '', date_to: '' }
 
 const reportStatusMeta = {
   out_of_stock: { label: 'Sin stock', chipClass: 'danger' },
@@ -35,7 +38,12 @@ function AdminMaterialesPage({ user }) {
   const [reportFilters, setReportFilters] = useState(defaultReportFilters)
   const [reportLoading, setReportLoading] = useState(false)
   const [reportError, setReportError] = useState('')
+  const [usageReport, setUsageReport] = useState(null)
+  const [usageReportFilters, setUsageReportFilters] = useState(defaultUsageReportFilters)
+  const [usageReportLoading, setUsageReportLoading] = useState(false)
+  const [usageReportError, setUsageReportError] = useState('')
   const [materialMovements, setMaterialMovements] = useState([])
+  const [systemUsers, setSystemUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -64,23 +72,47 @@ function AdminMaterialesPage({ user }) {
     }
   }
 
+  const fetchUsageReportData = async (filters = usageReportFilters) => {
+    setUsageReportLoading(true)
+    try {
+      const reportData = await getUsageReport({
+        borrowerId: filters.borrower_id,
+        practice: filters.practice,
+        dateFrom: filters.date_from,
+        dateTo: filters.date_to,
+      })
+      setUsageReport(reportData)
+      setUsageReportError('')
+      return reportData
+    } catch (err) {
+      setUsageReport(null)
+      setUsageReportError(err.message || 'No se pudo cargar el reporte de uso')
+      return null
+    } finally {
+      setUsageReportLoading(false)
+    }
+  }
+
   const loadData = async () => {
     setLoading(true)
     try {
-      const [labsData, materialsData] = await Promise.all([
+      const [labsData, materialsData, usersData] = await Promise.all([
         listAdminLabs(),
         listMaterials(),
+        listUsersWithRoles(),
       ])
       setLabs(labsData)
       setMaterials(materialsData)
+      setSystemUsers(usersData)
       setError('')
     } catch (err) {
-      setError(err.message || 'No se pudieron cargar los materiales')
+      setError(err.message || 'No se pudieron cargar los datos iniciales')
     } finally {
       setLoading(false)
     }
 
     await fetchReportData()
+    await fetchUsageReportData()
 
     try {
       const movementsData = await listMaterialMovements(null, 25)
@@ -208,6 +240,22 @@ function AdminMaterialesPage({ user }) {
     setReportFilters(defaultReportFilters)
     await fetchReportData()
   }
+
+  const handleUsageReportFilterChange = (key, value) => {
+    setUsageReportFilters((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const handleUsageReportSubmit = async (event) => {
+    event.preventDefault()
+    await fetchUsageReportData()
+  }
+
+  const handleUsageReportReset = async () => {
+    setUsageReportFilters(defaultUsageReportFilters)
+    await fetchUsageReportData(defaultUsageReportFilters)
+  }
+
+  const usageReportItems = useMemo(() => (Array.isArray(usageReport?.items) ? usageReport.items : []), [usageReport])
 
   const resetMaterialForm = () => {
     setEditingId(null)
@@ -900,6 +948,107 @@ function AdminMaterialesPage({ user }) {
                         </tr>
                       )
                     })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="infra-card">
+            <div className="infra-section-head">
+              <div>
+                <h3>Reporte de uso de insumos</h3>
+                <p>Analiza el consumo de materiales agrupado por prácticas y usuarios.</p>
+              </div>
+            </div>
+
+            <form className="infra-form" onSubmit={handleUsageReportSubmit}>
+              <div className="infra-form-grid">
+                <label>
+                  <span>Usuario</span>
+                  <select
+                    value={usageReportFilters.borrower_id}
+                    onChange={(e) => handleUsageReportFilterChange('borrower_id', e.target.value)}
+                  >
+                    <option value="">Todos los usuarios</option>
+                    {systemUsers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name || u.email}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Práctica</span>
+                  <input
+                    value={usageReportFilters.practice}
+                    onChange={(e) => handleUsageReportFilterChange('practice', e.target.value)}
+                    placeholder="Ej. Química, Física..."
+                  />
+                </label>
+                <label>
+                  <span>Fecha desde</span>
+                  <input
+                    type="date"
+                    value={usageReportFilters.date_from}
+                    onChange={(e) => handleUsageReportFilterChange('date_from', e.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Fecha hasta</span>
+                  <input
+                    type="date"
+                    value={usageReportFilters.date_to}
+                    onChange={(e) => handleUsageReportFilterChange('date_to', e.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="infra-actions">
+                <button type="submit" className="infra-primary" disabled={usageReportLoading}>
+                  {usageReportLoading ? 'Consultando...' : 'Actualizar reporte'}
+                </button>
+                <button type="button" className="infra-secondary" onClick={handleUsageReportReset} disabled={usageReportLoading}>
+                  Limpiar filtros
+                </button>
+              </div>
+            </form>
+
+            {usageReportError ? <p className="infra-alert infra-error">{usageReportError}</p> : null}
+
+            <div className="infra-summary" style={{ marginTop: '8px', justifyContent: 'flex-start' }}>
+              <div><span>Total registros</span><strong>{usageReport?.total_records || 0}</strong></div>
+              <div>
+                <span>Generado</span>
+                <strong style={{ fontSize: '0.95rem', marginTop: '8px' }}>
+                  {usageReport?.generated_at ? formatDateTime(usageReport.generated_at) : '--'}
+                </strong>
+              </div>
+            </div>
+
+            <div className="infra-table-wrap">
+              <table className="infra-table">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Material</th>
+                    <th>Usuario</th>
+                    <th>Práctica</th>
+                    <th>Cantidad</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {usageReportItems.length === 0 ? (
+                    <tr><td colSpan="5">No hay resultados para los filtros aplicados.</td></tr>
+                  ) : (
+                    usageReportItems.map((item, index) => (
+                      <tr key={index}>
+                        <td>{item.loaned_at ? formatDateTime(item.loaned_at) : '--'}</td>
+                        <td>{item.asset_name}</td>
+                        <td>{item.borrower_name}</td>
+                        <td>{item.practice || '--'}</td>
+                        <td>{item.quantity}</td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
