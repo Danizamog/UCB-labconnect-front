@@ -15,6 +15,7 @@ import {
   subscribeReservationsRealtime,
   updateReservation,
 } from '../services/reservationsService'
+import { listAdminAreas } from '../../admin/services/infrastructureService'
 import ReservationDetailModal from './ReservationDetailModal'
 import ReservationEditModal from './ReservationEditModal'
 import './ReservationsPages.css'
@@ -235,6 +236,11 @@ function isCreatableSlot(slot) {
 function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead }) {
   const [labs, setLabs] = useState([])
   const [labSearch, setLabSearch] = useState('')
+  const [areas, setAreas] = useState([])
+  const [labArea, setLabArea] = useState('')
+  const [labIsActive, setLabIsActive] = useState('')
+  const [labSort, setLabSort] = useState('')
+  const [isLoadingLabs, setIsLoadingLabs] = useState(false)
   const [reservations, setReservations] = useState([])
   const [penalties, setPenalties] = useState([])
   const [slots, setSlots] = useState([])
@@ -274,14 +280,16 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
 
   const loadData = useCallback(async () => {
     try {
-      const [labsData, reservationsData, penaltiesData] = await Promise.all([
+      const [labsData, reservationsData, penaltiesData, areasData] = await Promise.all([
         listAvailableLabs(user),
         listReservations(),
         listMyPenalties(),
+        listAdminAreas(),
       ])
       setLabs(labsData)
       setReservations(reservationsData)
       setPenalties(penaltiesData)
+      setAreas(Array.isArray(areasData) ? areasData : [])
       setForm((prev) => (prev.laboratory_id || labsData.length === 0 ? prev : { ...prev, laboratory_id: labsData[0].id }))
       setError(labsData.length === 0 ? 'No tienes permisos para reservar en los laboratorios disponibles actualmente.' : '')
     } catch (err) {
@@ -362,10 +370,17 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     let mounted = true
     const t = setTimeout(() => {
       ;(async () => {
+        setIsLoadingLabs(true)
         try {
-          const labsData = labSearch
-            ? await listAvailableLabs(user, { name: labSearch, sort: 'name', per_page: 200 })
-            : await listAvailableLabs(user)
+          const useFilters = Boolean(labSearch || labArea || String(labIsActive) !== '' || labSort)
+          const filters = {}
+          if (labSearch) filters.name = labSearch
+          if (labArea) filters.area_id = labArea
+          if (String(labIsActive) !== '') filters.is_active = String(labIsActive)
+          if (labSort) filters.sort = labSort
+          if (useFilters) filters.per_page = 200
+
+          const labsData = useFilters ? await listAvailableLabs(user, filters) : await listAvailableLabs(user)
 
           if (!mounted) return
           setLabs(labsData)
@@ -374,6 +389,8 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
         } catch (err) {
           if (!mounted) return
           setError(err.message || 'No se pudo buscar laboratorios.')
+        } finally {
+          if (mounted) setIsLoadingLabs(false)
         }
       })()
     }, 350)
@@ -382,7 +399,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       mounted = false
       clearTimeout(t)
     }
-  }, [labSearch, user])
+  }, [labSearch, labArea, labIsActive, labSort, user])
 
   const selectedLabIsAccessible = useMemo(
     () => (selectedLab ? isLabAccessibleToUser(selectedLab, user) : false),
@@ -1195,16 +1212,46 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
         <form className="reservations-form" onSubmit={handleSubmit}>
           <div className="reservations-form-section">
             <span className="reservations-form-section-label">1 - Laboratorio</span>
-            <label>
-              <span>Buscar laboratorio</span>
-              <input
-                type="search"
-                placeholder="Buscar por nombre o ubicacion..."
-                value={labSearch}
-                onChange={(e) => setLabSearch(e.target.value)}
-                disabled={Boolean(activePenalty)}
-              />
-            </label>
+            <div className="reservations-controls">
+              <label>
+                <span>Buscar laboratorio</span>
+                <input
+                  type="search"
+                  placeholder={isLoadingLabs ? 'Buscando...' : 'Buscar por nombre o ubicacion...'}
+                  value={labSearch}
+                  onChange={(e) => setLabSearch(e.target.value)}
+                  disabled={Boolean(activePenalty)}
+                />
+              </label>
+
+              <label>
+                <span>Área</span>
+                <select value={labArea} onChange={(e) => setLabArea(e.target.value)} disabled={Boolean(activePenalty)}>
+                  <option value="">Todas las áreas</option>
+                  {areas.map((area) => (
+                    <option key={area.id} value={area.id}>{area.name}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                <span>Estado</span>
+                <select value={labIsActive} onChange={(e) => setLabIsActive(e.target.value)} disabled={Boolean(activePenalty)}>
+                  <option value="">Todos</option>
+                  <option value="true">Activos</option>
+                  <option value="false">Inactivos</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Orden</span>
+                <select value={labSort} onChange={(e) => setLabSort(e.target.value)} disabled={Boolean(activePenalty)}>
+                  <option value="">Por defecto</option>
+                  <option value="name">Nombre asc</option>
+                  <option value="-name">Nombre desc</option>
+                </select>
+              </label>
+            </div>
 
             <label>
               <span>Laboratorio</span>
