@@ -61,7 +61,6 @@ const NAV_META = {
   history: { group: 'Reservas', aliases: ['historial', 'pasadas', 'actividad'], hint: 'Reservas pasadas' },
   reserve: { group: 'Reservas', aliases: ['reservar', 'laboratorio', 'nueva reserva'], hint: 'Crear solicitud' },
 }
-}
 
 function normalizeSearchText(value) {
   return String(value || '')
