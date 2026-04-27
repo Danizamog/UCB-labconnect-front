@@ -1,127 +1,438 @@
-.reservations-analytics {
-  display: block;
-  padding: 14px;
-}
-
-.reservations-analytics header h4 {
-  margin: 0 0 6px;
-  font-size: 1rem;
-  color: var(--ink-900);
-}
-
-.reservations-analytics .muted {
-  margin: 0;
-  color: var(--ink-700);
-  font-size: 0.86rem;
-}
-
-.analytics-grid {
-  display: grid;
-  grid-template-columns: 1fr 260px;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.analytics-card {
-  background: var(--surface-100);
-  border: 1px solid var(--line-300);
+.reservations-analytics-v2 {
+  padding: 1.5rem;
+  background: var(--bg-100);
   border-radius: 12px;
-  padding: 12px;
-}
-
-.analytics-card.small {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+  gap: 1.5rem;
+  font-family: inherit;
 }
 
-.analytics-card h5 {
-  margin: 0 0 8px;
+/* Header & Toolbar */
+.analytics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.analytics-title h4 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--ink-900);
+  font-weight: 800;
+}
+
+.analytics-title .muted {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  color: var(--ink-600);
+}
+
+.analytics-toolbar {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.toolbar-group {
+  display: flex;
+  gap: 0.75rem;
+  background: var(--bg-100);
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+}
+
+.toolbar-group label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.toolbar-group label span {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: var(--ink-500);
+  letter-spacing: 0.06em;
+}
+
+.toolbar-group input,
+.toolbar-group select {
+  background: transparent;
+  border: none;
   font-size: 0.95rem;
   color: var(--ink-900);
-}
-
-.chart-controls {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.chart-controls select {
-  padding: 4px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--line-300);
-  background: var(--surface-100);
-}
-
-.occupancy-value {
-  font-family: var(--font-display);
-  font-size: 2.2rem;
-  color: var(--ucb-blue);
-}
-
-.occupancy-meta {
-  color: var(--ink-700);
-  font-size: 0.9rem;
-}
-
-.reservations-analytics.error {
-  color: #b91c1c;
-}
-
-.analytics-card.heatmap-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.simple-heatmap {
-  padding: 8px;
-  background: transparent;
-  border-radius: 8px;
-}
-
-.simple-heatmap > div { }
-
-.heatmap-legend {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.heatmap-gradient {
-  width: 160px;
-  height: 10px;
-  border-radius: 6px;
-  background: linear-gradient(90deg, rgba(18,85,160,0.08), rgba(18,85,160,1));
-  border: 1px solid rgba(0,0,0,0.06);
-}
-
-.heatmap-scale {
-  color: var(--ink-700);
-  font-size: 0.85rem;
-}
-
-.heatmap-toggle {
-  background: transparent;
-  border: 1px solid var(--line-300);
-  color: var(--ink-700);
-  padding: 4px 8px;
-  border-radius: 8px;
-  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 2px 0;
+  outline: none;
   cursor: pointer;
 }
 
-.analytics-card.heatmap-card {
-  max-height: 360px;
+.analytics-refresh-btn {
+  background: var(--primary-600);
+  color: #fff;
+  border: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.analytics-refresh-btn:hover:not(:disabled) {
+  background: var(--primary-700);
+  transform: rotate(90deg);
+  box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
+}
+
+.analytics-clear-btn {
+  background: #fff;
+  color: #ef4444;
+  border: 1px solid #fee2e2;
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  height: 44px;
+}
+
+.analytics-clear-btn:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.1);
+}
+
+/* Summary Cards */
+.analytics-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+}
+
+.summary-card {
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+  display: flex;
+  flex-direction: column;
+  position: relative;
   overflow: hidden;
 }
 
-.simple-heatmap {
-  max-height: 260px;
-  overflow: auto;
-  padding-right: 6px;
+.summary-card.highlight {
+  background: linear-gradient(135deg, var(--primary-600), var(--primary-800));
+  border: none;
+  color: #fff;
 }
+
+.card-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink-600);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.summary-card.highlight .card-label {
+  color: rgba(255,255,255,0.85);
+}
+
+.card-value {
+  font-size: 2.4rem;
+  font-weight: 900;
+  margin: 0.6rem 0;
+  color: var(--ink-900);
+  line-height: 1;
+}
+
+.summary-card.highlight .card-value {
+  color: #fff;
+}
+
+.card-hint {
+  font-size: 0.85rem;
+  color: var(--ink-500);
+  font-weight: 500;
+}
+
+.summary-card.highlight .card-hint {
+  color: rgba(255,255,255,0.7);
+}
+
+/* Main Grid & Charts */
+.analytics-main-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1200px) {
+  .analytics-main-grid {
+    grid-template-columns: 380px 1fr;
+  }
+  .heatmap-full {
+    grid-column: 2;
+  }
+}
+
+.analytics-chart-container {
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  padding: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-head {
+  margin-bottom: 1.5rem;
+}
+
+.chart-head h5 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--ink-900);
+}
+
+.chart-head p {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  color: var(--ink-600);
+}
+
+/* Heatmap Core Structure */
+.analytics-heatmap-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.heatmap-controls-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-100);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+}
+
+.heatmap-info-badge {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink-700);
+}
+
+.heatmap-view-toggle {
+  background: var(--primary-100);
+  color: var(--primary-700);
+  border: none;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.heatmap-view-toggle:hover {
+  background: var(--primary-200);
+}
+
+.heatmap-scroll-container {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-50);
+}
+
+.heatmap-grid-layout {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 100%;
+}
+
+/* Table Header */
+.heatmap-header-row {
+  display: flex;
+  background: var(--bg-200);
+  border-bottom: 2px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.heatmap-label-spacer {
+  width: 80px;
+  flex-shrink: 0;
+  border-right: 2px solid var(--border-color);
+}
+
+.heatmap-column-labels {
+  display: flex;
+}
+
+.heatmap-column-tag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--ink-800);
+  text-transform: uppercase;
+  border-right: 1px solid var(--border-color);
+  text-align: center;
+}
+
+/* Table Body */
+.heatmap-data-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.heatmap-data-row {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.heatmap-row-tag {
+  width: 80px;
+  flex-shrink: 0;
+  background: var(--bg-100);
+  border-right: 2px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink-700);
+}
+
+.heatmap-cell-group {
+  display: flex;
+}
+
+.heatmap-data-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  border-right: 1px solid var(--border-color);
+  transition: all 0.15s ease;
+  cursor: default;
+}
+
+.heatmap-data-cell.has-data:hover {
+  filter: brightness(1.1);
+  transform: scale(1.05);
+  z-index: 2;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border-radius: 4px;
+}
+
+.heatmap-data-cell.is-empty {
+  color: var(--ink-300);
+  opacity: 0.5;
+}
+
+/* Footer & Legend */
+.heatmap-status-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.5rem 0;
+}
+
+.heatmap-legend-scale {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.scale-text {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink-600);
+}
+
+.scale-gradient {
+  width: 140px;
+  height: 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+}
+
+/* Mode Selector Toggle */
+.chart-head-with-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.heatmap-mode-selector {
+  display: flex;
+  background: var(--bg-200);
+  padding: 0.3rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.heatmap-mode-selector button {
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: transparent;
+  color: var(--ink-600);
+  transition: all 0.25s ease;
+}
+
+.heatmap-mode-selector button.active {
+  background: #fff;
+  color: var(--primary-700);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+/* Loading Spinner */
+.reservations-analytics-loading {
+  height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 5px solid var(--bg-300);
+  border-top-color: var(--primary-600);
+  border-radius: 50%;
+  animation: spin 1s infinite linear;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
