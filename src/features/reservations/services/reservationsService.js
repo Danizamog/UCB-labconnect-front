@@ -6,7 +6,6 @@ const gatewayBase = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localh
 const reservationsBase = gatewayBase.endsWith('/v1') ? gatewayBase : `${gatewayBase}/v1`
 const requestCache = new Map()
 const inFlightRequests = new Map()
-const AVAILABILITY_CACHE_TTL_MS = 15 * 1000
 
 
 
@@ -319,62 +318,6 @@ function mapPenalty(record) {
   }
 }
 
-function mapPenaltyRegularization(record) {
-  return {
-    is_regularized: Boolean(record?.is_regularized),
-    has_open_damage_flags: Boolean(record?.has_open_damage_flags),
-    active_damage_count: Number(record?.active_damage_count || 0),
-    summary: record?.summary || '',
-    latest_ticket_id: record?.latest_ticket_id || '',
-    latest_ticket_title: record?.latest_ticket_title || '',
-    latest_asset_name: record?.latest_asset_name || '',
-    latest_reported_at: record?.latest_reported_at || '',
-  }
-}
-
-function mapPenaltyReactivationHistory(record) {
-  return {
-    id: record?.id || '',
-    penalty_id: record?.penalty_id || '',
-    user_id: record?.user_id || '',
-    user_name: record?.user_name || '',
-    user_email: record?.user_email || '',
-    actor_user_id: record?.actor_user_id || '',
-    actor_name: record?.actor_name || '',
-    executed_at: record?.executed_at || '',
-    lift_reason: record?.lift_reason || '',
-    resolution_notes: record?.resolution_notes || '',
-    action_source: record?.action_source || 'admin_profile',
-    user_was_inactive: Boolean(record?.user_was_inactive),
-    user_is_active_after: Boolean(record?.user_is_active_after),
-    privileges_restored: Boolean(record?.privileges_restored),
-    active_penalty_count_after: Number(record?.active_penalty_count_after || 0),
-    active_damage_count_at_validation: Number(record?.active_damage_count_at_validation || 0),
-    regularization_confirmed: Boolean(record?.regularization_confirmed),
-    regularization_summary: record?.regularization_summary || '',
-    notification_sent: Boolean(record?.notification_sent),
-    email_sent: Boolean(record?.email_sent),
-    created: record?.created || '',
-    updated: record?.updated || '',
-  }
-}
-
-function mapPenaltyReactivationContext(record) {
-  return {
-    user_id: record?.user_id || '',
-    user_name: record?.user_name || '',
-    user_email: record?.user_email || '',
-    user_is_active: Boolean(record?.user_is_active),
-    block_status: record?.block_status || 'active',
-    active_penalty: record?.active_penalty ? mapPenalty(record.active_penalty) : null,
-    active_penalty_count: Number(record?.active_penalty_count || 0),
-    can_reactivate: Boolean(record?.can_reactivate),
-    privileges_restored_if_confirmed: Boolean(record?.privileges_restored_if_confirmed),
-    regularization: mapPenaltyRegularization(record?.regularization || {}),
-    history: Array.isArray(record?.history) ? record.history.map(mapPenaltyReactivationHistory) : [],
-  }
-}
-
 export async function listAvailableLabs(user = null) {
   const labs = await listAdminLabs()
   return labs.filter((lab) => isLabAccessibleToUser(lab, user))
@@ -423,32 +366,6 @@ export async function listReservationsPage(filters = {}) {
 
   const data = await request(`${reservationsBase}/reservations/search?${search.toString()}`, { cacheTtlMs: 2000 })
   return mapReservationPage(data || {})
-}
-
-export async function getMyAgendaSummary(options = {}) {
-  const search = new URLSearchParams()
-  const normalizedLimit = Math.max(Number(options.limit || 5), 1)
-  search.set('limit', String(normalizedLimit))
-
-  const skipCache = Boolean(options?.skipCache)
-  const query = search.toString() ? `?${search.toString()}` : ''
-  const data = await request(`${reservationsBase}/reservations/summary${query}`, {
-    cacheTtlMs: skipCache ? 0 : 1500,
-    skipCache,
-  })
-
-  return {
-    generated_at: data?.generated_at || '',
-    reservation_count: Number(data?.reservation_count || 0),
-    tutorial_count: Number(data?.tutorial_count || 0),
-    total_count: Number(data?.total_count || 0),
-    upcoming_reservations: Array.isArray(data?.upcoming_reservations)
-      ? data.upcoming_reservations.map(mapReservation)
-      : [],
-    upcoming_tutorials: Array.isArray(data?.upcoming_tutorials)
-      ? data.upcoming_tutorials.map(mapTutorialSession)
-      : [],
-  }
 }
 
 export async function createReservation(payload, user) {
@@ -565,75 +482,13 @@ export async function getOccupancyDashboard(laboratoryId = '') {
   return request(`${reservationsBase}/reservations/occupancy${query}`, { cacheTtlMs: 1500 })
 }
 
-function mapLaboratoryUsageStat(record) {
-  return {
-    laboratory_id: record?.laboratory_id || '',
-    laboratory_name: record?.laboratory_name || '',
-    laboratory_location: record?.laboratory_location || '',
-    area_id: record?.area_id || '',
-    area_name: record?.area_name || '',
-    available_blocks: Number(record?.available_blocks || 0),
-    blocked_blocks: Number(record?.blocked_blocks || 0),
-    used_blocks: Number(record?.used_blocks || 0),
-    reserved_blocks: Number(record?.reserved_blocks || 0),
-    in_progress_blocks: Number(record?.in_progress_blocks || 0),
-    completed_blocks: Number(record?.completed_blocks || 0),
-    occupancy_percentage: Number(record?.occupancy_percentage || 0),
-  }
-}
-
-export async function getLaboratoryUsageAnalytics(period = 'daily') {
-  const normalizedPeriod = ['daily', 'weekly', 'monthly'].includes(String(period || '').trim().toLowerCase())
-    ? String(period).trim().toLowerCase()
-    : 'daily'
-  const data = await request(
-    `${reservationsBase}/reservations/analytics/laboratory-usage?period=${encodeURIComponent(normalizedPeriod)}`,
-    { cacheTtlMs: 1500 },
-  )
-
-  return {
-    period: data?.period || normalizedPeriod,
-    period_label: data?.period_label || '',
-    start_date: data?.start_date || '',
-    end_date: data?.end_date || '',
-    generated_at: data?.generated_at || '',
-    labs: Array.isArray(data?.labs) ? data.labs.map(mapLaboratoryUsageStat) : [],
-    totals: {
-      laboratories_count: Number(data?.totals?.laboratories_count || 0),
-      available_blocks: Number(data?.totals?.available_blocks || 0),
-      blocked_blocks: Number(data?.totals?.blocked_blocks || 0),
-      used_blocks: Number(data?.totals?.used_blocks || 0),
-      reserved_blocks: Number(data?.totals?.reserved_blocks || 0),
-      in_progress_blocks: Number(data?.totals?.in_progress_blocks || 0),
-      completed_blocks: Number(data?.totals?.completed_blocks || 0),
-      occupancy_percentage: Number(data?.totals?.occupancy_percentage || 0),
-    },
-    highest_usage_laboratory: data?.highest_usage_laboratory ? mapLaboratoryUsageStat(data.highest_usage_laboratory) : null,
-    lowest_usage_laboratory: data?.lowest_usage_laboratory ? mapLaboratoryUsageStat(data.lowest_usage_laboratory) : null,
-  }
-}
-
-export async function getLabAvailability(laboratoryId, day, options = {}) {
+export async function getLabAvailability(laboratoryId, day) {
   if (!laboratoryId || !day) {
     return { slots: [], slot_minutes: 60 }
   }
 
   const search = new URLSearchParams({ day })
-  return request(`${reservationsBase}/availability/labs/${laboratoryId}?${search.toString()}`, {
-    cacheTtlMs: options.cacheTtlMs ?? AVAILABILITY_CACHE_TTL_MS,
-    skipCache: Boolean(options.skipCache),
-  })
-}
-
-export async function prefetchLabAvailability(laboratoryId, days = []) {
-  if (!laboratoryId || !Array.isArray(days) || days.length === 0) {
-    return []
-  }
-
-  const uniqueDays = [...new Set(days.filter(Boolean))]
-  return Promise.allSettled(
-    uniqueDays.map((day) => getLabAvailability(laboratoryId, day)),
-  )
+  return request(`${reservationsBase}/availability/labs/${laboratoryId}?${search.toString()}`, { cacheTtlMs: 1500 })
 }
 
 export async function listReservationNotifications(options = {}) {
@@ -713,273 +568,80 @@ export async function liftPenalty(penaltyId, options = {}) {
   return mapPenalty(data?.penalty || {})
 }
 
-export async function getPenaltyReactivationContext(userId) {
-  if (!userId) {
-    throw new Error('No se pudo identificar al usuario para revisar su bloqueo.')
+export function subscribeReservationsRealtime(onMessage) {
+  let isActive = true
+  let ws = null
+  let reconnectTimer = null
+  const RECONNECT_DELAY_MS = 3000
+  const INITIAL_CONNECT_DELAY_MS = import.meta.env.DEV ? 40 : 0
+
+  function getWsUrl() {
+    const configured = (import.meta.env.VITE_RESERVATION_WS_URL || '').replace(/\/$/, '')
+    if (configured) {
+      return configured.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')
+    }
+    return 'ws://localhost:8005/v1/ws/reservations'
   }
 
-  const data = await request(`${reservationsBase}/penalties/reactivation-context/${userId}`, { cacheTtlMs: 1000 })
-  return mapPenaltyReactivationContext(data || {})
-}
+  function connect() {
+    if (!isActive) return
 
-export async function reactivateUserAccount(penaltyId, payload = {}) {
-  if (!penaltyId) {
-    throw new Error('No se pudo identificar la penalizacion activa del usuario.')
-  }
-
-  const data = await request(`${reservationsBase}/penalties/${penaltyId}/reactivate`, {
-    method: 'POST',
-    body: JSON.stringify({
-      lift_reason: String(payload.lift_reason || '').trim(),
-      resolution_notes: String(payload.resolution_notes || '').trim(),
-      action_source: String(payload.action_source || 'admin_profile').trim() || 'admin_profile',
-    }),
-  })
-  clearReservationsCache()
-
-  return {
-    penalty: mapPenalty(data?.penalty || {}),
-    reactivation: mapPenaltyReactivationHistory(data?.reactivation || {}),
-    regularization: mapPenaltyRegularization(data?.regularization || {}),
-    privileges_restored: Boolean(data?.privileges_restored),
-    active_block_removed: Boolean(data?.active_block_removed),
-    user_status: data?.user_status || 'active',
-  }
-}
-
-let sharedSocket = null
-let sharedReconnectTimer = null
-let sharedHasLoggedError = false
-let sharedReconnectAttempt = 0
-let sharedHeartbeatTimer = null
-let sharedLastConnectAt = 0
-let sharedShutdownTimer = null
-const sharedListeners = new Set()
-const sharedResyncHandlers = new Set()
-const RECONNECT_BASE_MS = 1500
-const RECONNECT_MAX_MS = 30000
-const HEARTBEAT_INTERVAL_MS = 25000
-const RESYNC_THRESHOLD_MS = 5000
-const SHUTDOWN_GRACE_MS = 250
-
-function getReservationsWsUrl() {
-  const configured = (import.meta.env.VITE_RESERVATION_WS_URL || '').replace(/\/$/, '')
-  if (configured) {
-    return configured.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')
-  }
-  return 'ws://localhost:8005/v1/ws/reservations'
-}
-
-function notifyRealtimeListeners(data) {
-  sharedListeners.forEach((listener) => {
-    try {
-      listener(data)
-    } catch (err) {
-      if (import.meta.env.DEV) {
-        console.warn('[RealtimeWS] listener threw', err)
+    let url = getWsUrl()
+    const token = getAuthToken()
+    if (token) {
+      try {
+        const wsUrl = new URL(url)
+        wsUrl.searchParams.set('token', token)
+        url = wsUrl.toString()
+      } catch {
+        // Keep original url if it cannot be parsed.
       }
     }
-  })
-}
 
-function notifyResyncHandlers() {
-  sharedResyncHandlers.forEach((handler) => {
     try {
-      handler()
-    } catch (err) {
-      if (import.meta.env.DEV) {
-        console.warn('[RealtimeWS] resync handler threw', err)
+      ws = new WebSocket(url)
+    } catch {
+      scheduleReconnect()
+      return
+    }
+
+    ws.onopen = () => {}
+
+    ws.onmessage = (event) => {
+      if (!isActive) return
+      try {
+        const data = JSON.parse(event.data)
+        if (data.type === 'connected') return
+        onMessage?.(data)
+      } catch {
+        // ignore non-JSON messages
       }
     }
-  })
-}
 
-function clearHeartbeat() {
-  if (sharedHeartbeatTimer) {
-    clearInterval(sharedHeartbeatTimer)
-    sharedHeartbeatTimer = null
-  }
-}
-
-function startHeartbeat(socket) {
-  clearHeartbeat()
-  sharedHeartbeatTimer = setInterval(() => {
-    if (socket.readyState !== WebSocket.OPEN) return
-    try {
-      socket.send(JSON.stringify({ type: 'ping' }))
-    } catch {
-      // ignore
+    ws.onclose = () => {
+      ws = null
+      scheduleReconnect()
     }
-  }, HEARTBEAT_INTERVAL_MS)
-}
 
-function scheduleReservationsReconnect() {
-  if (sharedReconnectTimer || sharedListeners.size === 0) return
-  const delay = Math.min(RECONNECT_BASE_MS * 2 ** sharedReconnectAttempt, RECONNECT_MAX_MS)
-  sharedReconnectAttempt += 1
-  sharedReconnectTimer = setTimeout(() => {
-    sharedReconnectTimer = null
-    ensureReservationsSocket()
-  }, delay)
-}
-
-function buildAuthSubprotocols(token) {
-  if (!token) return undefined
-  return [`bearer.${token}`, 'json']
-}
-
-function cancelPendingShutdown() {
-  if (sharedShutdownTimer) {
-    clearTimeout(sharedShutdownTimer)
-    sharedShutdownTimer = null
-  }
-}
-
-function ensureReservationsSocket() {
-  cancelPendingShutdown()
-  if (sharedSocket && (sharedSocket.readyState === WebSocket.OPEN || sharedSocket.readyState === WebSocket.CONNECTING)) {
-    return
-  }
-
-  const url = getReservationsWsUrl()
-  const token = getAuthToken()
-  const protocols = buildAuthSubprotocols(token)
-
-  let socket
-  try {
-    socket = protocols ? new WebSocket(url, protocols) : new WebSocket(url)
-  } catch {
-    if (!sharedHasLoggedError) {
-      console.warn('[RealtimeWS] No se pudo crear la conexion en tiempo real. Se reintentara cuando el backend este disponible.')
-      sharedHasLoggedError = true
-    }
-    scheduleReservationsReconnect()
-    return
-  }
-
-  sharedSocket = socket
-  const isReconnect = sharedLastConnectAt > 0 && Date.now() - sharedLastConnectAt > RESYNC_THRESHOLD_MS
-
-  socket.onopen = () => {
-    sharedHasLoggedError = false
-    sharedReconnectAttempt = 0
-    sharedLastConnectAt = Date.now()
-    startHeartbeat(socket)
-    if (import.meta.env.DEV) {
-      console.debug('[RealtimeWS] Connected (shared)')
-    }
-    if (isReconnect) {
-      notifyResyncHandlers()
+    ws.onerror = () => {
+      ws?.close()
     }
   }
 
-  socket.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data)
-      if (data?.type === 'connected') return
-      if (data?.type === 'ping') {
-        try {
-          socket.send(JSON.stringify({ type: 'pong' }))
-        } catch {
-          // ignore
-        }
-        return
-      }
-      if (data?.type === 'pong') return
-      notifyRealtimeListeners(data)
-    } catch {
-      // ignore non-JSON messages
-    }
+  function scheduleReconnect() {
+    if (!isActive) return
+    reconnectTimer = setTimeout(connect, RECONNECT_DELAY_MS)
   }
 
-  socket.onclose = () => {
-    if (sharedSocket === socket) {
-      sharedSocket = null
-    }
-    clearHeartbeat()
-    if (sharedListeners.size > 0) {
-      scheduleReservationsReconnect()
-    }
-  }
-
-  socket.onerror = () => {
-    if (!sharedHasLoggedError) {
-      console.warn('[RealtimeWS] Backend realtime no disponible. Reintentando en segundo plano.')
-      sharedHasLoggedError = true
-    }
-    try {
-      socket.close()
-    } catch {
-      // ignore
-    }
-  }
-}
-
-export function subscribeReservationsRealtime(onMessage, options = {}) {
-  if (typeof onMessage !== 'function') {
-    return () => {}
-  }
-
-  const { onResync } = options
-  sharedListeners.add(onMessage)
-  if (typeof onResync === 'function') {
-    sharedResyncHandlers.add(onResync)
-  }
-  ensureReservationsSocket()
+  reconnectTimer = setTimeout(connect, INITIAL_CONNECT_DELAY_MS)
 
   return () => {
-    sharedListeners.delete(onMessage)
-    if (typeof onResync === 'function') {
-      sharedResyncHandlers.delete(onResync)
-    }
-    if (sharedListeners.size === 0) {
-      cancelPendingShutdown()
-      sharedShutdownTimer = setTimeout(() => {
-        sharedShutdownTimer = null
-        if (sharedListeners.size > 0) return
-        if (sharedReconnectTimer) {
-          clearTimeout(sharedReconnectTimer)
-          sharedReconnectTimer = null
-        }
-        sharedReconnectAttempt = 0
-        sharedLastConnectAt = 0
-        clearHeartbeat()
-        if (sharedSocket) {
-          try {
-            sharedSocket.onclose = null
-            sharedSocket.close()
-          } catch {
-            // ignore
-          }
-          sharedSocket = null
-        }
-      }, SHUTDOWN_GRACE_MS)
+    isActive = false
+    clearTimeout(reconnectTimer)
+    if (ws) {
+      ws.onclose = null
+      ws.close()
+      ws = null
     }
   }
 }
-
-export function applyRealtimeRecordPatch(list, event, options = {}) {
-  const { idKey = 'id', mapper, prepend = true } = options
-  if (!Array.isArray(list)) return list
-  const record = event?.record
-  if (!record) return list
-  const id = String(record?.[idKey] || '')
-  if (!id) return list
-  const action = String(event?.action || '').toLowerCase()
-  const mappedRecord = mapper ? mapper(record) : record
-
-  if (action === 'delete') {
-    const next = list.filter((item) => String(item?.[idKey]) !== id)
-    return next.length === list.length ? list : next
-  }
-
-  const index = list.findIndex((item) => String(item?.[idKey]) === id)
-  if (index === -1) {
-    return prepend ? [mappedRecord, ...list] : [...list, mappedRecord]
-  }
-  const next = list.slice()
-  next[index] = { ...next[index], ...mappedRecord }
-  return next
-}
-
-export { mapReservation as mapReservationRecord, mapPenalty as mapPenaltyRecord }
