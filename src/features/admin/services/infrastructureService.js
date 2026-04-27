@@ -277,6 +277,30 @@ export function listMaterials() {
   return request(`${inventoryBase}/stock-items`, { cacheTtlMs: 5000 })
 }
 
+export function getStockItemsReport({
+  laboratoryId = null,
+  onlyLowOrOut = false,
+  statusFilter = null,
+  search = null,
+} = {}) {
+  const params = new URLSearchParams()
+  if (laboratoryId) {
+    params.set('laboratory_id', String(laboratoryId))
+  }
+  if (onlyLowOrOut) {
+    params.set('only_low_or_out', 'true')
+  }
+  if (statusFilter) {
+    params.set('status_filter', String(statusFilter))
+  }
+  if (search) {
+    params.set('search', String(search))
+  }
+
+  const query = params.toString()
+  return request(`${inventoryBase}/reports/stock-items${query ? `?${query}` : ''}`, { cacheTtlMs: 3000 })
+}
+
 export function createMaterial(payload) {
   return request(`${inventoryBase}/stock-items`, {
     method: 'POST',
@@ -387,4 +411,14 @@ export async function returnLoanRecord(loanId, payload) {
   })
   clearInfrastructureCache()
   return mapLoanRecord(data || {})
+}
+
+export function getUsageReport({ borrowerId = null, practice = null, dateFrom = null, dateTo = null } = {}) {
+  const params = new URLSearchParams();
+  if (borrowerId) params.set('borrower_id', String(borrowerId));
+  if (practice) params.set('practice', String(practice));
+  if (dateFrom) params.set('date_from', String(dateFrom));
+  if (dateTo) params.set('date_to', String(dateTo));
+  const query = params.toString();
+  return request(`${inventoryBase}/reports/usage${query ? `?${query}` : ''}`, { cacheTtlMs: 3000 });
 }

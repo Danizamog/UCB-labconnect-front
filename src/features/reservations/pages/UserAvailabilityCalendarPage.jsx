@@ -5,6 +5,7 @@ import { openTutorialSessionFlow } from '../../tutorials/utils/focusTutorialNavi
 import {
   getLabAvailability,
   listAvailableLabs,
+  prefetchLabAvailability,
   subscribeReservationsRealtime,
 } from '../services/reservationsService'
 import './ReservationsPages.css'
@@ -133,6 +134,7 @@ function UserAvailabilityCalendarPage({ user }) {
   const [weekStart, setWeekStart] = useState(() => getMonday(today))
   const [error, setError] = useState('')
   const [focusedTutorial, setFocusedTutorial] = useState(null)
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false)
 
   const loadLabs = useCallback(async () => {
     try {
@@ -152,17 +154,27 @@ function UserAvailabilityCalendarPage({ user }) {
     return () => window.clearTimeout(timer)
   }, [loadLabs])
 
+  const weekDays = useMemo(() => {
+    const days = []
+    const start = new Date(`${weekStart}T00:00:00`)
+    for (let index = 0; index < 7; index += 1) {
+      const current = new Date(start)
+      current.setDate(start.getDate() + index)
+      days.push(`${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`)
+    }
+    return days
+  }, [weekStart])
+
   useEffect(() => {
     let mounted = true
 
     const loadAvailability = async () => {
       if (!selectedLab || !selectedDate) {
-        if (mounted) {
-          setSlots([])
-        }
+        if (mounted) setSlots([])
         return
       }
 
+      setIsLoadingAvailability(true)
       try {
         const payload = await getLabAvailability(selectedLab, selectedDate)
         if (mounted) {
@@ -174,6 +186,8 @@ function UserAvailabilityCalendarPage({ user }) {
           setError(err.message || 'No se pudo cargar la disponibilidad del laboratorio.')
           setSlots([])
         }
+      } finally {
+        if (mounted) setIsLoadingAvailability(false)
       }
     }
 
@@ -184,13 +198,23 @@ function UserAvailabilityCalendarPage({ user }) {
   }, [selectedDate, selectedLab])
 
   useEffect(() => {
+    if (!selectedLab || weekDays.length === 0) return undefined
+
+    const timer = window.setTimeout(() => {
+      prefetchLabAvailability(selectedLab, weekDays)
+    }, 120)
+
+    return () => window.clearTimeout(timer)
+  }, [selectedLab, weekDays])
+
+  useEffect(() => {
     const unsubscribe = subscribeReservationsRealtime((event) => {
       if (!event?.topic || (event.topic !== 'lab_reservation' && event.topic !== 'tutorial_session')) {
         return
       }
 
       if (selectedLab && selectedDate) {
-        getLabAvailability(selectedLab, selectedDate)
+        getLabAvailability(selectedLab, selectedDate, { skipCache: true })
           .then((payload) => setSlots(Array.isArray(payload?.slots) ? payload.slots : []))
           .catch(() => {})
       }
@@ -206,17 +230,6 @@ function UserAvailabilityCalendarPage({ user }) {
     })),
     [slots],
   )
-
-  const weekDays = useMemo(() => {
-    const days = []
-    const start = new Date(`${weekStart}T00:00:00`)
-    for (let index = 0; index < 7; index += 1) {
-      const current = new Date(start)
-      current.setDate(start.getDate() + index)
-      days.push(`${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`)
-    }
-    return days
-  }, [weekStart])
 
   const goToPrevWeek = () => {
     const d = new Date(`${weekStart}T00:00:00`)
@@ -259,8 +272,8 @@ function UserAvailabilityCalendarPage({ user }) {
       <header className="reservations-header">
         <div>
           <p className="reservations-kicker">Reserva de laboratorios</p>
-          <h2>Calendario de disponibilidad</h2>
-          <p>Elige un laboratorio, navega la semana y selecciona un dia para ver horarios, reservas y tutorias.</p>
+          <h2>Disponibilidad por laboratorio</h2>
+          <p>Selecciona un espacio y revisa bloques libres, reservas y tutorias antes de solicitar una hora.</p>
         </div>
       </header>
 
@@ -339,7 +352,9 @@ function UserAvailabilityCalendarPage({ user }) {
             ) : null}
           </div>
 
-          {mappedSlots.length === 0 ? (
+          {isLoadingAvailability && mappedSlots.length === 0 ? (
+            <p className="reservations-empty">Cargando horarios...</p>
+          ) : mappedSlots.length === 0 ? (
             <p className="reservations-empty">No hay horarios disponibles para este dia.</p>
           ) : (
             <div className="reservations-slots">

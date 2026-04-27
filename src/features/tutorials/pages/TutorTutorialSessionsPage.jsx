@@ -514,8 +514,8 @@ function TutorTutorialSessionsPage() {
       <header className="tutorials-header">
         <div>
           <p className="tutorials-kicker">Soporte academico</p>
-          <h2>Publicar horarios de tutorias</h2>
-          <p>Configura bloques con dias, horas y cupos. El sistema evita conflictos con tus propias reservas de laboratorio.</p>
+          <h2>Tutorias docentes</h2>
+          <p>Publica sesiones con fecha, hora y cupos. El sistema ayuda a evitar cruces con reservas de laboratorio.</p>
         </div>
         <div className="tutorials-summary">
           <div><span>Sesiones</span><strong>{sessions.length}</strong></div>

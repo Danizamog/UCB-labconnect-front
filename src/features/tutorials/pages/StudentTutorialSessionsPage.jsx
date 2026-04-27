@@ -181,8 +181,8 @@ function StudentTutorialSessionsPage({ user }) {
       <header className="tutorials-header">
         <div>
           <p className="tutorials-kicker">Apoyo academico</p>
-          <h2>Tutorias disponibles</h2>
-          <p>Consulta las sesiones publicadas por docentes y auxiliares, revisa cupos y registrate en la que necesites.</p>
+          <h2>Apoyo y tutorias</h2>
+          <p>Encuentra sesiones disponibles, revisa cupos y registrate en la que mejor encaje con tu horario.</p>
         </div>
         <div className="tutorials-summary">
           <div><span>Disponibles</span><strong>{availableSessions.length}</strong></div>
