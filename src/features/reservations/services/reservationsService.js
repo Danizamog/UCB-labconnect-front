@@ -1,4 +1,4 @@
-import { listAdminLabs } from '../../admin/services/infrastructureService'
+import { listAdminLabs, searchLabs } from '../../admin/services/infrastructureService'
 import { getAuthToken } from '../../../shared/utils/storage'
 import { clearStoredSession } from '../../auth/services/authService'
 
@@ -318,8 +318,22 @@ function mapPenalty(record) {
   }
 }
 
-export async function listAvailableLabs(user = null) {
-  const labs = await listAdminLabs()
+export async function listAvailableLabs(user = null, filters = {}) {
+  const hasFilters = filters && (filters.name || filters.sort || filters.page || filters.per_page || filters.area_id || filters.is_active)
+  let labs = []
+
+  if (hasFilters) {
+    try {
+      const data = await searchLabs(filters)
+      labs = Array.isArray(data) ? data : []
+    } catch (err) {
+      // fallback to full list if search fails
+      labs = await listAdminLabs()
+    }
+  } else {
+    labs = await listAdminLabs()
+  }
+
   return labs.filter((lab) => isLabAccessibleToUser(lab, user))
 }
 

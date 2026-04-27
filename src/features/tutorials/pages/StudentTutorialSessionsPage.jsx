@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import {
   cancelTutorialEnrollment,
   enrollInTutorialSession,
@@ -46,11 +46,13 @@ function StudentTutorialSessionsPage({ user }) {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [clockTick, setClockTick] = useState(() => Date.now())
+  const [filters, setFilters] = useState({ q: '', session_date: '', is_published: '', sort: 'session_date,start_time' })
+  const filtersRef = useRef(filters)
 
-  const loadSessions = useCallback(async () => {
+  const loadSessions = useCallback(async (filtersArg = filtersRef.current) => {
     try {
       const [publicSessions, enrolledSessions] = await Promise.all([
-        listPublicTutorialSessions(),
+        listPublicTutorialSessions(filtersArg),
         listMyEnrolledTutorialSessions(),
       ])
       setSessions(publicSessions)
@@ -66,7 +68,7 @@ function StudentTutorialSessionsPage({ user }) {
 
     const unsubscribe = subscribeTutorialSessionsRealtime((event) => {
       if (event?.topic === 'tutorial_session') {
-        loadSessions()
+        loadSessions(filtersRef.current)
       }
 
       if (event?.topic === 'user_notification') {
@@ -76,13 +78,21 @@ function StudentTutorialSessionsPage({ user }) {
           recipients.includes(user?.user_id || '')
 
         if (isCurrentUserNotification) {
-          loadSessions()
+          loadSessions(filtersRef.current)
         }
       }
     })
 
     return () => unsubscribe?.()
   }, [loadSessions, user?.user_id])
+
+  useEffect(() => {
+    filtersRef.current = filters
+    const t = setTimeout(() => {
+      loadSessions(filters)
+    }, 300)
+    return () => clearTimeout(t)
+  }, [filters, loadSessions])
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -131,10 +141,13 @@ function StudentTutorialSessionsPage({ user }) {
     [allKnownSessions, focusedSessionId],
   )
 
-  const availableSessions = useMemo(
-    () => sessions.filter((session) => session.is_published),
-    [sessions],
-  )
+  const availableSessions = useMemo(() => {
+    if (filters.is_published === '') {
+      return sessions.filter((session) => session.is_published)
+    }
+    const showPublished = String(filters.is_published) === 'true'
+    return sessions.filter((session) => session.is_published === showPublished)
+  }, [sessions, filters.is_published])
 
   const nowReference = useMemo(() => new Date(clockTick), [clockTick])
 
@@ -353,6 +366,52 @@ function StudentTutorialSessionsPage({ user }) {
           <p className="tutorials-panel-subtitle">
             Explora todas las tutorias publicadas y reserva tu cupo solo en sesiones futuras con capacidad disponible.
           </p>
+        </div>
+
+        <div className="tutorials-filters">
+          <form className="tutorials-filters-form" onSubmit={(e) => e.preventDefault()}>
+            <label>
+              <span>Buscar</span>
+              <input
+                type="search"
+                placeholder="Buscar por tema..."
+                value={filters.q}
+                onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
+              />
+            </label>
+
+            <label>
+              <span>Fecha</span>
+              <input
+                type="date"
+                value={filters.session_date}
+                onChange={(e) => setFilters((prev) => ({ ...prev, session_date: e.target.value }))}
+              />
+            </label>
+
+            <label>
+              <span>Estado</span>
+              <select value={filters.is_published} onChange={(e) => setFilters((prev) => ({ ...prev, is_published: e.target.value }))}>
+                <option value="">Todos</option>
+                <option value="true">Publicadas</option>
+                <option value="false">No publicadas</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Orden</span>
+              <select value={filters.sort} onChange={(e) => setFilters((prev) => ({ ...prev, sort: e.target.value }))}>
+                <option value="session_date,start_time">Fecha asc</option>
+                <option value="-session_date,-start_time">Fecha desc</option>
+              </select>
+            </label>
+
+            <div className="tutorials-filters-actions">
+              <button type="button" className="tutorials-secondary" onClick={() => setFilters({ q: '', session_date: '', is_published: '', sort: 'session_date,start_time' })}>
+                Limpiar
+              </button>
+            </div>
+          </form>
         </div>
 
         {availableSessions.length === 0 ? (

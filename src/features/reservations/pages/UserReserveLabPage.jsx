@@ -234,6 +234,7 @@ function isCreatableSlot(slot) {
 
 function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead }) {
   const [labs, setLabs] = useState([])
+  const [labSearch, setLabSearch] = useState('')
   const [reservations, setReservations] = useState([])
   const [penalties, setPenalties] = useState([])
   const [slots, setSlots] = useState([])
@@ -356,6 +357,32 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     () => labs.find((lab) => String(lab.id) === String(form.laboratory_id)) || null,
     [form.laboratory_id, labs],
   )
+
+  useEffect(() => {
+    let mounted = true
+    const t = setTimeout(() => {
+      ;(async () => {
+        try {
+          const labsData = labSearch
+            ? await listAvailableLabs(user, { name: labSearch, sort: 'name', per_page: 200 })
+            : await listAvailableLabs(user)
+
+          if (!mounted) return
+          setLabs(labsData)
+          setForm((prev) => (prev.laboratory_id || labsData.length === 0 ? prev : { ...prev, laboratory_id: labsData[0].id }))
+          setError(labsData.length === 0 ? 'No tienes permisos para reservar en los laboratorios disponibles actualmente.' : '')
+        } catch (err) {
+          if (!mounted) return
+          setError(err.message || 'No se pudo buscar laboratorios.')
+        }
+      })()
+    }, 350)
+
+    return () => {
+      mounted = false
+      clearTimeout(t)
+    }
+  }, [labSearch, user])
 
   const selectedLabIsAccessible = useMemo(
     () => (selectedLab ? isLabAccessibleToUser(selectedLab, user) : false),
@@ -1168,6 +1195,17 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
         <form className="reservations-form" onSubmit={handleSubmit}>
           <div className="reservations-form-section">
             <span className="reservations-form-section-label">1 - Laboratorio</span>
+            <label>
+              <span>Buscar laboratorio</span>
+              <input
+                type="search"
+                placeholder="Buscar por nombre o ubicacion..."
+                value={labSearch}
+                onChange={(e) => setLabSearch(e.target.value)}
+                disabled={Boolean(activePenalty)}
+              />
+            </label>
+
             <label>
               <span>Laboratorio</span>
               <select
