@@ -133,8 +133,16 @@ function mapTutorialSession(record) {
   }
 }
 
-export async function listPublicTutorialSessions() {
-  const data = await request(`${tutorialsBase}/tutorial-sessions`, { cacheTtlMs: 5000 })
+export async function listPublicTutorialSessions(filters = {}) {
+  const search = new URLSearchParams()
+  if (filters.q) search.set('q', String(filters.q).trim())
+  if (filters.laboratory_id) search.set('laboratory_id', String(filters.laboratory_id))
+  if (filters.session_date) search.set('session_date', String(filters.session_date))
+  if (filters.is_published !== undefined && filters.is_published !== '') search.set('is_published', String(filters.is_published))
+  if (filters.sort) search.set('sort', String(filters.sort))
+
+  const query = search.toString() ? `?${search.toString()}` : ''
+  const data = await request(`${tutorialsBase}/tutorial-sessions${query}`, { cacheTtlMs: 5000 })
   return Array.isArray(data) ? data.map(mapTutorialSession) : []
 }
 
