@@ -6,6 +6,7 @@ import {
   listPublicTutorialSessions,
   subscribeTutorialSessionsRealtime,
 } from '../services/tutorialSessionsService'
+import { listAdminLabs } from '../../admin/services/infrastructureService'
 import { FOCUSED_TUTORIAL_KEY, OPEN_TUTORIAL_EVENT } from '../utils/focusTutorialNavigation'
 import './TutorialPages.css'
 
@@ -40,13 +41,14 @@ function getEnrollmentState(session, userId, referenceNow = new Date()) {
 function StudentTutorialSessionsPage({ user }) {
   const [sessions, setSessions] = useState([])
   const [mySessions, setMySessions] = useState([])
+  const [labs, setLabs] = useState([])
   const [focusedSessionId, setFocusedSessionId] = useState('')
   const [enrollingId, setEnrollingId] = useState('')
   const [cancellingId, setCancellingId] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [clockTick, setClockTick] = useState(() => Date.now())
-  const [filters, setFilters] = useState({ q: '', session_date: '', is_published: '', sort: 'session_date,start_time' })
+  const [filters, setFilters] = useState({ q: '', session_date: '', laboratory_id: '', is_published: '', sort: 'session_date,start_time' })
   const filtersRef = useRef(filters)
 
   const loadSessions = useCallback(async (filtersArg = filtersRef.current) => {
@@ -63,8 +65,18 @@ function StudentTutorialSessionsPage({ user }) {
     }
   }, [])
 
+  const loadLabs = useCallback(async () => {
+    try {
+      const labsData = await listAdminLabs()
+      setLabs(Array.isArray(labsData) ? labsData : [])
+    } catch {
+      setLabs([])
+    }
+  }, [])
+
   useEffect(() => {
     loadSessions()
+    loadLabs()
 
     const unsubscribe = subscribeTutorialSessionsRealtime((event) => {
       if (event?.topic === 'tutorial_session') {
@@ -84,7 +96,7 @@ function StudentTutorialSessionsPage({ user }) {
     })
 
     return () => unsubscribe?.()
-  }, [loadSessions, user?.user_id])
+  }, [loadLabs, loadSessions, user?.user_id])
 
   useEffect(() => {
     filtersRef.current = filters
@@ -390,6 +402,16 @@ function StudentTutorialSessionsPage({ user }) {
             </label>
 
             <label>
+              <span>Laboratorio</span>
+              <select value={filters.laboratory_id} onChange={(e) => setFilters((prev) => ({ ...prev, laboratory_id: e.target.value }))}>
+                <option value="">Todos los laboratorios</option>
+                {labs.map((lab) => (
+                  <option key={lab.id} value={lab.id}>{lab.name}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
               <span>Estado</span>
               <select value={filters.is_published} onChange={(e) => setFilters((prev) => ({ ...prev, is_published: e.target.value }))}>
                 <option value="">Todos</option>
@@ -407,7 +429,7 @@ function StudentTutorialSessionsPage({ user }) {
             </label>
 
             <div className="tutorials-filters-actions">
-              <button type="button" className="tutorials-secondary" onClick={() => setFilters({ q: '', session_date: '', is_published: '', sort: 'session_date,start_time' })}>
+              <button type="button" className="tutorials-secondary" onClick={() => setFilters({ q: '', session_date: '', laboratory_id: '', is_published: '', sort: 'session_date,start_time' })}>
                 Limpiar
               </button>
             </div>

@@ -1225,7 +1225,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
               </label>
 
               <label>
-                <span>Área</span>
+                <span>Área (Tipo)</span>
                 <select value={labArea} onChange={(e) => setLabArea(e.target.value)} disabled={Boolean(activePenalty)}>
                   <option value="">Todas las áreas</option>
                   {areas.map((area) => (
@@ -1244,46 +1244,18 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
               </label>
 
               <label>
-                <span>Orden</span>
+                <span>Orden alfabético</span>
                 <select value={labSort} onChange={(e) => setLabSort(e.target.value)} disabled={Boolean(activePenalty)}>
                   <option value="">Por defecto</option>
-                  <option value="name">Nombre asc</option>
-                  <option value="-name">Nombre desc</option>
+                  <option value="name">Nombre (A-Z)</option>
+                  <option value="-name">Nombre (Z-A)</option>
                 </select>
               </label>
             </div>
 
-            <label>
-              <span>Laboratorio</span>
-              <select
-                value={form.laboratory_id}
-                onChange={(event) => setForm((prev) => ({
-                  ...prev,
-                  laboratory_id: event.target.value,
-                  start_time: '',
-                  end_time: '',
-                }))}
-                disabled={Boolean(activePenalty)}
-                required
-              >
-                <option value="">Selecciona un laboratorio</option>
-                {labs.map((lab) => (
-                  <option key={lab.id} value={lab.id}>{lab.name}</option>
-                ))}
-              </select>
-            </label>
-            {!selectedLabIsAccessible && form.laboratory_id ? (
-              <p className="reservation-inline-hint">
-                No tienes permisos para reservar este laboratorio. El formulario se deshabilita hasta elegir uno habilitado.
-              </p>
-            ) : null}
-          </div>
-
-          <div className="reservations-form-section">
-            <span className="reservations-form-section-label">2 - Fecha y Bloque Horario</span>
-            <div className="reservations-form-grid">
+            <div className="reservations-form-grid" style={{ marginTop: '1rem', borderTop: '1px dashed var(--border-color)', paddingTop: '1rem' }}>
               <label>
-                <span>Fecha</span>
+                <span>Fecha para búsqueda</span>
                 <input
                   type="date"
                   value={form.date}
@@ -1299,6 +1271,36 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                   required
                 />
               </label>
+              <label style={{ flex: 2 }}>
+                <span>Seleccionar Laboratorio</span>
+                <select
+                  value={form.laboratory_id}
+                  onChange={(event) => setForm((prev) => ({
+                    ...prev,
+                    laboratory_id: event.target.value,
+                    start_time: '',
+                    end_time: '',
+                  }))}
+                  disabled={Boolean(activePenalty)}
+                  required
+                >
+                  <option value="">Elige un laboratorio de la lista filtrada...</option>
+                  {labs.map((lab) => (
+                    <option key={lab.id} value={lab.id}>{lab.name} ({lab.location})</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {!selectedLabIsAccessible && form.laboratory_id ? (
+              <p className="reservation-inline-hint">
+                No tienes permisos para reservar este laboratorio. El formulario se deshabilita hasta elegir uno habilitado.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="reservations-form-section">
+            <span className="reservations-form-section-label">2 - Bloque Horario</span>
+            <div className="reservations-form-grid">
               <label>
                 <span>Hora de inicio</span>
                 <input
