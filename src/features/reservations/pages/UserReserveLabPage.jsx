@@ -16,6 +16,8 @@ import {
   prefetchLabAvailability,
   subscribeReservationsRealtime,
   updateReservation,
+  applyRealtimeRecordPatch,
+  mapReservationRecord,
 } from '../services/reservationsService'
 import ReservationDetailModal from './ReservationDetailModal'
 import ReservationEditModal from './ReservationEditModal'
@@ -315,7 +317,11 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
 
     const unsubscribe = subscribeReservationsRealtime((event) => {
       if (event?.topic === 'lab_reservation') {
-        loadData()
+        const userId = String(user?.user_id || '')
+        const requestedBy = String(event?.record?.requested_by || '')
+        if (userId && requestedBy && requestedBy === userId) {
+          setReservations((prev) => applyRealtimeRecordPatch(prev, event, { mapper: mapReservationRecord }))
+        }
         setAvailabilityRefreshNonce((value) => value + 1)
         return
       }
@@ -343,6 +349,11 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
           setMessage('Tienes una nueva notificacion relacionada con tus reservas o tutorias.')
         }
       }
+    }, {
+      onResync: () => {
+        loadData()
+        setAvailabilityRefreshNonce((value) => value + 1)
+      },
     })
 
     return () => unsubscribe?.()

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getTutorialSessionById } from '../../tutorials/services/tutorialSessionsService'
 import TutorialSessionDetailModal from '../../tutorials/pages/TutorialSessionDetailModal'
 import { openTutorialSessionFlow } from '../../tutorials/utils/focusTutorialNavigation'
@@ -207,20 +207,41 @@ function UserAvailabilityCalendarPage({ user }) {
     return () => window.clearTimeout(timer)
   }, [selectedLab, weekDays])
 
+  const slotsRefreshTimerRef = useRef(null)
+
   useEffect(() => {
     const unsubscribe = subscribeReservationsRealtime((event) => {
       if (!event?.topic || (event.topic !== 'lab_reservation' && event.topic !== 'tutorial_session')) {
         return
       }
 
-      if (selectedLab && selectedDate) {
-        getLabAvailability(selectedLab, selectedDate, { skipCache: true })
-          .then((payload) => setSlots(Array.isArray(payload?.slots) ? payload.slots : []))
-          .catch(() => {})
+      const eventLabId = String(event?.record?.laboratory_id || '')
+      if (eventLabId && selectedLab && eventLabId !== String(selectedLab)) {
+        return
       }
+
+      if (selectedLab && selectedDate) {
+        window.clearTimeout(slotsRefreshTimerRef.current)
+        slotsRefreshTimerRef.current = window.setTimeout(() => {
+          getLabAvailability(selectedLab, selectedDate, { skipCache: true })
+            .then((payload) => setSlots(Array.isArray(payload?.slots) ? payload.slots : []))
+            .catch(() => {})
+        }, 800)
+      }
+    }, {
+      onResync: () => {
+        if (selectedLab && selectedDate) {
+          getLabAvailability(selectedLab, selectedDate, { skipCache: true })
+            .then((payload) => setSlots(Array.isArray(payload?.slots) ? payload.slots : []))
+            .catch(() => {})
+        }
+      },
     })
 
-    return () => unsubscribe?.()
+    return () => {
+      window.clearTimeout(slotsRefreshTimerRef.current)
+      unsubscribe?.()
+    }
   }, [selectedDate, selectedLab])
 
   const mappedSlots = useMemo(

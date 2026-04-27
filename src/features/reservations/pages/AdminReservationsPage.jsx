@@ -21,6 +21,8 @@ import {
   subscribeReservationsRealtime,
   updateReservation,
   updateReservationStatus,
+  applyRealtimeRecordPatch,
+  mapReservationRecord,
 } from '../services/reservationsService'
 import ReservationEditModal from './ReservationEditModal'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
@@ -274,13 +276,35 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     loadOperationalData()
 
     const unsubscribe = subscribeReservationsRealtime((event) => {
-      if (event?.topic === 'lab_reservation' || event?.topic === 'lab_access') {
-        window.clearTimeout(realtimeRefreshTimeoutRef.current)
-        realtimeRefreshTimeoutRef.current = window.setTimeout(() => {
-          loadOperationalData()
-          loadTableData(tableQueryRef.current)
-        }, 250)
-      }
+      if (event?.topic !== 'lab_reservation' && event?.topic !== 'lab_access') return
+
+      const patchOptions = { mapper: mapReservationRecord }
+      setReservations((prev) => applyRealtimeRecordPatch(prev, event, patchOptions))
+      setTableReservations((prev) => {
+        const action = String(event?.action || '').toLowerCase()
+        const id = String(event?.record?.id || '')
+        if (!id) return prev
+        if (action === 'delete') {
+          return prev.filter((item) => String(item?.id) !== id)
+        }
+        const index = prev.findIndex((item) => String(item?.id) === id)
+        if (index === -1) return prev
+        const next = prev.slice()
+        next[index] = { ...next[index], ...mapReservationRecord(event.record) }
+        return next
+      })
+
+      window.clearTimeout(realtimeRefreshTimeoutRef.current)
+      realtimeRefreshTimeoutRef.current = window.setTimeout(() => {
+        getOccupancyDashboard()
+          .then((value) => setOccupancy(value))
+          .catch(() => {})
+      }, 1500)
+    }, {
+      onResync: () => {
+        loadOperationalData()
+        loadTableData(tableQueryRef.current)
+      },
     })
 
     return () => {

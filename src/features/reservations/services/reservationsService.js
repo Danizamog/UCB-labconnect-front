@@ -747,100 +747,239 @@ export async function reactivateUserAccount(penaltyId, payload = {}) {
   }
 }
 
-export function subscribeReservationsRealtime(onMessage) {
-  let isActive = true
-  let ws = null
-  let reconnectTimer = null
-  let hasLoggedConnectionError = false
-  const RECONNECT_DELAY_MS = 3000
+let sharedSocket = null
+let sharedReconnectTimer = null
+let sharedHasLoggedError = false
+let sharedReconnectAttempt = 0
+let sharedHeartbeatTimer = null
+let sharedLastConnectAt = 0
+let sharedShutdownTimer = null
+const sharedListeners = new Set()
+const sharedResyncHandlers = new Set()
+const RECONNECT_BASE_MS = 1500
+const RECONNECT_MAX_MS = 30000
+const HEARTBEAT_INTERVAL_MS = 25000
+const RESYNC_THRESHOLD_MS = 5000
+const SHUTDOWN_GRACE_MS = 250
 
-  function getWsUrl() {
-    const configured = (import.meta.env.VITE_RESERVATION_WS_URL || '').replace(/\/$/, '')
-    if (configured) {
-      return configured.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')
-    }
-    return 'ws://localhost:8005/v1/ws/reservations'
+function getReservationsWsUrl() {
+  const configured = (import.meta.env.VITE_RESERVATION_WS_URL || '').replace(/\/$/, '')
+  if (configured) {
+    return configured.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')
   }
+  return 'ws://localhost:8005/v1/ws/reservations'
+}
 
-  function connect() {
-    if (!isActive) return
-
-    let url = getWsUrl()
-    const token = getAuthToken()
-    if (token) {
-      try {
-        const wsUrl = new URL(url)
-        wsUrl.searchParams.set('token', token)
-        url = wsUrl.toString()
-      } catch {
-        // Keep original url if it cannot be parsed.
-      }
-    }
-
-    if (import.meta.env.DEV && !hasLoggedConnectionError) {
-      console.debug('[RealtimeWS] Connecting')
-    }
-
+function notifyRealtimeListeners(data) {
+  sharedListeners.forEach((listener) => {
     try {
-      ws = new WebSocket(url)
-    } catch {
-      if (!hasLoggedConnectionError) {
-        console.warn('[RealtimeWS] No se pudo crear la conexion en tiempo real. Se reintentara cuando el backend este disponible.')
-        hasLoggedConnectionError = true
-      }
-      scheduleReconnect()
-      return
-    }
-
-    ws.onopen = () => {
-      hasLoggedConnectionError = false
+      listener(data)
+    } catch (err) {
       if (import.meta.env.DEV) {
-        console.debug('[RealtimeWS] Connected')
+        console.warn('[RealtimeWS] listener threw', err)
       }
     }
+  })
+}
 
-    ws.onmessage = (event) => {
-      if (!isActive) return
-      try {
-        const data = JSON.parse(event.data)
-        if (data.type === 'connected') return
-        onMessage?.(data)
-      } catch {
-        // ignore non-JSON messages
+function notifyResyncHandlers() {
+  sharedResyncHandlers.forEach((handler) => {
+    try {
+      handler()
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.warn('[RealtimeWS] resync handler threw', err)
       }
     }
+  })
+}
 
-    ws.onclose = () => {
-      ws = null
-      scheduleReconnect()
-    }
+function clearHeartbeat() {
+  if (sharedHeartbeatTimer) {
+    clearInterval(sharedHeartbeatTimer)
+    sharedHeartbeatTimer = null
+  }
+}
 
-    ws.onerror = () => {
-      if (!hasLoggedConnectionError) {
-        console.warn('[RealtimeWS] Backend realtime no disponible. Reintentando en segundo plano.')
-        hasLoggedConnectionError = true
-      }
-      ws?.close()
+function startHeartbeat(socket) {
+  clearHeartbeat()
+  sharedHeartbeatTimer = setInterval(() => {
+    if (socket.readyState !== WebSocket.OPEN) return
+    try {
+      socket.send(JSON.stringify({ type: 'ping' }))
+    } catch {
+      // ignore
     }
+  }, HEARTBEAT_INTERVAL_MS)
+}
+
+function scheduleReservationsReconnect() {
+  if (sharedReconnectTimer || sharedListeners.size === 0) return
+  const delay = Math.min(RECONNECT_BASE_MS * 2 ** sharedReconnectAttempt, RECONNECT_MAX_MS)
+  sharedReconnectAttempt += 1
+  sharedReconnectTimer = setTimeout(() => {
+    sharedReconnectTimer = null
+    ensureReservationsSocket()
+  }, delay)
+}
+
+function buildAuthSubprotocols(token) {
+  if (!token) return undefined
+  return [`bearer.${token}`, 'json']
+}
+
+function cancelPendingShutdown() {
+  if (sharedShutdownTimer) {
+    clearTimeout(sharedShutdownTimer)
+    sharedShutdownTimer = null
+  }
+}
+
+function ensureReservationsSocket() {
+  cancelPendingShutdown()
+  if (sharedSocket && (sharedSocket.readyState === WebSocket.OPEN || sharedSocket.readyState === WebSocket.CONNECTING)) {
+    return
   }
 
-  function scheduleReconnect() {
-    if (!isActive) return
-    reconnectTimer = setTimeout(connect, RECONNECT_DELAY_MS)
+  const url = getReservationsWsUrl()
+  const token = getAuthToken()
+  const protocols = buildAuthSubprotocols(token)
+
+  let socket
+  try {
+    socket = protocols ? new WebSocket(url, protocols) : new WebSocket(url)
+  } catch {
+    if (!sharedHasLoggedError) {
+      console.warn('[RealtimeWS] No se pudo crear la conexion en tiempo real. Se reintentara cuando el backend este disponible.')
+      sharedHasLoggedError = true
+    }
+    scheduleReservationsReconnect()
+    return
   }
 
-  connect()
+  sharedSocket = socket
+  const isReconnect = sharedLastConnectAt > 0 && Date.now() - sharedLastConnectAt > RESYNC_THRESHOLD_MS
 
-  return () => {
+  socket.onopen = () => {
+    sharedHasLoggedError = false
+    sharedReconnectAttempt = 0
+    sharedLastConnectAt = Date.now()
+    startHeartbeat(socket)
     if (import.meta.env.DEV) {
-      console.debug('[RealtimeWS] Unsubscribing')
+      console.debug('[RealtimeWS] Connected (shared)')
     }
-    isActive = false
-    clearTimeout(reconnectTimer)
-    if (ws) {
-      ws.onclose = null
-      ws.close()
-      ws = null
+    if (isReconnect) {
+      notifyResyncHandlers()
+    }
+  }
+
+  socket.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data)
+      if (data?.type === 'connected') return
+      if (data?.type === 'ping') {
+        try {
+          socket.send(JSON.stringify({ type: 'pong' }))
+        } catch {
+          // ignore
+        }
+        return
+      }
+      if (data?.type === 'pong') return
+      notifyRealtimeListeners(data)
+    } catch {
+      // ignore non-JSON messages
+    }
+  }
+
+  socket.onclose = () => {
+    if (sharedSocket === socket) {
+      sharedSocket = null
+    }
+    clearHeartbeat()
+    if (sharedListeners.size > 0) {
+      scheduleReservationsReconnect()
+    }
+  }
+
+  socket.onerror = () => {
+    if (!sharedHasLoggedError) {
+      console.warn('[RealtimeWS] Backend realtime no disponible. Reintentando en segundo plano.')
+      sharedHasLoggedError = true
+    }
+    try {
+      socket.close()
+    } catch {
+      // ignore
     }
   }
 }
+
+export function subscribeReservationsRealtime(onMessage, options = {}) {
+  if (typeof onMessage !== 'function') {
+    return () => {}
+  }
+
+  const { onResync } = options
+  sharedListeners.add(onMessage)
+  if (typeof onResync === 'function') {
+    sharedResyncHandlers.add(onResync)
+  }
+  ensureReservationsSocket()
+
+  return () => {
+    sharedListeners.delete(onMessage)
+    if (typeof onResync === 'function') {
+      sharedResyncHandlers.delete(onResync)
+    }
+    if (sharedListeners.size === 0) {
+      cancelPendingShutdown()
+      sharedShutdownTimer = setTimeout(() => {
+        sharedShutdownTimer = null
+        if (sharedListeners.size > 0) return
+        if (sharedReconnectTimer) {
+          clearTimeout(sharedReconnectTimer)
+          sharedReconnectTimer = null
+        }
+        sharedReconnectAttempt = 0
+        sharedLastConnectAt = 0
+        clearHeartbeat()
+        if (sharedSocket) {
+          try {
+            sharedSocket.onclose = null
+            sharedSocket.close()
+          } catch {
+            // ignore
+          }
+          sharedSocket = null
+        }
+      }, SHUTDOWN_GRACE_MS)
+    }
+  }
+}
+
+export function applyRealtimeRecordPatch(list, event, options = {}) {
+  const { idKey = 'id', mapper, prepend = true } = options
+  if (!Array.isArray(list)) return list
+  const record = event?.record
+  if (!record) return list
+  const id = String(record?.[idKey] || '')
+  if (!id) return list
+  const action = String(event?.action || '').toLowerCase()
+  const mappedRecord = mapper ? mapper(record) : record
+
+  if (action === 'delete') {
+    const next = list.filter((item) => String(item?.[idKey]) !== id)
+    return next.length === list.length ? list : next
+  }
+
+  const index = list.findIndex((item) => String(item?.[idKey]) === id)
+  if (index === -1) {
+    return prepend ? [mappedRecord, ...list] : [...list, mappedRecord]
+  }
+  const next = list.slice()
+  next[index] = { ...next[index], ...mappedRecord }
+  return next
+}
+
+export { mapReservation as mapReservationRecord, mapPenalty as mapPenaltyRecord }

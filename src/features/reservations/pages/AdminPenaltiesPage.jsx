@@ -10,6 +10,8 @@ import {
   listPenalties,
   listReservations,
   subscribeReservationsRealtime,
+  applyRealtimeRecordPatch,
+  mapPenaltyRecord,
 } from '../services/reservationsService'
 import './ReservationsPages.css'
 
@@ -219,8 +221,10 @@ function AdminPenaltiesPage({ user }) {
 
     const unsubscribe = subscribeReservationsRealtime((event) => {
       if (event?.topic === 'user_penalty') {
-        loadPenalties().catch(() => {})
+        setPenalties((prev) => applyRealtimeRecordPatch(prev, event, { mapper: mapPenaltyRecord }))
       }
+    }, {
+      onResync: () => loadPenalties().catch(() => {}),
     })
 
     return () => unsubscribe?.()

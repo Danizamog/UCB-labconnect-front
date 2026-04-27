@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   listReservations,
   subscribeReservationsRealtime,
+  applyRealtimeRecordPatch,
+  mapReservationRecord,
 } from '../services/reservationsService'
 import {
   listMyEnrolledTutorialSessions,
@@ -141,22 +143,46 @@ function UserHistoryPage({ user }) {
     }
   }, [])
 
+  const tutorialReloadTimerRef = useRef(null)
+  const userIdRef = useRef(String(user?.user_id || ''))
+
+  useEffect(() => {
+    userIdRef.current = String(user?.user_id || '')
+  }, [user?.user_id])
+
   useEffect(() => {
     loadHistory()
 
-    const unsubscribeReservations = subscribeReservationsRealtime((event) => {
-      if (event?.topic === 'lab_reservation' || event?.topic === 'tutorial_session' || event?.topic === 'user_notification') {
+    const scheduleTutorialReload = () => {
+      window.clearTimeout(tutorialReloadTimerRef.current)
+      tutorialReloadTimerRef.current = window.setTimeout(() => {
         loadHistory({ skipCache: true })
+      }, 1500)
+    }
+
+    const unsubscribeReservations = subscribeReservationsRealtime((event) => {
+      if (event?.topic === 'lab_reservation') {
+        const requestedBy = String(event?.record?.requested_by || '')
+        if (requestedBy && requestedBy === userIdRef.current) {
+          setReservations((prev) => applyRealtimeRecordPatch(prev, event, { mapper: mapReservationRecord }))
+        }
+        return
       }
+      if (event?.topic === 'tutorial_session' || event?.topic === 'user_notification') {
+        scheduleTutorialReload()
+      }
+    }, {
+      onResync: () => loadHistory({ skipCache: true }),
     })
 
     const unsubscribeTutorials = subscribeTutorialSessionsRealtime((event) => {
       if (event?.topic === 'tutorial_session' || event?.topic === 'user_notification') {
-        loadHistory({ skipCache: true })
+        scheduleTutorialReload()
       }
     })
 
     return () => {
+      window.clearTimeout(tutorialReloadTimerRef.current)
       unsubscribeReservations?.()
       unsubscribeTutorials?.()
     }
