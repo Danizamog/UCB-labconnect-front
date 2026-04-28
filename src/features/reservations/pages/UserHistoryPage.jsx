@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  listReservations,
+  listMyReservations,
   subscribeReservationsRealtime,
   applyRealtimeRecordPatch,
   mapReservationRecord,
@@ -8,7 +8,6 @@ import {
 import {
   listMyEnrolledTutorialSessions,
   listMyTutorialSessions,
-  subscribeTutorialSessionsRealtime,
 } from '../../tutorials/services/tutorialSessionsService'
 import { formatDateTime, formatStatus } from '../../../shared/utils/formatters'
 import './UserHistoryPage.css'
@@ -95,53 +94,52 @@ function UserHistoryPage({ user }) {
   const [activeFilter, setActiveFilter] = useState(FILTER_TYPES.ALL)
   const [keyword, setKeyword] = useState('')
 
-  const loadHistory = useCallback(async (options = {}) => {
-    setIsLoading(true)
-    setError('')
-
+  const loadReservationsOnly = useCallback(async (options = {}) => {
     try {
-      const [reservationsResult, enrolledResult, taughtResult] = await Promise.allSettled([
-        listReservations({ skipCache: options.skipCache }),
+      const data = await listMyReservations({ skipCache: options.skipCache })
+      setReservations(Array.isArray(data) ? data : [])
+    } catch {
+      setReservations([])
+    }
+  }, [])
+
+  const loadTutorialsOnly = useCallback(async () => {
+    try {
+      const [enrolledResult, taughtResult] = await Promise.allSettled([
         listMyEnrolledTutorialSessions(),
         listMyTutorialSessions(),
       ])
 
-      if (reservationsResult.status === 'fulfilled') {
-        setReservations(Array.isArray(reservationsResult.value) ? reservationsResult.value : [])
-      } else {
-        setReservations([])
-      }
-
-      const mergedTutorials = []
+      const merged = []
       if (enrolledResult.status === 'fulfilled' && Array.isArray(enrolledResult.value)) {
-        mergedTutorials.push(...enrolledResult.value)
+        merged.push(...enrolledResult.value)
       }
       if (taughtResult.status === 'fulfilled' && Array.isArray(taughtResult.value)) {
-        mergedTutorials.push(...taughtResult.value)
+        merged.push(...taughtResult.value)
       }
 
       const seenIds = new Set()
-      const uniqueTutorials = mergedTutorials.filter((item) => {
-        if (!item?.id || seenIds.has(item.id)) {
-          return false
-        }
+      setTutorials(merged.filter((item) => {
+        if (!item?.id || seenIds.has(item.id)) return false
         seenIds.add(item.id)
         return true
-      })
-
-      setTutorials(uniqueTutorials)
-
-      if (reservationsResult.status === 'rejected' && enrolledResult.status === 'rejected' && taughtResult.status === 'rejected') {
-        setError('No se pudo cargar el historial en este momento.')
-      }
+      }))
     } catch {
-      setReservations([])
       setTutorials([])
+    }
+  }, [])
+
+  const loadHistory = useCallback(async (options = {}) => {
+    setIsLoading(true)
+    setError('')
+    try {
+      await Promise.all([loadReservationsOnly(options), loadTutorialsOnly()])
+    } catch {
       setError('No se pudo cargar el historial en este momento.')
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [loadReservationsOnly, loadTutorialsOnly])
 
   const tutorialReloadTimerRef = useRef(null)
   const userIdRef = useRef(String(user?.user_id || ''))
@@ -156,11 +154,27 @@ function UserHistoryPage({ user }) {
     const scheduleTutorialReload = () => {
       window.clearTimeout(tutorialReloadTimerRef.current)
       tutorialReloadTimerRef.current = window.setTimeout(() => {
-        loadHistory({ skipCache: true })
+        loadTutorialsOnly()
       }, 1500)
     }
 
-    const unsubscribeReservations = subscribeReservationsRealtime((event) => {
+    const tutorialEventConcernsUser = (event) => {
+      const userId = userIdRef.current
+      if (!userId) return false
+      const record = event?.record || {}
+      if (String(record.tutor_id || '') === userId) return true
+      const enrolled = Array.isArray(record.enrolled_students) ? record.enrolled_students : []
+      return enrolled.some((student) => String(student?.student_id || '') === userId)
+    }
+
+    const notificationConcernsUser = (event) => {
+      const userId = userIdRef.current
+      if (!userId) return false
+      const recipients = Array.isArray(event?.recipients) ? event.recipients : []
+      return event?.record?.recipient_user_id === userId || recipients.includes(userId)
+    }
+
+    const unsubscribe = subscribeReservationsRealtime((event) => {
       if (event?.topic === 'lab_reservation') {
         const requestedBy = String(event?.record?.requested_by || '')
         if (requestedBy && requestedBy === userIdRef.current) {
@@ -168,25 +182,25 @@ function UserHistoryPage({ user }) {
         }
         return
       }
-      if (event?.topic === 'tutorial_session' || event?.topic === 'user_notification') {
+      if (event?.topic === 'tutorial_session') {
+        if (tutorialEventConcernsUser(event)) {
+          scheduleTutorialReload()
+        }
+        return
+      }
+      if (event?.topic === 'user_notification' && notificationConcernsUser(event)) {
         scheduleTutorialReload()
       }
     }, {
+      topics: ['lab_reservation', 'tutorial_session', 'user_notification'],
       onResync: () => loadHistory({ skipCache: true }),
-    })
-
-    const unsubscribeTutorials = subscribeTutorialSessionsRealtime((event) => {
-      if (event?.topic === 'tutorial_session' || event?.topic === 'user_notification') {
-        scheduleTutorialReload()
-      }
     })
 
     return () => {
       window.clearTimeout(tutorialReloadTimerRef.current)
-      unsubscribeReservations?.()
-      unsubscribeTutorials?.()
+      unsubscribe?.()
     }
-  }, [loadHistory])
+  }, [loadHistory, loadTutorialsOnly])
 
   const reservationHistory = useMemo(() => {
     const currentUserId = String(user?.user_id || '')

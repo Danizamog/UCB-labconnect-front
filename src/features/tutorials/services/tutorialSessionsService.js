@@ -224,9 +224,14 @@ export async function cancelTutorialEnrollment(sessionId) {
 }
 
 export function subscribeTutorialSessionsRealtime(onMessage, options = {}) {
+  const { topics: extraTopics, laboratoryIds, ...rest } = options
+  const topics = Array.isArray(extraTopics) && extraTopics.length > 0
+    ? extraTopics
+    : ['tutorial_session', 'user_notification']
+
   return subscribeReservationsRealtime((event) => {
     if (event?.topic === 'tutorial_session' || event?.topic === 'user_notification') {
       onMessage?.(event)
     }
-  }, options)
+  }, { ...rest, topics, laboratoryIds })
 }

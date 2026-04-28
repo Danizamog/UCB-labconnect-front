@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { listAdminLabs } from '../../admin/services/infrastructureService'
 import { getLabAvailability } from '../../reservations/services/reservationsService'
 import {
@@ -191,18 +191,43 @@ function TutorTutorialSessionsPage() {
     }
   }
 
+  const sessionIdsRef = useRef(new Set())
+  const tutorIdRef = useRef('')
+  const reloadTimerRef = useRef(null)
+
+  useEffect(() => {
+    sessionIdsRef.current = new Set(sessions.map((session) => session.id))
+    if (!tutorIdRef.current && sessions.length > 0) {
+      tutorIdRef.current = String(sessions[0]?.tutor_id || '')
+    }
+  }, [sessions])
+
   useEffect(() => {
     loadSessions()
     loadLabs()
 
-    const unsubscribe = subscribeTutorialSessionsRealtime((event) => {
-      if (event?.topic === 'tutorial_session') {
+    const scheduleReload = () => {
+      window.clearTimeout(reloadTimerRef.current)
+      reloadTimerRef.current = window.setTimeout(() => {
         loadSessions()
         setAvailabilityRefreshNonce((value) => value + 1)
-      }
+      }, 1000)
+    }
+
+    const unsubscribe = subscribeTutorialSessionsRealtime((event) => {
+      if (event?.topic !== 'tutorial_session') return
+      const recordId = String(event?.record?.id || '')
+      const recordTutorId = String(event?.record?.tutor_id || '')
+      const concernsMe =
+        (recordId && sessionIdsRef.current.has(recordId)) ||
+        (tutorIdRef.current && recordTutorId && recordTutorId === tutorIdRef.current)
+      if (concernsMe) scheduleReload()
     })
 
-    return () => unsubscribe?.()
+    return () => {
+      window.clearTimeout(reloadTimerRef.current)
+      unsubscribe?.()
+    }
   }, [])
 
   const totalSeats = useMemo(

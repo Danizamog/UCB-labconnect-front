@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   listMyEnrolledTutorialSessions,
   subscribeTutorialSessionsRealtime,
@@ -46,27 +46,38 @@ function UserTutorialAttendanceHistoryPage({ user }) {
     }
   }, [])
 
+  const reloadTimerRef = useRef(null)
+
   useEffect(() => {
     loadSessions()
 
+    const userId = String(user?.user_id || '')
+    const scheduleReload = () => {
+      window.clearTimeout(reloadTimerRef.current)
+      reloadTimerRef.current = window.setTimeout(loadSessions, 1500)
+    }
+
     const unsubscribe = subscribeTutorialSessionsRealtime((event) => {
       if (event?.topic === 'tutorial_session') {
-        loadSessions()
+        if (!userId) return
+        const enrolled = Array.isArray(event?.record?.enrolled_students) ? event.record.enrolled_students : []
+        const concerns = enrolled.some((student) => String(student?.student_id || '') === userId)
+        if (concerns) scheduleReload()
+        return
       }
 
       if (event?.topic === 'user_notification') {
         const recipients = Array.isArray(event?.recipients) ? event.recipients : []
         const isCurrentUserNotification =
-          event?.record?.recipient_user_id === (user?.user_id || '') ||
-          recipients.includes(user?.user_id || '')
-
-        if (isCurrentUserNotification) {
-          loadSessions()
-        }
+          event?.record?.recipient_user_id === userId || recipients.includes(userId)
+        if (isCurrentUserNotification) scheduleReload()
       }
     })
 
-    return () => unsubscribe?.()
+    return () => {
+      window.clearTimeout(reloadTimerRef.current)
+      unsubscribe?.()
+    }
   }, [loadSessions, user?.user_id])
 
   const completedSessions = useMemo(() => {

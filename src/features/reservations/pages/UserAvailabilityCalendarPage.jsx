@@ -210,17 +210,24 @@ function UserAvailabilityCalendarPage({ user }) {
   const slotsRefreshTimerRef = useRef(null)
 
   useEffect(() => {
+    if (!selectedLab) return undefined
+
     const unsubscribe = subscribeReservationsRealtime((event) => {
       if (!event?.topic || (event.topic !== 'lab_reservation' && event.topic !== 'tutorial_session')) {
         return
       }
 
       const eventLabId = String(event?.record?.laboratory_id || '')
-      if (eventLabId && selectedLab && eventLabId !== String(selectedLab)) {
+      if (eventLabId && eventLabId !== String(selectedLab)) {
         return
       }
 
-      if (selectedLab && selectedDate) {
+      const eventDate = String(event?.record?.start_at || event?.record?.session_date || '').slice(0, 10)
+      if (eventDate && selectedDate && eventDate !== selectedDate) {
+        return
+      }
+
+      if (selectedDate) {
         window.clearTimeout(slotsRefreshTimerRef.current)
         slotsRefreshTimerRef.current = window.setTimeout(() => {
           getLabAvailability(selectedLab, selectedDate, { skipCache: true })
@@ -229,8 +236,10 @@ function UserAvailabilityCalendarPage({ user }) {
         }, 800)
       }
     }, {
+      topics: ['lab_reservation', 'tutorial_session'],
+      laboratoryIds: [String(selectedLab)],
       onResync: () => {
-        if (selectedLab && selectedDate) {
+        if (selectedDate) {
           getLabAvailability(selectedLab, selectedDate, { skipCache: true })
             .then((payload) => setSlots(Array.isArray(payload?.slots) ? payload.slots : []))
             .catch(() => {})

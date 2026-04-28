@@ -8,7 +8,7 @@ import {
   createPenalty,
   liftPenalty,
   listPenalties,
-  listReservations,
+  listReservationsPage,
   subscribeReservationsRealtime,
   applyRealtimeRecordPatch,
   mapPenaltyRecord,
@@ -176,7 +176,7 @@ function AdminPenaltiesPage({ user }) {
 
   const loadSupportData = useCallback(async () => {
     const [reservationsResult, assetsResult, ticketsResult, profilesResult, labsResult] = await Promise.allSettled([
-      listReservations(),
+      listReservationsPage({ pageSize: 200, sortBy: 'updated', sortType: 'DESC' }),
       listAssets(),
       listAssetMaintenanceTickets(),
       listUserProfiles(),
@@ -184,7 +184,7 @@ function AdminPenaltiesPage({ user }) {
     ])
 
     if (reservationsResult.status === 'fulfilled') {
-      setReservations(reservationsResult.value)
+      setReservations(Array.isArray(reservationsResult.value?.items) ? reservationsResult.value.items : [])
     } else {
       setReservations([])
     }
@@ -224,6 +224,7 @@ function AdminPenaltiesPage({ user }) {
         setPenalties((prev) => applyRealtimeRecordPatch(prev, event, { mapper: mapPenaltyRecord }))
       }
     }, {
+      topics: ['user_penalty'],
       onResync: () => loadPenalties().catch(() => {}),
     })
 

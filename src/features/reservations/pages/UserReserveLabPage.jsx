@@ -12,7 +12,7 @@ import {
   isLabAccessibleToUser,
   listAvailableLabs,
   listMyPenalties,
-  listReservations,
+  listMyReservations,
   prefetchLabAvailability,
   subscribeReservationsRealtime,
   updateReservation,
@@ -299,7 +299,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     try {
       const [labsData, reservationsData, penaltiesData] = await Promise.all([
         listAvailableLabs(user),
-        listReservations(),
+        listMyReservations(),
         listMyPenalties(),
       ])
       setLabs(labsData)
@@ -350,6 +350,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
         }
       }
     }, {
+      topics: ['lab_reservation', 'user_penalty', 'user_notification'],
       onResync: () => {
         loadData()
         setAvailabilityRefreshNonce((value) => value + 1)

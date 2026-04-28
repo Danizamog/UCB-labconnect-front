@@ -13,7 +13,6 @@ import { listUserProfiles } from '../../admin/services/profileService'
 import {
   createWalkInReservation,
   getOccupancyDashboard,
-  listReservations,
   listReservationsPage,
   markReservationAbsent,
   registerReservationEntry,
@@ -149,7 +148,8 @@ function formatAccessTime(value) {
 }
 
 function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
-  const [reservations, setReservations] = useState([])
+  const [todaysReservations, setTodaysReservations] = useState([])
+  const [reservationCounters, setReservationCounters] = useState({ total: 0, pending: 0, walkIn: 0 })
   const [tableReservations, setTableReservations] = useState([])
   const [tableLoading, setTableLoading] = useState(false)
   const [tableFilters, setTableFilters] = useState(defaultTableFilters)
@@ -225,15 +225,25 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
 
   const loadOperationalData = useCallback(async () => {
     try {
-      const [reservationsResult, occupancyResult] = await Promise.allSettled([
-        listReservations(),
+      const today = todayDate()
+      const [todayPage, pendingCountPage, walkInPage, totalCountPage, occupancyResult] = await Promise.allSettled([
+        listReservationsPage({ date: today, pageSize: 100, sortBy: 'start_at', sortType: 'ASC' }),
+        listReservationsPage({ status: 'pending', pageSize: 1 }),
+        listReservationsPage({ where: 'is_walk_in=true', pageSize: 1 }),
+        listReservationsPage({ pageSize: 1 }),
         getOccupancyDashboard(),
       ])
-      if (reservationsResult.status !== 'fulfilled' || occupancyResult.status !== 'fulfilled') {
+
+      if (occupancyResult.status !== 'fulfilled' || todayPage.status !== 'fulfilled') {
         throw new Error('No se pudo cargar el panel de reservas.')
       }
 
-      setReservations(reservationsResult.value)
+      setTodaysReservations(todayPage.value.items)
+      setReservationCounters({
+        total: totalCountPage.status === 'fulfilled' ? totalCountPage.value.totalElements : 0,
+        pending: pendingCountPage.status === 'fulfilled' ? pendingCountPage.value.totalElements : 0,
+        walkIn: walkInPage.status === 'fulfilled' ? walkInPage.value.totalElements : 0,
+      })
       setOccupancy(occupancyResult.value)
       setError('')
     } catch (err) {
@@ -276,10 +286,16 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     loadOperationalData()
 
     const unsubscribe = subscribeReservationsRealtime((event) => {
-      if (event?.topic !== 'lab_reservation' && event?.topic !== 'lab_access') return
+      if (event?.topic !== 'lab_reservation') return
 
+      const today = todayDate()
+      const recordDate = String(event?.record?.start_at || '').slice(0, 10)
       const patchOptions = { mapper: mapReservationRecord }
-      setReservations((prev) => applyRealtimeRecordPatch(prev, event, patchOptions))
+
+      if (recordDate === today) {
+        setTodaysReservations((prev) => applyRealtimeRecordPatch(prev, event, patchOptions))
+      }
+
       setTableReservations((prev) => {
         const action = String(event?.action || '').toLowerCase()
         const id = String(event?.record?.id || '')
@@ -296,11 +312,10 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
 
       window.clearTimeout(realtimeRefreshTimeoutRef.current)
       realtimeRefreshTimeoutRef.current = window.setTimeout(() => {
-        getOccupancyDashboard()
-          .then((value) => setOccupancy(value))
-          .catch(() => {})
+        loadOperationalData().catch(() => {})
       }, 1500)
     }, {
+      topics: ['lab_reservation'],
       onResync: () => {
         loadOperationalData()
         loadTableData(tableQueryRef.current)
@@ -352,8 +367,8 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     onNavigate?.(`/app/admin/reservas#${workspaceId}`, { replace: true })
   }, [onNavigate])
 
-  const pendingCount = reservations.filter((item) => item.status === 'pending').length
-  const walkInCount = reservations.filter((item) => item.is_walk_in).length
+  const pendingCount = reservationCounters.pending
+  const walkInCount = reservationCounters.walkIn
   const selectedWalkInLab = labById[String(walkInForm.laboratory_id)] || null
   const selectedWalkInProfile = profileById[String(walkInForm.requested_by)] || null
   const selectedWalkInLabOccupancy =
@@ -379,19 +394,19 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   const isEditChronologyValid = minutesFromClock(draft.end_time) > minutesFromClock(draft.start_time)
   const editValidationMessage = !isEditChronologyValid ? 'La hora de fin debe ser mayor a la hora de inicio.' : ''
 
-  const todaysReservations = useMemo(
-    () => reservations.filter((item) => item.date === todayDate()).sort((a, b) => a.start_time.localeCompare(b.start_time)),
-    [reservations],
-  )
-  const actionableTodaysReservations = useMemo(
-    () => todaysReservations.filter((item) => item.status === 'approved' || item.status === 'in_progress'),
+  const sortedTodaysReservations = useMemo(
+    () => [...todaysReservations].sort((a, b) => a.start_time.localeCompare(b.start_time)),
     [todaysReservations],
   )
+  const actionableTodaysReservations = useMemo(
+    () => sortedTodaysReservations.filter((item) => item.status === 'approved' || item.status === 'in_progress'),
+    [sortedTodaysReservations],
+  )
   const editingReservation = useMemo(
-    () => reservations.find((item) => item.id === editingReservationId)
+    () => todaysReservations.find((item) => item.id === editingReservationId)
       || tableReservations.find((item) => item.id === editingReservationId)
       || null,
-    [editingReservationId, reservations, tableReservations],
+    [editingReservationId, todaysReservations, tableReservations],
   )
   const canApproveFromModal = Boolean(editingReservation && editingReservation.status === 'pending' && canManage)
   const canRejectFromModal = canApproveFromModal
@@ -662,7 +677,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
             <span className="reservations-summary-card-icon"><LayoutDashboard size={18} /></span>
             <div>
               <span>Reservas</span>
-              <strong>{reservations.length}</strong>
+              <strong>{reservationCounters.total}</strong>
             </div>
           </div>
           <div className="reservations-summary-card tone-requests">
@@ -683,7 +698,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
             <span className="reservations-summary-card-icon"><ClipboardList size={18} /></span>
             <div>
               <span>Hoy</span>
-              <strong>{todaysReservations.length}</strong>
+              <strong>{sortedTodaysReservations.length}</strong>
             </div>
           </div>
         </div>
@@ -740,7 +755,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                 <span>Reservas</span>
                 <span className="reservations-task-card-icon"><LayoutDashboard size={18} /></span>
               </div>
-              <strong>{reservations.length}</strong>
+              <strong>{reservationCounters.total}</strong>
               <p>Total de solicitudes registradas.</p>
             </article>
             <article className="reservations-task-card tone-requests">

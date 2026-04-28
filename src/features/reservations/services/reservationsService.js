@@ -400,6 +400,17 @@ export async function listReservations(filters = {}) {
     })
 }
 
+export async function listMyReservations() {
+  const data = await request(`${reservationsBase}/reservations/mine`, { cacheTtlMs: 2000 })
+  const mapped = Array.isArray(data) ? data.map(mapReservation) : []
+  return mapped.sort((a, b) => {
+    if (a.date === b.date) {
+      return a.start_time.localeCompare(b.start_time)
+    }
+    return a.date.localeCompare(b.date)
+  })
+}
+
 export async function getReservationById(reservationId) {
   if (!reservationId) {
     throw new Error('No se pudo identificar la reserva seleccionada.')
@@ -751,16 +762,24 @@ let sharedSocket = null
 let sharedReconnectTimer = null
 let sharedHasLoggedError = false
 let sharedReconnectAttempt = 0
-let sharedHeartbeatTimer = null
 let sharedLastConnectAt = 0
 let sharedShutdownTimer = null
 const sharedListeners = new Set()
 const sharedResyncHandlers = new Set()
+const sharedSubscriptions = new Map()
 const RECONNECT_BASE_MS = 1500
 const RECONNECT_MAX_MS = 30000
-const HEARTBEAT_INTERVAL_MS = 25000
 const RESYNC_THRESHOLD_MS = 5000
 const SHUTDOWN_GRACE_MS = 250
+const ALL_REALTIME_TOPICS = [
+  'lab_reservation',
+  'lab_access',
+  'lab_block',
+  'lab_schedule',
+  'tutorial_session',
+  'user_notification',
+  'user_penalty',
+]
 
 function getReservationsWsUrl() {
   const configured = (import.meta.env.VITE_RESERVATION_WS_URL || '').replace(/\/$/, '')
@@ -794,23 +813,39 @@ function notifyResyncHandlers() {
   })
 }
 
-function clearHeartbeat() {
-  if (sharedHeartbeatTimer) {
-    clearInterval(sharedHeartbeatTimer)
-    sharedHeartbeatTimer = null
+function aggregateSubscription() {
+  const topics = new Set()
+  const labs = new Set()
+  let hasUnscoped = false
+
+  sharedSubscriptions.forEach((entry) => {
+    if (Array.isArray(entry?.topics) && entry.topics.length > 0) {
+      entry.topics.forEach((topic) => topic && topics.add(String(topic)))
+    } else {
+      ALL_REALTIME_TOPICS.forEach((topic) => topics.add(topic))
+    }
+
+    if (Array.isArray(entry?.laboratoryIds) && entry.laboratoryIds.length > 0) {
+      entry.laboratoryIds.forEach((lab) => lab && labs.add(String(lab)))
+    } else {
+      hasUnscoped = true
+    }
+  })
+
+  return {
+    topics: Array.from(topics),
+    laboratoryIds: hasUnscoped ? [] : Array.from(labs),
   }
 }
 
-function startHeartbeat(socket) {
-  clearHeartbeat()
-  sharedHeartbeatTimer = setInterval(() => {
-    if (socket.readyState !== WebSocket.OPEN) return
-    try {
-      socket.send(JSON.stringify({ type: 'ping' }))
-    } catch {
-      // ignore
-    }
-  }, HEARTBEAT_INTERVAL_MS)
+function sendSubscription() {
+  if (!sharedSocket || sharedSocket.readyState !== WebSocket.OPEN) return
+  const payload = aggregateSubscription()
+  try {
+    sharedSocket.send(JSON.stringify({ type: 'subscribe', ...payload }))
+  } catch {
+    // ignore
+  }
 }
 
 function scheduleReservationsReconnect() {
@@ -864,7 +899,7 @@ function ensureReservationsSocket() {
     sharedHasLoggedError = false
     sharedReconnectAttempt = 0
     sharedLastConnectAt = Date.now()
-    startHeartbeat(socket)
+    sendSubscription()
     if (import.meta.env.DEV) {
       console.debug('[RealtimeWS] Connected (shared)')
     }
@@ -896,7 +931,6 @@ function ensureReservationsSocket() {
     if (sharedSocket === socket) {
       sharedSocket = null
     }
-    clearHeartbeat()
     if (sharedListeners.size > 0) {
       scheduleReservationsReconnect()
     }
@@ -920,18 +954,25 @@ export function subscribeReservationsRealtime(onMessage, options = {}) {
     return () => {}
   }
 
-  const { onResync } = options
+  const { onResync, topics, laboratoryIds } = options
   sharedListeners.add(onMessage)
+  sharedSubscriptions.set(onMessage, {
+    topics: Array.isArray(topics) ? topics.filter(Boolean) : null,
+    laboratoryIds: Array.isArray(laboratoryIds) ? laboratoryIds.filter(Boolean) : null,
+  })
   if (typeof onResync === 'function') {
     sharedResyncHandlers.add(onResync)
   }
   ensureReservationsSocket()
+  sendSubscription()
 
   return () => {
     sharedListeners.delete(onMessage)
+    sharedSubscriptions.delete(onMessage)
     if (typeof onResync === 'function') {
       sharedResyncHandlers.delete(onResync)
     }
+    sendSubscription()
     if (sharedListeners.size === 0) {
       cancelPendingShutdown()
       sharedShutdownTimer = setTimeout(() => {
@@ -943,7 +984,6 @@ export function subscribeReservationsRealtime(onMessage, options = {}) {
         }
         sharedReconnectAttempt = 0
         sharedLastConnectAt = 0
-        clearHeartbeat()
         if (sharedSocket) {
           try {
             sharedSocket.onclose = null
@@ -956,6 +996,16 @@ export function subscribeReservationsRealtime(onMessage, options = {}) {
       }, SHUTDOWN_GRACE_MS)
     }
   }
+}
+
+export function updateRealtimeSubscription(onMessage, options = {}) {
+  if (!sharedSubscriptions.has(onMessage)) return
+  const { topics, laboratoryIds } = options
+  sharedSubscriptions.set(onMessage, {
+    topics: Array.isArray(topics) ? topics.filter(Boolean) : null,
+    laboratoryIds: Array.isArray(laboratoryIds) ? laboratoryIds.filter(Boolean) : null,
+  })
+  sendSubscription()
 }
 
 export function applyRealtimeRecordPatch(list, event, options = {}) {
