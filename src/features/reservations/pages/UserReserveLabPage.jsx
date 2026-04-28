@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRef } from 'react'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import TutorialSessionDetailModal from '../../tutorials/pages/TutorialSessionDetailModal'
 import { getTutorialSessionById } from '../../tutorials/services/tutorialSessionsService'
@@ -12,9 +13,13 @@ import {
   listAvailableLabs,
   listMyPenalties,
   listReservations,
+  prefetchLabAvailability,
   subscribeReservationsRealtime,
   updateReservation,
+  applyRealtimeRecordPatch,
+  mapReservationRecord,
 } from '../services/reservationsService'
+import { listAdminAreas } from '../../admin/services/infrastructureService'
 import ReservationDetailModal from './ReservationDetailModal'
 import ReservationEditModal from './ReservationEditModal'
 import './ReservationsPages.css'
@@ -138,6 +143,21 @@ function buildLocalDateTime(dateValue, timeValue) {
   return new Date(year, month - 1, day, hour, minute, 0, 0)
 }
 
+function buildPrefetchDays(dateValue, count = 7) {
+  const start = new Date(`${dateValue || todayLocalDateString()}T00:00:00`)
+  if (Number.isNaN(start.getTime())) {
+    return []
+  }
+
+  const days = []
+  for (let index = 0; index < count; index += 1) {
+    const current = new Date(start)
+    current.setDate(start.getDate() + index)
+    days.push(`${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`)
+  }
+  return days
+}
+
 function isPastSlotForDate(slot, dateValue, referenceNow = new Date()) {
   const slotStart = buildLocalDateTime(dateValue, slot?.start_time)
   if (!slotStart) {
@@ -234,6 +254,12 @@ function isCreatableSlot(slot) {
 
 function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead }) {
   const [labs, setLabs] = useState([])
+  const [labSearch, setLabSearch] = useState('')
+  const [areas, setAreas] = useState([])
+  const [labArea, setLabArea] = useState('')
+  const [labIsActive, setLabIsActive] = useState('')
+  const [labSort, setLabSort] = useState('')
+  const [isLoadingLabs, setIsLoadingLabs] = useState(false)
   const [reservations, setReservations] = useState([])
   const [penalties, setPenalties] = useState([])
   const [slots, setSlots] = useState([])
@@ -250,6 +276,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
   const [isLoadingReservationDetails, setIsLoadingReservationDetails] = useState(false)
   const [reservationToCancel, setReservationToCancel] = useState(null)
   const [selectedSlotKey, setSelectedSlotKey] = useState('')
+  const selectedSlotKeyRef = useRef('')
   const [availabilityRefreshNonce, setAvailabilityRefreshNonce] = useState(0)
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
@@ -271,16 +298,22 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     }
   }, [])
 
+  useEffect(() => {
+    selectedSlotKeyRef.current = selectedSlotKey
+  }, [selectedSlotKey])
+
   const loadData = useCallback(async () => {
     try {
-      const [labsData, reservationsData, penaltiesData] = await Promise.all([
+      const [labsData, reservationsData, penaltiesData, areasData] = await Promise.all([
         listAvailableLabs(user),
         listReservations(),
         listMyPenalties(),
+        listAdminAreas(),
       ])
       setLabs(labsData)
       setReservations(reservationsData)
       setPenalties(penaltiesData)
+      setAreas(Array.isArray(areasData) ? areasData : [])
       setForm((prev) => (prev.laboratory_id || labsData.length === 0 ? prev : { ...prev, laboratory_id: labsData[0].id }))
       setError(labsData.length === 0 ? 'No tienes permisos para reservar en los laboratorios disponibles actualmente.' : '')
     } catch (err) {
@@ -293,7 +326,11 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
 
     const unsubscribe = subscribeReservationsRealtime((event) => {
       if (event?.topic === 'lab_reservation') {
-        loadData()
+        const userId = String(user?.user_id || '')
+        const requestedBy = String(event?.record?.requested_by || '')
+        if (userId && requestedBy && requestedBy === userId) {
+          setReservations((prev) => applyRealtimeRecordPatch(prev, event, { mapper: mapReservationRecord }))
+        }
         setAvailabilityRefreshNonce((value) => value + 1)
         return
       }
@@ -321,6 +358,11 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
           setMessage('Tienes una nueva notificacion relacionada con tus reservas o tutorias.')
         }
       }
+    }, {
+      onResync: () => {
+        loadData()
+        setAvailabilityRefreshNonce((value) => value + 1)
+      },
     })
 
     return () => unsubscribe?.()
@@ -357,6 +399,41 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     [form.laboratory_id, labs],
   )
 
+  useEffect(() => {
+    let mounted = true
+    const t = setTimeout(() => {
+      ;(async () => {
+        setIsLoadingLabs(true)
+        try {
+          const useFilters = Boolean(labSearch || labArea || String(labIsActive) !== '' || labSort)
+          const filters = {}
+          if (labSearch) filters.name = labSearch
+          if (labArea) filters.area_id = labArea
+          if (String(labIsActive) !== '') filters.is_active = String(labIsActive)
+          if (labSort) filters.sort = labSort
+          if (useFilters) filters.per_page = 200
+
+          const labsData = useFilters ? await listAvailableLabs(user, filters) : await listAvailableLabs(user)
+
+          if (!mounted) return
+          setLabs(labsData)
+          setForm((prev) => (prev.laboratory_id || labsData.length === 0 ? prev : { ...prev, laboratory_id: labsData[0].id }))
+          setError(labsData.length === 0 ? 'No tienes permisos para reservar en los laboratorios disponibles actualmente.' : '')
+        } catch (err) {
+          if (!mounted) return
+          setError(err.message || 'No se pudo buscar laboratorios.')
+        } finally {
+          if (mounted) setIsLoadingLabs(false)
+        }
+      })()
+    }, 350)
+
+    return () => {
+      mounted = false
+      clearTimeout(t)
+    }
+  }, [labSearch, labArea, labIsActive, labSort, user])
+
   const selectedLabIsAccessible = useMemo(
     () => (selectedLab ? isLabAccessibleToUser(selectedLab, user) : false),
     [selectedLab, user],
@@ -376,7 +453,9 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
 
       setIsLoadingSlots(true)
       try {
-        const payload = await getLabAvailability(form.laboratory_id, form.date)
+        const payload = await getLabAvailability(form.laboratory_id, form.date, {
+          skipCache: availabilityRefreshNonce > 0,
+        })
         if (!mounted) {
           return
         }
@@ -384,7 +463,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
         const nextSlots = Array.isArray(payload?.slots) ? payload.slots : []
         setSlots(nextSlots)
 
-        const currentFormKey = `${form.start_time}-${form.end_time}`
+        const currentFormKey = selectedSlotKeyRef.current
         const matchingAvailableSlot = nextSlots.find(
           (slot) => getSlotKey(slot) === currentFormKey && slot.state === 'available',
         )
@@ -416,7 +495,19 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     return () => {
       mounted = false
     }
-  }, [availabilityRefreshNonce, form.date, form.end_time, form.laboratory_id, form.start_time, selectedLabIsAccessible])
+  }, [availabilityRefreshNonce, form.date, form.laboratory_id, selectedLabIsAccessible])
+
+  useEffect(() => {
+    if (!form.laboratory_id || !form.date || !selectedLabIsAccessible) {
+      return undefined
+    }
+
+    const timer = window.setTimeout(() => {
+      prefetchLabAvailability(form.laboratory_id, buildPrefetchDays(form.date, 7))
+    }, 150)
+
+    return () => window.clearTimeout(timer)
+  }, [form.date, form.laboratory_id, selectedLabIsAccessible])
 
   const labNameById = useMemo(
     () => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])),
@@ -921,8 +1012,8 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       <header className="reservations-header">
         <div>
           <p className="reservations-kicker">Solicitud de uso</p>
-          <h2>Reservar laboratorio por horas</h2>
-          <p>Completa los datos para registrar una solicitud y administra tus reservas con cambios o cancelaciones cuando aun haya tiempo disponible.</p>
+          <h2>Reservar laboratorio</h2>
+          <p>Elige laboratorio, fecha y horario. Luego revisa tus solicitudes y cambios desde esta misma pantalla.</p>
         </div>
         <div className="reservations-summary">
           <div>
@@ -1168,37 +1259,50 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
         <form className="reservations-form" onSubmit={handleSubmit}>
           <div className="reservations-form-section">
             <span className="reservations-form-section-label">1 - Laboratorio</span>
-            <label>
-              <span>Laboratorio</span>
-              <select
-                value={form.laboratory_id}
-                onChange={(event) => setForm((prev) => ({
-                  ...prev,
-                  laboratory_id: event.target.value,
-                  start_time: '',
-                  end_time: '',
-                }))}
-                disabled={Boolean(activePenalty)}
-                required
-              >
-                <option value="">Selecciona un laboratorio</option>
-                {labs.map((lab) => (
-                  <option key={lab.id} value={lab.id}>{lab.name}</option>
-                ))}
-              </select>
-            </label>
-            {!selectedLabIsAccessible && form.laboratory_id ? (
-              <p className="reservation-inline-hint">
-                No tienes permisos para reservar este laboratorio. El formulario se deshabilita hasta elegir uno habilitado.
-              </p>
-            ) : null}
-          </div>
-
-          <div className="reservations-form-section">
-            <span className="reservations-form-section-label">2 - Fecha y Bloque Horario</span>
-            <div className="reservations-form-grid">
+            <div className="reservations-controls">
               <label>
-                <span>Fecha</span>
+                <span>Buscar laboratorio</span>
+                <input
+                  type="search"
+                  placeholder={isLoadingLabs ? 'Buscando...' : 'Buscar por nombre o ubicacion...'}
+                  value={labSearch}
+                  onChange={(e) => setLabSearch(e.target.value)}
+                  disabled={Boolean(activePenalty)}
+                />
+              </label>
+
+              <label>
+                <span>Área (Tipo)</span>
+                <select value={labArea} onChange={(e) => setLabArea(e.target.value)} disabled={Boolean(activePenalty)}>
+                  <option value="">Todas las áreas</option>
+                  {areas.map((area) => (
+                    <option key={area.id} value={area.id}>{area.name}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                <span>Estado</span>
+                <select value={labIsActive} onChange={(e) => setLabIsActive(e.target.value)} disabled={Boolean(activePenalty)}>
+                  <option value="">Todos</option>
+                  <option value="true">Activos</option>
+                  <option value="false">Inactivos</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Orden alfabético</span>
+                <select value={labSort} onChange={(e) => setLabSort(e.target.value)} disabled={Boolean(activePenalty)}>
+                  <option value="">Por defecto</option>
+                  <option value="name">Nombre (A-Z)</option>
+                  <option value="-name">Nombre (Z-A)</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="reservations-form-grid" style={{ marginTop: '1rem', borderTop: '1px dashed var(--border-color)', paddingTop: '1rem' }}>
+              <label>
+                <span>Fecha para búsqueda</span>
                 <input
                   type="date"
                   value={form.date}
@@ -1214,6 +1318,36 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                   required
                 />
               </label>
+              <label style={{ flex: 2 }}>
+                <span>Seleccionar Laboratorio</span>
+                <select
+                  value={form.laboratory_id}
+                  onChange={(event) => setForm((prev) => ({
+                    ...prev,
+                    laboratory_id: event.target.value,
+                    start_time: '',
+                    end_time: '',
+                  }))}
+                  disabled={Boolean(activePenalty)}
+                  required
+                >
+                  <option value="">Elige un laboratorio de la lista filtrada...</option>
+                  {labs.map((lab) => (
+                    <option key={lab.id} value={lab.id}>{lab.name} ({lab.location})</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {!selectedLabIsAccessible && form.laboratory_id ? (
+              <p className="reservation-inline-hint">
+                No tienes permisos para reservar este laboratorio. El formulario se deshabilita hasta elegir uno habilitado.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="reservations-form-section">
+            <span className="reservations-form-section-label">2 - Bloque Horario</span>
+            <div className="reservations-form-grid">
               <label>
                 <span>Hora de inicio</span>
                 <input

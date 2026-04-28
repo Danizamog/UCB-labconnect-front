@@ -89,6 +89,44 @@
   gap: 4px;
 }
 
+.tutorials-filters {
+  display: block;
+  margin-top: 6px;
+}
+
+.tutorials-filters-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.tutorials-filters-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--ink-700);
+}
+
+.tutorials-filters-form input,
+.tutorials-filters-form select {
+  border: 1.5px solid rgba(10, 53, 89, 0.14);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 0.92rem;
+  color: var(--ink-900);
+  background: #fcfdff;
+}
+
+.tutorials-filters-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .tutorials-panel-header h3 {
   margin: 0;
   font-size: 1.05rem;
@@ -472,6 +510,54 @@
 
 .tutorial-detail-enrolled strong {
   color: var(--ink-900);
+}
+
+.tutorial-detail-enrolled-empty {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(10, 53, 89, 0.05);
+  border: 1px solid rgba(10, 53, 89, 0.1);
+  color: var(--ink-700);
+  font-size: 0.88rem;
+}
+
+.tutorial-detail-enrolled-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(10, 53, 89, 0.12);
+  background: #fff;
+}
+
+.tutorial-detail-enrolled-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+}
+
+.tutorial-detail-enrolled-table thead {
+  background: rgba(10, 53, 89, 0.08);
+}
+
+.tutorial-detail-enrolled-table th,
+.tutorial-detail-enrolled-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(10, 53, 89, 0.08);
+  color: var(--ink-800);
+  font-size: 0.84rem;
+}
+
+.tutorial-detail-enrolled-table th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #0a3559;
+}
+
+.tutorial-detail-enrolled-table tbody tr:nth-child(even) {
+  background: rgba(248, 251, 255, 0.9);
 }
 
 .tutorial-detail-enrolled-list {

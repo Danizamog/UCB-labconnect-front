@@ -21,6 +21,8 @@ import {
   subscribeReservationsRealtime,
   updateReservation,
   updateReservationStatus,
+  applyRealtimeRecordPatch,
+  mapReservationRecord,
 } from '../services/reservationsService'
 import ReservationEditModal from './ReservationEditModal'
 import ReservationsAnalytics from '../components/ReservationsAnalytics'
@@ -111,7 +113,7 @@ const defaultTableFilters = {
   where: '',
   sortBy: 'start_at',
   sortType: 'DESC',
-  pageSize: 5,
+  pageSize: 20,
 }
 
 function todayDate() {
@@ -281,13 +283,35 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     loadOperationalData()
 
     const unsubscribe = subscribeReservationsRealtime((event) => {
-      if (event?.topic === 'lab_reservation' || event?.topic === 'lab_access') {
-        window.clearTimeout(realtimeRefreshTimeoutRef.current)
-        realtimeRefreshTimeoutRef.current = window.setTimeout(() => {
-          loadOperationalData()
-          loadTableData(tableQueryRef.current)
-        }, 250)
-      }
+      if (event?.topic !== 'lab_reservation' && event?.topic !== 'lab_access') return
+
+      const patchOptions = { mapper: mapReservationRecord }
+      setReservations((prev) => applyRealtimeRecordPatch(prev, event, patchOptions))
+      setTableReservations((prev) => {
+        const action = String(event?.action || '').toLowerCase()
+        const id = String(event?.record?.id || '')
+        if (!id) return prev
+        if (action === 'delete') {
+          return prev.filter((item) => String(item?.id) !== id)
+        }
+        const index = prev.findIndex((item) => String(item?.id) === id)
+        if (index === -1) return prev
+        const next = prev.slice()
+        next[index] = { ...next[index], ...mapReservationRecord(event.record) }
+        return next
+      })
+
+      window.clearTimeout(realtimeRefreshTimeoutRef.current)
+      realtimeRefreshTimeoutRef.current = window.setTimeout(() => {
+        getOccupancyDashboard()
+          .then((value) => setOccupancy(value))
+          .catch(() => {})
+      }, 1500)
+    }, {
+      onResync: () => {
+        loadOperationalData()
+        loadTableData(tableQueryRef.current)
+      },
     })
 
     return () => {
@@ -637,8 +661,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
           <p className="reservations-kicker">Gestion paso a paso</p>
           <h2>Reservas de laboratorio</h2>
           <p>
-            Reorganicé esta pantalla para que veas una sola tarea importante a la vez. Usa las secciones de abajo para ir
-            directo a lo que necesitas.
+            Atiende solicitudes, registra ingresos y revisa la ocupacion desde un flujo ordenado por tareas.
           </p>
         </div>
         <div className="reservations-summary">
@@ -1136,6 +1159,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                       <option value="10">10</option>
                       <option value="20">20</option>
                       <option value="50">50</option>
+                      <option value="100">100</option>
                     </select>
                   </label>
                 </div>
@@ -1187,6 +1211,19 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
             <span>
               Pagina {tableMeta.totalPages === 0 ? 0 : tableMeta.pageNumber + 1} de {tableMeta.totalPages}
             </span>
+            {tableMeta.totalElements > tableMeta.pageSize ? (
+              <button
+                type="button"
+                className="reservations-secondary"
+                onClick={() => {
+                  const nextPageSize = Math.min(tableMeta.totalElements, 100)
+                  setTableFilters((previous) => ({ ...previous, pageSize: nextPageSize }))
+                  setTableQuery((previous) => ({ ...previous, pageSize: nextPageSize, pageNumber: 0 }))
+                }}
+              >
+                Ver mas reservas
+              </button>
+            ) : null}
           </div>
 
           {tableLoading ? (
@@ -1200,6 +1237,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                   <tr>
                     <th>Laboratorio</th>
                     <th>Solicitante</th>
+                    <th>Motivo</th>
                     <th>Fecha</th>
                     <th>Horario</th>
                     <th>Estado</th>
@@ -1216,6 +1254,10 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                       <td>
                         <strong>{getReservationRequesterName(item)}</strong>
                         <div>{getReservationRequesterEmail(item)}</div>
+                      </td>
+                      <td>
+                        <strong>{item.purpose || 'Sin motivo registrado'}</strong>
+                        <div>{item.is_walk_in ? 'Ingreso rapido' : 'Reserva programada'}</div>
                       </td>
                       <td>{formatDate(item.date)}</td>
                       <td>{item.start_time} - {item.end_time}</td>

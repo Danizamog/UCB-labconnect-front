@@ -130,6 +130,19 @@ export function listAdminLabs() {
   return request(`${reservationsBase}/labs/all`, { cacheTtlMs: 60000 })
 }
 
+export function searchLabs(filters = {}) {
+  const search = new URLSearchParams()
+  if (filters.name) search.set('name', String(filters.name).trim())
+  if (filters.area_id) search.set('area_id', String(filters.area_id))
+  if (filters.is_active !== undefined && String(filters.is_active) !== '') search.set('is_active', String(filters.is_active))
+  if (filters.sort) search.set('sort', String(filters.sort))
+  if (filters.page) search.set('page', String(filters.page))
+  if (filters.per_page) search.set('per_page', String(filters.per_page))
+
+  const query = search.toString() ? `?${search.toString()}` : ''
+  return request(`${inventoryBase}/v1/laboratories${query}`, { cacheTtlMs: 30000 }).then((data) => Array.isArray(data) ? data : [])
+}
+
 export function createLab(payload) {
   return request(`${reservationsBase}/labs`, {
     method: 'POST',
@@ -277,6 +290,30 @@ export function listMaterials() {
   return request(`${inventoryBase}/stock-items`, { cacheTtlMs: 5000 })
 }
 
+export function getStockItemsReport({
+  laboratoryId = null,
+  onlyLowOrOut = false,
+  statusFilter = null,
+  search = null,
+} = {}) {
+  const params = new URLSearchParams()
+  if (laboratoryId) {
+    params.set('laboratory_id', String(laboratoryId))
+  }
+  if (onlyLowOrOut) {
+    params.set('only_low_or_out', 'true')
+  }
+  if (statusFilter) {
+    params.set('status_filter', String(statusFilter))
+  }
+  if (search) {
+    params.set('search', String(search))
+  }
+
+  const query = params.toString()
+  return request(`${inventoryBase}/reports/stock-items${query ? `?${query}` : ''}`, { cacheTtlMs: 3000 })
+}
+
 export function createMaterial(payload) {
   return request(`${inventoryBase}/stock-items`, {
     method: 'POST',
@@ -387,4 +424,14 @@ export async function returnLoanRecord(loanId, payload) {
   })
   clearInfrastructureCache()
   return mapLoanRecord(data || {})
+}
+
+export function getUsageReport({ borrowerId = null, practice = null, dateFrom = null, dateTo = null } = {}) {
+  const params = new URLSearchParams();
+  if (borrowerId) params.set('borrower_id', String(borrowerId));
+  if (practice) params.set('practice', String(practice));
+  if (dateFrom) params.set('date_from', String(dateFrom));
+  if (dateTo) params.set('date_to', String(dateTo));
+  const query = params.toString();
+  return request(`${inventoryBase}/reports/usage${query ? `?${query}` : ''}`, { cacheTtlMs: 3000 });
 }

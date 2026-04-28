@@ -271,8 +271,8 @@ function AdminRolesPage({ user, onSessionRefresh }) {
       <header className="roles-header">
         <div className="roles-header-content">
           <p className="roles-header-kicker">Gestion operativa</p>
-          <h2>Administracion de roles</h2>
-          <p>Asigna y actualiza los permisos de acceso para cada usuario.</p>
+          <h2>Roles y permisos</h2>
+          <p>Configura accesos por responsabilidad para que cada usuario vea solo lo que necesita.</p>
         </div>
         <button
           type="button"
