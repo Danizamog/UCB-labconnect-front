@@ -441,6 +441,7 @@ export async function updateReservation(reservationId, payload) {
     start_at: `${payload.date}T${payload.start_time}:00`,
     end_at: `${payload.date}T${payload.end_time}:00`,
     notes: String(payload.notes || ''),
+  }
 
   if (!reservationId || !normalized.laboratory_id || !payload.date || !payload.start_time || !payload.end_time) {
     throw new Error('Debes completar laboratorio, fecha y horario para actualizar la reserva.')
@@ -470,6 +471,7 @@ export async function updateReservationStatus(reservationId, status, options = {
   const record = await request(`${reservationsBase}/reservations/${reservationId}/status`, {
     method: 'PATCH',
     body: JSON.stringify({
+      status,
       cancel_reason: status === 'rejected' ? cancelReason : '',
     }),
   })
