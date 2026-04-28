@@ -474,6 +474,54 @@
   color: var(--ink-900);
 }
 
+.tutorial-detail-enrolled-empty {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(10, 53, 89, 0.05);
+  border: 1px solid rgba(10, 53, 89, 0.1);
+  color: var(--ink-700);
+  font-size: 0.88rem;
+}
+
+.tutorial-detail-enrolled-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(10, 53, 89, 0.12);
+  background: #fff;
+}
+
+.tutorial-detail-enrolled-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+}
+
+.tutorial-detail-enrolled-table thead {
+  background: rgba(10, 53, 89, 0.08);
+}
+
+.tutorial-detail-enrolled-table th,
+.tutorial-detail-enrolled-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(10, 53, 89, 0.08);
+  color: var(--ink-800);
+  font-size: 0.84rem;
+}
+
+.tutorial-detail-enrolled-table th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #0a3559;
+}
+
+.tutorial-detail-enrolled-table tbody tr:nth-child(even) {
+  background: rgba(248, 251, 255, 0.9);
+}
+
 .tutorial-detail-enrolled-list {
   display: flex;
   gap: 8px;

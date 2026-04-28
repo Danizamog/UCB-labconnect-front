@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { jsPDF } from 'jspdf'
+import ucbEscudoLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
 import { listAdminLabs } from '../../admin/services/infrastructureService'
 import { getLabAvailability } from '../../reservations/services/reservationsService'
 import {
@@ -16,6 +18,70 @@ const MIN_TOPIC_LENGTH = 5
 const MAX_DESCRIPTION_LENGTH = 400
 const MAX_SEATS = 50
 const CLOCK_REFRESH_MS = 30 * 1000
+
+function normalizeFilePart(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function downloadTextFile(filename, content, mimeType) {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  document.body.removeChild(anchor)
+  URL.revokeObjectURL(url)
+}
+
+function escapeCsvValue(value) {
+  const normalized = String(value ?? '')
+  if (normalized.includes(',') || normalized.includes('"') || normalized.includes('\n')) {
+    return `"${normalized.replaceAll('"', '""')}"`
+  }
+  return normalized
+}
+
+function formatEnrollmentDate(value) {
+  const date = new Date(value || '')
+  if (Number.isNaN(date.getTime())) {
+    return '-'
+  }
+  return new Intl.DateTimeFormat('es-BO', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
+function formatEnrollmentTime(value) {
+  const date = new Date(value || '')
+  if (Number.isNaN(date.getTime())) {
+    return '-'
+  }
+  return new Intl.DateTimeFormat('es-BO', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(date)
+}
+
+async function loadImageAsDataUrl(src) {
+  const response = await fetch(src)
+  const blob = await response.blob()
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('No se pudo leer el logo institucional'))
+    reader.readAsDataURL(blob)
+  })
+}
 
 function todayLocalDateString() {
   const value = new Date()
@@ -509,6 +575,150 @@ function TutorTutorialSessionsPage() {
     }
   }
 
+  const handleDownloadEnrolledCsv = (session) => {
+    const students = Array.isArray(session?.enrolled_students) ? session.enrolled_students : []
+    const csvLines = [
+      ['Tema', session.topic || ''],
+      ['Fecha tutoria', session.session_date || ''],
+      ['Horario', `${session.start_time || '-'} - ${session.end_time || '-'}`],
+      ['Laboratorio', session.location || ''],
+      ['Inscritos', String(students.length)],
+      [],
+      ['N', 'Estudiante', 'Correo', 'Fecha de inscripcion', 'Hora de inscripcion'],
+      ...students.map((student, index) => ([
+        String(index + 1),
+        student.student_name || 'Estudiante',
+        student.student_email || '',
+        formatEnrollmentDate(student.created_at),
+        formatEnrollmentTime(student.created_at),
+      ])),
+    ]
+      .map((row) => row.map((cell) => escapeCsvValue(cell)).join(','))
+      .join('\r\n')
+
+    const fileSafeTopic = normalizeFilePart(session.topic) || 'tutoria'
+    const fileSafeDate = normalizeFilePart(session.session_date) || 'fecha'
+    downloadTextFile(
+      `inscritos-${fileSafeTopic}-${fileSafeDate}.csv`,
+      csvLines,
+      'text/csv;charset=utf-8',
+    )
+    setMessage('Lista de inscritos descargada en CSV.')
+  }
+
+  const handleDownloadEnrolledPdf = async (session) => {
+    const students = Array.isArray(session?.enrolled_students) ? session.enrolled_students : []
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+    const marginX = 44
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
+    let cursorY = 54
+
+    const writeLine = (text, size = 11, weight = 'normal', color = [19, 33, 68]) => {
+      doc.setFont('helvetica', weight)
+      doc.setFontSize(size)
+      doc.setTextColor(color[0], color[1], color[2])
+      doc.text(text, marginX, cursorY)
+      cursorY += size + 8
+    }
+
+    const drawPageFooter = () => {
+      doc.setDrawColor(214, 224, 238)
+      doc.line(marginX, pageHeight - 32, pageWidth - marginX, pageHeight - 32)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(96, 112, 138)
+      doc.text('Universidad Catolica Boliviana - LabConnect', marginX, pageHeight - 18)
+      doc.text(`Generado: ${new Date().toLocaleString('es-BO')}`, pageWidth - marginX, pageHeight - 18, { align: 'right' })
+    }
+
+    doc.setFillColor(10, 53, 89)
+    doc.rect(0, 0, pageWidth, 88, 'F')
+    doc.setFillColor(244, 197, 66)
+    doc.rect(0, 84, pageWidth, 4, 'F')
+
+    try {
+      const logoDataUrl = await loadImageAsDataUrl(ucbEscudoLogo)
+      doc.addImage(logoDataUrl, 'PNG', marginX, 16, 44, 56)
+    } catch {
+      // If logo loading fails, PDF still renders with branded colors.
+    }
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(18)
+    doc.setTextColor(255, 255, 255)
+    doc.text('Lista de Estudiantes Inscritos', marginX + 56, 38)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(11)
+    doc.text('LabConnect - Soporte Academico', marginX + 56, 58)
+
+    cursorY = 120
+
+    writeLine(`Tutoria: ${session.topic || '-'}`, 12, 'bold')
+    writeLine(`Fecha: ${session.session_date || '-'} | Horario: ${session.start_time || '-'} - ${session.end_time || '-'}`)
+    writeLine(`Laboratorio: ${session.location || '-'}`)
+    writeLine(`Inscritos: ${students.length} / ${Number(session.max_students || 0)}`)
+
+    cursorY += 6
+    doc.setFillColor(235, 242, 250)
+    doc.roundedRect(marginX, cursorY - 8, pageWidth - (marginX * 2), 28, 8, 8, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(10, 53, 89)
+    doc.text('N°', marginX + 10, cursorY + 9)
+    doc.text('Estudiante', marginX + 36, cursorY + 9)
+    doc.text('Correo', marginX + 220, cursorY + 9)
+    doc.text('Fecha', marginX + 400, cursorY + 9)
+    doc.text('Hora', marginX + 490, cursorY + 9)
+    cursorY += 30
+
+    if (students.length === 0) {
+      writeLine('No hay estudiantes inscritos en esta tutoria.', 11, 'bold', [88, 102, 126])
+    } else {
+      students.forEach((student, index) => {
+        if (cursorY > 742) {
+          drawPageFooter()
+          doc.addPage()
+          cursorY = 56
+
+          doc.setFillColor(235, 242, 250)
+          doc.roundedRect(marginX, cursorY - 8, pageWidth - (marginX * 2), 28, 8, 8, 'F')
+          doc.setFont('helvetica', 'bold')
+          doc.setFontSize(10)
+          doc.setTextColor(10, 53, 89)
+          doc.text('N°', marginX + 10, cursorY + 9)
+          doc.text('Estudiante', marginX + 36, cursorY + 9)
+          doc.text('Correo', marginX + 220, cursorY + 9)
+          doc.text('Fecha', marginX + 400, cursorY + 9)
+          doc.text('Hora', marginX + 490, cursorY + 9)
+          cursorY += 30
+        }
+
+        if (index % 2 === 0) {
+          doc.setFillColor(248, 251, 255)
+          doc.rect(marginX, cursorY - 12, pageWidth - (marginX * 2), 24, 'F')
+        }
+
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(10)
+        doc.setTextColor(26, 43, 72)
+        doc.text(String(index + 1), marginX + 10, cursorY + 4)
+        doc.text(String(student.student_name || 'Estudiante'), marginX + 36, cursorY + 4)
+        doc.text(String(student.student_email || '-'), marginX + 220, cursorY + 4)
+        doc.text(formatEnrollmentDate(student.created_at), marginX + 400, cursorY + 4)
+        doc.text(formatEnrollmentTime(student.created_at), marginX + 490, cursorY + 4)
+        cursorY += 24
+      })
+    }
+
+    drawPageFooter()
+
+    const fileSafeTopic = normalizeFilePart(session.topic) || 'tutoria'
+    const fileSafeDate = normalizeFilePart(session.session_date) || 'fecha'
+    doc.save(`inscritos-${fileSafeTopic}-${fileSafeDate}.pdf`)
+    setMessage('Lista de inscritos descargada en PDF.')
+  }
+
   return (
     <section className="tutorials-page" aria-label="Gestion de tutorias">
       <header className="tutorials-header">
@@ -739,16 +949,21 @@ function TutorTutorialSessionsPage() {
 
                 <div className="tutorial-enrolled-list">
                   <strong>Inscritos</strong>
-                  {session.enrolled_students.length === 0 ? (
-                    <p>Aun no hay estudiantes registrados.</p>
-                  ) : (
-                    session.enrolled_students.map((student) => (
-                      <span key={`${session.id}-${student.student_id}`}>{student.student_name}</span>
-                    ))
-                  )}
+                  <p>
+                    {session.enrolled_count > 0
+                      ? `${session.enrolled_count} estudiante(s) inscrito(s).`
+                      : 'Aun no hay estudiantes registrados.'}
+                  </p>
                 </div>
 
                 <div className="tutorials-actions">
+                  <button
+                    type="button"
+                    className="tutorials-secondary"
+                    onClick={() => handleOpenTutorialDetails(session.id)}
+                  >
+                    Ver inscritos
+                  </button>
                   <button
                     type="button"
                     className="tutorials-secondary"
@@ -775,6 +990,11 @@ function TutorTutorialSessionsPage() {
         <TutorialSessionDetailModal
           session={focusedSession}
           title="Bloque de tutoria"
+          showEnrollmentDetails
+          enrollmentDownloadActions={{
+            onDownloadPdf: () => handleDownloadEnrolledPdf(focusedSession),
+            onDownloadCsv: () => handleDownloadEnrolledCsv(focusedSession),
+          }}
           onClose={() => {
             if (!isLoadingFocusedSession) {
               setFocusedSession(null)
