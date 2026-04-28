@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   listMyEnrolledTutorialSessions,
+  listMyTutorialSessions,
   subscribeTutorialSessionsRealtime,
 } from '../services/tutorialSessionsService'
 import { formatDateTime } from '../../../shared/utils/formatters'
@@ -11,6 +12,47 @@ function parseDateTimeValue(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
+function normalizeTimeValue(timeValue) {
+  const raw = String(timeValue || '').trim()
+  if (!raw) {
+    return ''
+  }
+
+  const [hours = '', minutes = '', seconds = ''] = raw.split(':')
+  if (!hours || !minutes) {
+    return ''
+  }
+
+  const safeHours = String(hours).padStart(2, '0')
+  const safeMinutes = String(minutes).padStart(2, '0')
+  const safeSeconds = String(seconds || '00').padStart(2, '0')
+  return `${safeHours}:${safeMinutes}:${safeSeconds}`
+}
+
+function parseSessionDateAndTime(sessionDate, sessionTime) {
+  if (!sessionDate || !sessionTime) {
+    return null
+  }
+
+  const normalizedTime = normalizeTimeValue(sessionTime)
+  if (!normalizedTime) {
+    return null
+  }
+
+  return parseDateTimeValue(`${sessionDate}T${normalizedTime}`)
+}
+
+function parseSessionStart(session) {
+  if (session?.start_at) {
+    const parsed = parseDateTimeValue(session.start_at)
+    if (parsed) {
+      return parsed
+    }
+  }
+
+  return parseSessionDateAndTime(session?.session_date, session?.start_time)
+}
+
 function parseSessionEnd(session) {
   if (session?.end_at) {
     const parsed = parseDateTimeValue(session.end_at)
@@ -19,11 +61,14 @@ function parseSessionEnd(session) {
     }
   }
 
-  if (session?.session_date && session?.end_time) {
-    return parseDateTimeValue(`${session.session_date}T${session.end_time}:00`)
-  }
+  return parseSessionDateAndTime(session?.session_date, session?.end_time)
+}
 
-  return null
+function getSessionDateLabel(session) {
+  const sessionStartAt = parseSessionStart(session)
+  return sessionStartAt
+    ? formatDateTime(sessionStartAt.toISOString())
+    : (session?.session_date || 'Sin fecha')
 }
 
 function UserTutorialAttendanceHistoryPage({ user }) {
@@ -36,8 +81,30 @@ function UserTutorialAttendanceHistoryPage({ user }) {
     setError('')
 
     try {
-      const enrolledSessions = await listMyEnrolledTutorialSessions()
-      setSessions(Array.isArray(enrolledSessions) ? enrolledSessions : [])
+      const [enrolledResult, taughtResult] = await Promise.allSettled([
+        listMyEnrolledTutorialSessions(),
+        listMyTutorialSessions(),
+      ])
+
+      const merged = []
+      if (enrolledResult.status === 'fulfilled' && Array.isArray(enrolledResult.value)) {
+        merged.push(...enrolledResult.value)
+      }
+      if (taughtResult.status === 'fulfilled' && Array.isArray(taughtResult.value)) {
+        merged.push(...taughtResult.value)
+      }
+
+      const seenIds = new Set()
+      const uniqueSessions = merged.filter((item) => {
+        const sessionId = String(item?.id || '')
+        if (!sessionId || seenIds.has(sessionId)) {
+          return false
+        }
+        seenIds.add(sessionId)
+        return true
+      })
+
+      setSessions(uniqueSessions)
     } catch (err) {
       setSessions([])
       setError(err.message || 'No se pudo cargar el historial de tutorias atendidas.')
@@ -60,8 +127,11 @@ function UserTutorialAttendanceHistoryPage({ user }) {
     const unsubscribe = subscribeTutorialSessionsRealtime((event) => {
       if (event?.topic === 'tutorial_session') {
         if (!userId) return
+        const tutorId = String(event?.record?.tutor_id || '')
         const enrolled = Array.isArray(event?.record?.enrolled_students) ? event.record.enrolled_students : []
-        const concerns = enrolled.some((student) => String(student?.student_id || '') === userId)
+        const concerns =
+          tutorId === userId
+          || enrolled.some((student) => String(student?.student_id || '') === userId)
         if (concerns) scheduleReload()
         return
       }
@@ -97,8 +167,8 @@ function UserTutorialAttendanceHistoryPage({ user }) {
 
   const totalHours = useMemo(() => {
     return completedSessions.reduce((acc, session) => {
-      const startAt = parseDateTimeValue(session?.start_at)
-      const endAt = parseDateTimeValue(session?.end_at)
+      const startAt = parseSessionStart(session)
+      const endAt = parseSessionEnd(session)
       if (!startAt || !endAt) {
         return acc
       }
@@ -160,7 +230,7 @@ function UserTutorialAttendanceHistoryPage({ user }) {
 
                 <div className="tutorial-history-meta">
                   <span><strong>Tutor:</strong> {session.tutor_name || 'No disponible'}</span>
-                  <span><strong>Fecha:</strong> {formatDateTime(session.start_at)}</span>
+                  <span><strong>Fecha:</strong> {getSessionDateLabel(session)}</span>
                   <span><strong>Horario:</strong> {session.start_time} - {session.end_time}</span>
                   <span><strong>Lugar:</strong> {session.location || session.laboratory_id || 'Sin ubicacion'}</span>
                 </div>

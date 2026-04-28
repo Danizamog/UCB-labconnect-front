@@ -4,6 +4,7 @@
   gap: 20px;
   align-content: start;
   padding-bottom: 28px;
+  overflow-x: clip;
 }
 
 .profiles-header {
@@ -113,10 +114,14 @@
 
 .profiles-grid {
   display: grid;
-  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  grid-template-columns: minmax(360px, 0.85fr) minmax(0, 1.15fr);
   gap: 24px;
   padding: 0 clamp(16px, 2.4vw, 32px);
   align-items: start;
+}
+
+.profiles-grid > * {
+  min-width: 0;
 }
 
 .profiles-card {
@@ -159,11 +164,51 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
+  min-width: 0;
   border-radius: 16px;
   border: 1px solid rgba(177, 198, 220, 0.8);
   background: rgba(247, 251, 255, 0.9);
   padding: 12px 14px;
   color: var(--ink-600);
+}
+
+.profiles-search input {
+  min-width: 0;
+}
+
+.profiles-directory-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.profiles-select-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-700);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.profiles-select-control select {
+  border-radius: 10px;
+  border: 1px solid rgba(177, 198, 220, 0.85);
+  background: rgba(247, 251, 255, 0.95);
+  padding: 6px 8px;
+  color: var(--ink-900);
+  font: inherit;
+}
+
+.profiles-directory-controls .profiles-inline-hint {
+  margin-left: auto;
+}
+
+.profiles-load-more {
+  width: 100%;
 }
 
 .profiles-search input,
@@ -230,6 +275,14 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.profiles-item-head > div {
+  min-width: 0;
+}
+
+.profiles-item-head p {
+  overflow-wrap: anywhere;
 }
 
 .profiles-item-head strong,
@@ -618,10 +671,13 @@
 
 @media (max-width: 1180px) {
   .profiles-header,
-  .profiles-grid,
   .profiles-spotlight-grid,
   .profiles-penalty-panel {
     grid-template-columns: 1fr;
+  }
+
+  .profiles-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -629,6 +685,14 @@
   .profiles-form-grid,
   .profiles-summary {
     grid-template-columns: 1fr;
+  }
+
+  .profiles-directory-controls {
+    align-items: stretch;
+  }
+
+  .profiles-directory-controls .profiles-inline-hint {
+    margin-left: 0;
   }
 
   .profiles-header {

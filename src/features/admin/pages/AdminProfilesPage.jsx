@@ -24,8 +24,50 @@ const defaultReactivationForm = {
   resolution_notes: '',
 }
 
+const USER_PAGE_SIZE_OPTIONS = [8, 12, 20, 40]
+
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase()
+}
+
+function normalizeProfileRecord(profile) {
+  const username = String(profile?.username || '').trim().toLowerCase()
+  const email = String(profile?.email || '').trim().toLowerCase()
+
+  return {
+    ...profile,
+    username: username || email,
+    name: String(profile?.name || '').trim(),
+    role: String(profile?.role || '').trim(),
+  }
+}
+
+function dedupeProfiles(records) {
+  const seen = new Set()
+
+  return records.filter((profile) => {
+    const idKey = String(profile?.id || '').trim()
+    const usernameKey = normalizeEmail(profile?.username)
+    const dedupeKey = idKey || usernameKey
+    if (!dedupeKey || seen.has(dedupeKey)) {
+      return false
+    }
+    seen.add(dedupeKey)
+    return true
+  })
+}
+
+function getProfileDisplayName(profile) {
+  const name = String(profile?.name || '').trim()
+  if (name) {
+    return name
+  }
+  return String(profile?.username || 'Sin nombre').trim() || 'Sin nombre'
+}
+
+function getProfileDisplayIdentity(profile) {
+  const username = String(profile?.username || '').trim()
+  return username || 'Sin correo institucional'
 }
 
 function formatDateTime(value) {
@@ -87,6 +129,9 @@ function AdminProfilesPage({ user }) {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [showAllProfiles, setShowAllProfiles] = useState(false)
+  const [profilesPerPage, setProfilesPerPage] = useState(12)
+  const [visibleCount, setVisibleCount] = useState(12)
   const [editingUser, setEditingUser] = useState(null)
   const [form, setForm] = useState(defaultForm)
   const [confirmModal, setConfirmModal] = useState(null)
@@ -117,7 +162,8 @@ function AdminProfilesPage({ user }) {
         throw new Error('No se pudieron cargar los perfiles')
       }
 
-      const nextProfiles = Array.isArray(profileResult.value) ? profileResult.value : []
+      const rawProfiles = Array.isArray(profileResult.value) ? profileResult.value : []
+      const nextProfiles = dedupeProfiles(rawProfiles.map(normalizeProfileRecord))
       const nextRoles = Array.isArray(roleResult.value) ? roleResult.value : []
       const nextFlags = flagResult.status === 'fulfilled' && Array.isArray(flagResult.value) ? flagResult.value : []
       const nextPenalties = penaltyResult.status === 'fulfilled' && Array.isArray(penaltyResult.value) ? penaltyResult.value : []
@@ -160,16 +206,21 @@ function AdminProfilesPage({ user }) {
     return mapped
   }, [penalties])
 
+  const visibleProfiles = useMemo(
+    () => (showAllProfiles ? profiles : profiles.filter((profile) => profile.is_active !== false)),
+    [profiles, showAllProfiles],
+  )
+
   const filteredProfiles = useMemo(() => {
     const needle = String(searchTerm || '').trim().toLowerCase()
-    const source = [...profiles].sort((left, right) => String(left.name || left.username).localeCompare(String(right.name || right.username)))
+    const source = [...visibleProfiles].sort((left, right) => getProfileDisplayName(left).localeCompare(getProfileDisplayName(right), 'es', { sensitivity: 'base' }))
     if (!needle) {
       return source
     }
 
     return source.filter((profile) => {
       const haystack = [
-        profile.name,
+        getProfileDisplayName(profile),
         profile.username,
         profile.role,
         activePenaltyByUserId[profile.id]?.reason,
@@ -179,7 +230,22 @@ function AdminProfilesPage({ user }) {
         .toLowerCase()
       return haystack.includes(needle)
     })
-  }, [activePenaltyByUserId, profiles, searchTerm])
+  }, [activePenaltyByUserId, searchTerm, visibleProfiles])
+
+  useEffect(() => {
+    setVisibleCount(profilesPerPage)
+  }, [profilesPerPage, searchTerm, showAllProfiles])
+
+  useEffect(() => {
+    setVisibleCount((current) => Math.min(current, filteredProfiles.length || profilesPerPage))
+  }, [filteredProfiles.length, profilesPerPage])
+
+  const limitedProfiles = useMemo(
+    () => filteredProfiles.slice(0, visibleCount),
+    [filteredProfiles, visibleCount],
+  )
+
+  const hasMoreProfiles = limitedProfiles.length < filteredProfiles.length
 
   const summary = useMemo(() => {
     const blockedUsers = new Set(penalties.filter((penalty) => penalty.is_active).map((penalty) => penalty.user_id))
@@ -402,6 +468,29 @@ function AdminProfilesPage({ user }) {
                 placeholder="Buscar por nombre, correo, rol o motivo"
               />
             </label>
+            <div className="profiles-directory-controls">
+              <button
+                type="button"
+                className="profiles-secondary"
+                onClick={() => setShowAllProfiles((value) => !value)}
+              >
+                {showAllProfiles ? 'Mostrar solo activos' : 'Mostrar todos'}
+              </button>
+              <label className="profiles-select-control">
+                <span>Mostrar</span>
+                <select
+                  value={profilesPerPage}
+                  onChange={(event) => setProfilesPerPage(Number(event.target.value) || 12)}
+                >
+                  {USER_PAGE_SIZE_OPTIONS.map((value) => (
+                    <option key={value} value={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+              <span className="profiles-inline-hint">
+                Mostrando {limitedProfiles.length} de {filteredProfiles.length} usuarios filtrados.
+              </span>
+            </div>
           </div>
 
           {loading ? (
@@ -410,7 +499,7 @@ function AdminProfilesPage({ user }) {
             <p className="profiles-empty">No encontramos usuarios con ese criterio.</p>
           ) : (
             <div className="profiles-list">
-              {filteredProfiles.map((profile) => {
+              {limitedProfiles.map((profile) => {
                 const activePenalty = activePenaltyByUserId[profile.id] || null
                 const flag = flagsByEmail[normalizeEmail(profile.username)] || null
                 const state = getProfileState(profile, activePenalty)
@@ -421,8 +510,8 @@ function AdminProfilesPage({ user }) {
                   >
                     <div className="profiles-item-head">
                       <div>
-                        <strong>{profile.name || profile.username}</strong>
-                        <p>{profile.username}</p>
+                        <strong>{getProfileDisplayName(profile)}</strong>
+                        <p>{getProfileDisplayIdentity(profile)}</p>
                       </div>
                       <span className={`profiles-badge ${state.key}`}>{state.label}</span>
                     </div>
@@ -473,6 +562,15 @@ function AdminProfilesPage({ user }) {
                   </article>
                 )
               })}
+              {hasMoreProfiles ? (
+                <button
+                  type="button"
+                  className="profiles-secondary profiles-load-more"
+                  onClick={() => setVisibleCount((current) => Math.min(current + profilesPerPage, filteredProfiles.length))}
+                >
+                  Ver mas usuarios
+                </button>
+              ) : null}
             </div>
           )}
         </section>
