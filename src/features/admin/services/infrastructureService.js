@@ -130,6 +130,19 @@ export function listAdminLabs() {
   return request(`${reservationsBase}/labs/all`, { cacheTtlMs: 60000 })
 }
 
+export function searchLabs(filters = {}) {
+  const search = new URLSearchParams()
+  if (filters.name) search.set('name', String(filters.name).trim())
+  if (filters.area_id) search.set('area_id', String(filters.area_id))
+  if (filters.is_active !== undefined && String(filters.is_active) !== '') search.set('is_active', String(filters.is_active))
+  if (filters.sort) search.set('sort', String(filters.sort))
+  if (filters.page) search.set('page', String(filters.page))
+  if (filters.per_page) search.set('per_page', String(filters.per_page))
+
+  const query = search.toString() ? `?${search.toString()}` : ''
+  return request(`${inventoryBase}/v1/laboratories${query}`, { cacheTtlMs: 30000 }).then((data) => Array.isArray(data) ? data : [])
+}
+
 export function createLab(payload) {
   return request(`${reservationsBase}/labs`, {
     method: 'POST',

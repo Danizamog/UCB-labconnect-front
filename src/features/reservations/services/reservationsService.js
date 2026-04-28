@@ -1,4 +1,4 @@
-import { listAdminLabs } from '../../admin/services/infrastructureService'
+import { listAdminLabs, searchLabs } from '../../admin/services/infrastructureService'
 import { getAuthToken } from '../../../shared/utils/storage'
 import { clearStoredSession } from '../../auth/services/authService'
 
@@ -319,64 +319,22 @@ function mapPenalty(record) {
   }
 }
 
-function mapPenaltyRegularization(record) {
-  return {
-    is_regularized: Boolean(record?.is_regularized),
-    has_open_damage_flags: Boolean(record?.has_open_damage_flags),
-    active_damage_count: Number(record?.active_damage_count || 0),
-    summary: record?.summary || '',
-    latest_ticket_id: record?.latest_ticket_id || '',
-    latest_ticket_title: record?.latest_ticket_title || '',
-    latest_asset_name: record?.latest_asset_name || '',
-    latest_reported_at: record?.latest_reported_at || '',
-  }
-}
+export async function listAvailableLabs(user = null, filters = {}) {
+  const hasFilters = filters && (filters.name || filters.sort || filters.page || filters.per_page || filters.area_id || filters.is_active)
+  let labs = []
 
-function mapPenaltyReactivationHistory(record) {
-  return {
-    id: record?.id || '',
-    penalty_id: record?.penalty_id || '',
-    user_id: record?.user_id || '',
-    user_name: record?.user_name || '',
-    user_email: record?.user_email || '',
-    actor_user_id: record?.actor_user_id || '',
-    actor_name: record?.actor_name || '',
-    executed_at: record?.executed_at || '',
-    lift_reason: record?.lift_reason || '',
-    resolution_notes: record?.resolution_notes || '',
-    action_source: record?.action_source || 'admin_profile',
-    user_was_inactive: Boolean(record?.user_was_inactive),
-    user_is_active_after: Boolean(record?.user_is_active_after),
-    privileges_restored: Boolean(record?.privileges_restored),
-    active_penalty_count_after: Number(record?.active_penalty_count_after || 0),
-    active_damage_count_at_validation: Number(record?.active_damage_count_at_validation || 0),
-    regularization_confirmed: Boolean(record?.regularization_confirmed),
-    regularization_summary: record?.regularization_summary || '',
-    notification_sent: Boolean(record?.notification_sent),
-    email_sent: Boolean(record?.email_sent),
-    created: record?.created || '',
-    updated: record?.updated || '',
+  if (hasFilters) {
+    try {
+      const data = await searchLabs(filters)
+      labs = Array.isArray(data) ? data : []
+    } catch (err) {
+      // fallback to full list if search fails
+      labs = await listAdminLabs()
+    }
+  } else {
+    labs = await listAdminLabs()
   }
-}
 
-function mapPenaltyReactivationContext(record) {
-  return {
-    user_id: record?.user_id || '',
-    user_name: record?.user_name || '',
-    user_email: record?.user_email || '',
-    user_is_active: Boolean(record?.user_is_active),
-    block_status: record?.block_status || 'active',
-    active_penalty: record?.active_penalty ? mapPenalty(record.active_penalty) : null,
-    active_penalty_count: Number(record?.active_penalty_count || 0),
-    can_reactivate: Boolean(record?.can_reactivate),
-    privileges_restored_if_confirmed: Boolean(record?.privileges_restored_if_confirmed),
-    regularization: mapPenaltyRegularization(record?.regularization || {}),
-    history: Array.isArray(record?.history) ? record.history.map(mapPenaltyReactivationHistory) : [],
-  }
-}
-
-export async function listAvailableLabs(user = null) {
-  const labs = await listAdminLabs()
   return labs.filter((lab) => isLabAccessibleToUser(lab, user))
 }
 
