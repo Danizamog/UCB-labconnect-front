@@ -10,6 +10,8 @@ import {
   listPenalties,
   listReservations,
   subscribeReservationsRealtime,
+  applyRealtimeRecordPatch,
+  mapPenaltyRecord,
 } from '../services/reservationsService'
 import './ReservationsPages.css'
 
@@ -219,8 +221,10 @@ function AdminPenaltiesPage({ user }) {
 
     const unsubscribe = subscribeReservationsRealtime((event) => {
       if (event?.topic === 'user_penalty') {
-        loadPenalties().catch(() => {})
+        setPenalties((prev) => applyRealtimeRecordPatch(prev, event, { mapper: mapPenaltyRecord }))
       }
+    }, {
+      onResync: () => loadPenalties().catch(() => {}),
     })
 
     return () => unsubscribe?.()
@@ -520,8 +524,8 @@ function AdminPenaltiesPage({ user }) {
       <header className="reservations-header">
         <div>
           <p className="reservations-kicker">Control disciplinario</p>
-          <h2>Penalizaciones por danos</h2>
-          <p>Registra suspensiones con evidencia, bloquea nuevas reservas y rehabilita cuentas cuando el castigo termine.</p>
+          <h2>Sanciones y bloqueos</h2>
+          <p>Registra evidencias, bloquea nuevas reservas y rehabilita cuentas cuando corresponda.</p>
         </div>
         <div className="reservations-summary">
           <div><span>Total</span><strong>{penalties.length}</strong></div>

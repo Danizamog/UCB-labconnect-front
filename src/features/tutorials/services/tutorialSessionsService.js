@@ -231,10 +231,10 @@ export async function cancelTutorialEnrollment(sessionId) {
   return mapTutorialSession(record)
 }
 
-export function subscribeTutorialSessionsRealtime(onMessage) {
+export function subscribeTutorialSessionsRealtime(onMessage, options = {}) {
   return subscribeReservationsRealtime((event) => {
     if (event?.topic === 'tutorial_session' || event?.topic === 'user_notification') {
       onMessage?.(event)
     }
-  })
+  }, options)
 }

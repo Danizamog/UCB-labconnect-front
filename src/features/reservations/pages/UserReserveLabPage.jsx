@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRef } from 'react'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import TutorialSessionDetailModal from '../../tutorials/pages/TutorialSessionDetailModal'
 import { getTutorialSessionById } from '../../tutorials/services/tutorialSessionsService'
@@ -12,8 +13,11 @@ import {
   listAvailableLabs,
   listMyPenalties,
   listReservations,
+  prefetchLabAvailability,
   subscribeReservationsRealtime,
   updateReservation,
+  applyRealtimeRecordPatch,
+  mapReservationRecord,
 } from '../services/reservationsService'
 import { listAdminAreas } from '../../admin/services/infrastructureService'
 import ReservationDetailModal from './ReservationDetailModal'
@@ -139,6 +143,21 @@ function buildLocalDateTime(dateValue, timeValue) {
   return new Date(year, month - 1, day, hour, minute, 0, 0)
 }
 
+function buildPrefetchDays(dateValue, count = 7) {
+  const start = new Date(`${dateValue || todayLocalDateString()}T00:00:00`)
+  if (Number.isNaN(start.getTime())) {
+    return []
+  }
+
+  const days = []
+  for (let index = 0; index < count; index += 1) {
+    const current = new Date(start)
+    current.setDate(start.getDate() + index)
+    days.push(`${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`)
+  }
+  return days
+}
+
 function isPastSlotForDate(slot, dateValue, referenceNow = new Date()) {
   const slotStart = buildLocalDateTime(dateValue, slot?.start_time)
   if (!slotStart) {
@@ -257,6 +276,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
   const [isLoadingReservationDetails, setIsLoadingReservationDetails] = useState(false)
   const [reservationToCancel, setReservationToCancel] = useState(null)
   const [selectedSlotKey, setSelectedSlotKey] = useState('')
+  const selectedSlotKeyRef = useRef('')
   const [availabilityRefreshNonce, setAvailabilityRefreshNonce] = useState(0)
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
@@ -277,6 +297,10 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       window.clearInterval(timer)
     }
   }, [])
+
+  useEffect(() => {
+    selectedSlotKeyRef.current = selectedSlotKey
+  }, [selectedSlotKey])
 
   const loadData = useCallback(async () => {
     try {
@@ -302,7 +326,11 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
 
     const unsubscribe = subscribeReservationsRealtime((event) => {
       if (event?.topic === 'lab_reservation') {
-        loadData()
+        const userId = String(user?.user_id || '')
+        const requestedBy = String(event?.record?.requested_by || '')
+        if (userId && requestedBy && requestedBy === userId) {
+          setReservations((prev) => applyRealtimeRecordPatch(prev, event, { mapper: mapReservationRecord }))
+        }
         setAvailabilityRefreshNonce((value) => value + 1)
         return
       }
@@ -330,6 +358,11 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
           setMessage('Tienes una nueva notificacion relacionada con tus reservas o tutorias.')
         }
       }
+    }, {
+      onResync: () => {
+        loadData()
+        setAvailabilityRefreshNonce((value) => value + 1)
+      },
     })
 
     return () => unsubscribe?.()
@@ -420,7 +453,9 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
 
       setIsLoadingSlots(true)
       try {
-        const payload = await getLabAvailability(form.laboratory_id, form.date)
+        const payload = await getLabAvailability(form.laboratory_id, form.date, {
+          skipCache: availabilityRefreshNonce > 0,
+        })
         if (!mounted) {
           return
         }
@@ -428,7 +463,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
         const nextSlots = Array.isArray(payload?.slots) ? payload.slots : []
         setSlots(nextSlots)
 
-        const currentFormKey = `${form.start_time}-${form.end_time}`
+        const currentFormKey = selectedSlotKeyRef.current
         const matchingAvailableSlot = nextSlots.find(
           (slot) => getSlotKey(slot) === currentFormKey && slot.state === 'available',
         )
@@ -460,7 +495,19 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     return () => {
       mounted = false
     }
-  }, [availabilityRefreshNonce, form.date, form.end_time, form.laboratory_id, form.start_time, selectedLabIsAccessible])
+  }, [availabilityRefreshNonce, form.date, form.laboratory_id, selectedLabIsAccessible])
+
+  useEffect(() => {
+    if (!form.laboratory_id || !form.date || !selectedLabIsAccessible) {
+      return undefined
+    }
+
+    const timer = window.setTimeout(() => {
+      prefetchLabAvailability(form.laboratory_id, buildPrefetchDays(form.date, 7))
+    }, 150)
+
+    return () => window.clearTimeout(timer)
+  }, [form.date, form.laboratory_id, selectedLabIsAccessible])
 
   const labNameById = useMemo(
     () => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])),
@@ -965,8 +1012,8 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       <header className="reservations-header">
         <div>
           <p className="reservations-kicker">Solicitud de uso</p>
-          <h2>Reservar laboratorio por horas</h2>
-          <p>Completa los datos para registrar una solicitud y administra tus reservas con cambios o cancelaciones cuando aun haya tiempo disponible.</p>
+          <h2>Reservar laboratorio</h2>
+          <p>Elige laboratorio, fecha y horario. Luego revisa tus solicitudes y cambios desde esta misma pantalla.</p>
         </div>
         <div className="reservations-summary">
           <div>

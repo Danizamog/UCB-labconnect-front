@@ -6,10 +6,41 @@ function TutorialSessionDetailModal({
   onPrimaryAction = null,
   primaryActionDisabled = false,
   primaryActionHint = '',
+  showEnrollmentDetails = false,
+  enrollmentDownloadActions = null,
 }) {
   if (!session) {
     return null
   }
+
+  const formatDate = (value) => {
+    const date = new Date(value || '')
+    if (Number.isNaN(date.getTime())) {
+      return '-'
+    }
+
+    return new Intl.DateTimeFormat('es-BO', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date)
+  }
+
+  const formatTime = (value) => {
+    const date = new Date(value || '')
+    if (Number.isNaN(date.getTime())) {
+      return '-'
+    }
+
+    return new Intl.DateTimeFormat('es-BO', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).format(date)
+  }
+
+  const enrolledStudents = Array.isArray(session.enrolled_students) ? session.enrolled_students : []
 
   return (
     <div className="tutorial-detail-backdrop" onClick={onClose} role="dialog" aria-modal="true">
@@ -69,22 +100,75 @@ function TutorialSessionDetailModal({
           </div>
         </div>
 
-        {Array.isArray(session.enrolled_students) && session.enrolled_students.length > 0 ? (
+        {showEnrollmentDetails ? (
           <div className="tutorial-detail-enrolled">
             <strong>Inscritos</strong>
-            <div className="tutorial-detail-enrolled-list">
-              {session.enrolled_students.map((student) => (
-                <span key={`${session.id}-${student.student_id}`}>{student.student_name}</span>
-              ))}
-            </div>
+
+            {enrolledStudents.length === 0 ? (
+              <p className="tutorial-detail-enrolled-empty">Aun no hay estudiantes inscritos en esta tutoria.</p>
+            ) : (
+              <div className="tutorial-detail-enrolled-table-wrap">
+                <table className="tutorial-detail-enrolled-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Estudiante</th>
+                      <th>Correo</th>
+                      <th>Fecha de inscripcion</th>
+                      <th>Hora de inscripcion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {enrolledStudents.map((student, index) => (
+                      <tr key={`${session.id}-${student.student_id || index}`}>
+                        <td>{index + 1}</td>
+                        <td>{student.student_name || 'Estudiante'}</td>
+                        <td>{student.student_email || '-'}</td>
+                        <td>{formatDate(student.created_at)}</td>
+                        <td>{formatTime(student.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        ) : null}
+        ) : (
+          Array.isArray(session.enrolled_students) && session.enrolled_students.length > 0 ? (
+            <div className="tutorial-detail-enrolled">
+              <strong>Inscritos</strong>
+              <div className="tutorial-detail-enrolled-list">
+                {session.enrolled_students.map((student) => (
+                  <span key={`${session.id}-${student.student_id}`}>{student.student_name}</span>
+                ))}
+              </div>
+            </div>
+          ) : null
+        )}
 
         {primaryActionHint ? (
           <p className="tutorial-detail-hint">{primaryActionHint}</p>
         ) : null}
 
         <div className="tutorial-detail-actions">
+          {showEnrollmentDetails && enrollmentDownloadActions?.onDownloadPdf ? (
+            <button
+              type="button"
+              className="tutorials-secondary"
+              onClick={enrollmentDownloadActions.onDownloadPdf}
+            >
+              Descargar PDF
+            </button>
+          ) : null}
+          {showEnrollmentDetails && enrollmentDownloadActions?.onDownloadCsv ? (
+            <button
+              type="button"
+              className="tutorials-secondary"
+              onClick={enrollmentDownloadActions.onDownloadCsv}
+            >
+              Descargar CSV
+            </button>
+          ) : null}
           {primaryActionLabel && typeof onPrimaryAction === 'function' ? (
             <button
               type="button"
