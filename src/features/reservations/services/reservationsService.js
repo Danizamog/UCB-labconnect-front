@@ -206,6 +206,38 @@ export function isLabAccessibleToUser(lab, user) {
   return true
 }
 
+function mapTutorialSession(record) {
+  const enrolledStudents = Array.isArray(record?.enrolled_students) ? record.enrolled_students : []
+
+  return {
+    id: record?.id || '',
+    tutor_id: record?.tutor_id || '',
+    tutor_name: record?.tutor_name || 'Tutor',
+    tutor_email: record?.tutor_email || '',
+    topic: record?.topic || '',
+    description: record?.description || '',
+    laboratory_id: record?.laboratory_id || '',
+    location: record?.location || '',
+    session_date: record?.session_date || '',
+    start_time: record?.start_time || '',
+    end_time: record?.end_time || '',
+    start_at: record?.start_at || '',
+    end_at: record?.end_at || '',
+    max_students: Number(record?.max_students || 0),
+    is_published: record?.is_published !== false,
+    enrolled_students: enrolledStudents.map((student) => ({
+      student_id: student?.student_id || '',
+      student_name: student?.student_name || 'Estudiante',
+      student_email: student?.student_email || '',
+      created_at: student?.created_at || '',
+    })),
+    created: record?.created || '',
+    updated: record?.updated || '',
+    enrolled_count: enrolledStudents.length,
+    seats_left: Math.max(Number(record?.max_students || 0) - enrolledStudents.length, 0),
+  }
+}
+
 function mapNotification(record) {
   const payload = record?.payload && typeof record.payload === 'object' ? record.payload : {}
   const previousStart = splitDateTime(payload?.old_start_at)
