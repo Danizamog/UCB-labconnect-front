@@ -10,7 +10,7 @@ import {
   listMaterials,
   updateMaterial,
 } from '../services/infrastructureService'
-import { listUsersWithRoles } from '../services/rolesService'
+import { listUserProfiles } from '../services/profileService'
 import { hasAnyPermission, isAdminUser } from '../../../shared/lib/permissions'
 import { formatDateTime, movementTypeLabel } from '../../../shared/utils/formatters'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
@@ -43,7 +43,8 @@ function AdminMaterialesPage({ user }) {
   const [usageReportLoading, setUsageReportLoading] = useState(false)
   const [usageReportError, setUsageReportError] = useState('')
   const [materialMovements, setMaterialMovements] = useState([])
-  const [systemUsers, setSystemUsers] = useState([])
+  const [borrowerQuery, setBorrowerQuery] = useState('')
+  const [borrowerResults, setBorrowerResults] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -55,7 +56,6 @@ function AdminMaterialesPage({ user }) {
   const [confirmModal, setConfirmModal] = useState(null)
 
   const canManage = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos'])
-  const canViewUserDirectory = hasAnyPermission(user, ['gestionar_roles_permisos', 'reactivar_cuentas'])
   const isAdmin = isAdminUser(user)
 
   const fetchReportData = async () => {
@@ -111,17 +111,6 @@ function AdminMaterialesPage({ user }) {
       setLoading(false)
     }
 
-    if (canViewUserDirectory) {
-      try {
-        const usersData = await listUsersWithRoles()
-        setSystemUsers(usersData)
-      } catch {
-        setSystemUsers([])
-      }
-    } else {
-      setSystemUsers([])
-    }
-
     await fetchReportData()
     await fetchUsageReportData()
 
@@ -132,14 +121,6 @@ function AdminMaterialesPage({ user }) {
       // historial de movimientos no critico
     }
   }
-
-  useEffect(() => { loadData() }, [])
-
-  useEffect(() => {
-    if (!movementForm.stock_item_id && visibleMaterials.length > 0) {
-      setMovementForm((prev) => ({ ...prev, stock_item_id: String(visibleMaterials[0].id) }))
-    }
-  }, [visibleMaterials, movementForm.stock_item_id])
 
   const managedLabIds = useMemo(() => {
     const currentUserId = String(user?.user_id || '')
@@ -167,6 +148,44 @@ function AdminMaterialesPage({ user }) {
     () => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])),
     [labs],
   )
+
+  useEffect(() => { loadData() }, [])
+
+  useEffect(() => {
+    if (!movementForm.stock_item_id && visibleMaterials.length > 0) {
+      setMovementForm((prev) => ({ ...prev, stock_item_id: String(visibleMaterials[0].id) }))
+    }
+  }, [visibleMaterials, movementForm.stock_item_id])
+
+  useEffect(() => {
+    const query = String(borrowerQuery || '').trim().toLowerCase()
+    if (query.length < 2) {
+      setBorrowerResults([])
+      return undefined
+    }
+    let cancelled = false
+    const timer = window.setTimeout(async () => {
+      try {
+        const profiles = await listUserProfiles()
+        if (cancelled) return
+        const matches = (Array.isArray(profiles) ? profiles : [])
+          .filter((profile) => {
+            const haystack = [profile?.name, profile?.email, profile?.username, profile?.student_code]
+              .map((v) => String(v || '').toLowerCase())
+              .join(' ')
+            return haystack.includes(query)
+          })
+          .slice(0, 8)
+        setBorrowerResults(matches)
+      } catch {
+        if (!cancelled) setBorrowerResults([])
+      }
+    }, 250)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [borrowerQuery])
 
   const selectedMovementMaterial = useMemo(
     () => materials.find((m) => String(m.id) === String(movementForm.stock_item_id)) || null,
@@ -1009,17 +1028,50 @@ function AdminMaterialesPage({ user }) {
               <div className="infra-form-grid">
                 <label>
                   <span>Usuario</span>
-                  <select
-                    value={usageReportFilters.borrower_id}
-                    onChange={(e) => handleUsageReportFilterChange('borrower_id', e.target.value)}
-                  >
-                    <option value="">Todos los usuarios</option>
-                    {systemUsers.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name || u.email}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    type="search"
+                    value={borrowerQuery}
+                    onChange={(e) => {
+                      setBorrowerQuery(e.target.value)
+                      if (!e.target.value.trim()) {
+                        handleUsageReportFilterChange('borrower_id', '')
+                      }
+                    }}
+                    placeholder="Busca por nombre, correo o codigo"
+                  />
+                  {borrowerQuery.trim().length >= 2 && borrowerResults.length > 0 ? (
+                    <ul className="infra-search-suggestions">
+                      {borrowerResults.map((u) => (
+                        <li key={u.id}>
+                          <button
+                            type="button"
+                            className={usageReportFilters.borrower_id === u.id ? 'is-active' : ''}
+                            onClick={() => {
+                              handleUsageReportFilterChange('borrower_id', u.id)
+                              setBorrowerQuery(u.name ? `${u.name} (${u.email || u.username || ''})` : u.email || u.username || '')
+                              setBorrowerResults([])
+                            }}
+                          >
+                            <strong>{u.name || u.username || u.email}</strong>
+                            <small>{u.email || u.username}</small>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {usageReportFilters.borrower_id ? (
+                    <button
+                      type="button"
+                      className="infra-secondary"
+                      onClick={() => {
+                        handleUsageReportFilterChange('borrower_id', '')
+                        setBorrowerQuery('')
+                        setBorrowerResults([])
+                      }}
+                    >
+                      Quitar filtro de usuario
+                    </button>
+                  ) : null}
                 </label>
                 <label>
                   <span>Práctica</span>
