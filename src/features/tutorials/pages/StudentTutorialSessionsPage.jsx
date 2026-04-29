@@ -47,34 +47,54 @@ function StudentTutorialSessionsPage({ user }) {
   const [message, setMessage] = useState('')
   const [clockTick, setClockTick] = useState(() => Date.now())
 
-  const loadSessions = useCallback(async () => {
+  const loadPublicSessions = useCallback(async () => {
     try {
-      const [publicSessions, enrolledSessions] = await Promise.all([
-        listPublicTutorialSessions(),
-        listMyEnrolledTutorialSessions(),
-      ])
+      const publicSessions = await listPublicTutorialSessions()
       setSessions(publicSessions)
-      setMySessions(enrolledSessions)
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudo cargar la cartelera de tutorias.')
     }
   }, [])
 
-  const reloadTimerRef = useRef(null)
+  const loadMyEnrollments = useCallback(async () => {
+    try {
+      const enrolledSessions = await listMyEnrolledTutorialSessions()
+      setMySessions(enrolledSessions)
+    } catch {
+      // ignore — la cartelera publica sigue siendo util sin las inscripciones
+    }
+  }, [])
+
+  const loadSessions = useCallback(async () => {
+    await Promise.all([loadPublicSessions(), loadMyEnrollments()])
+  }, [loadMyEnrollments, loadPublicSessions])
+
+  const publicReloadTimerRef = useRef(null)
+  const myReloadTimerRef = useRef(null)
 
   useEffect(() => {
     loadSessions()
 
     const userId = String(user?.user_id || '')
-    const scheduleReload = () => {
-      window.clearTimeout(reloadTimerRef.current)
-      reloadTimerRef.current = window.setTimeout(loadSessions, 1000)
+    const schedulePublicReload = () => {
+      window.clearTimeout(publicReloadTimerRef.current)
+      publicReloadTimerRef.current = window.setTimeout(loadPublicSessions, 1000)
+    }
+    const scheduleMyReload = () => {
+      window.clearTimeout(myReloadTimerRef.current)
+      myReloadTimerRef.current = window.setTimeout(loadMyEnrollments, 1000)
     }
 
     const unsubscribe = subscribeTutorialSessionsRealtime((event) => {
       if (event?.topic === 'tutorial_session') {
-        scheduleReload()
+        schedulePublicReload()
+        if (!userId) return
+        const tutorId = String(event?.record?.tutor_id || '')
+        const enrolled = Array.isArray(event?.record?.enrolled_students) ? event.record.enrolled_students : []
+        const concerns = tutorId === userId
+          || enrolled.some((student) => String(student?.student_id || '') === userId)
+        if (concerns) scheduleMyReload()
         return
       }
 
@@ -82,15 +102,16 @@ function StudentTutorialSessionsPage({ user }) {
         const recipients = Array.isArray(event?.recipients) ? event.recipients : []
         const isCurrentUserNotification =
           event?.record?.recipient_user_id === userId || recipients.includes(userId)
-        if (isCurrentUserNotification) scheduleReload()
+        if (isCurrentUserNotification) scheduleMyReload()
       }
     })
 
     return () => {
-      window.clearTimeout(reloadTimerRef.current)
+      window.clearTimeout(publicReloadTimerRef.current)
+      window.clearTimeout(myReloadTimerRef.current)
       unsubscribe?.()
     }
-  }, [loadSessions, user?.user_id])
+  }, [loadMyEnrollments, loadPublicSessions, loadSessions, user?.user_id])
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {

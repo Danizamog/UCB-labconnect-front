@@ -10,9 +10,10 @@ import {
   listMyTutorialSessions,
 } from '../../tutorials/services/tutorialSessionsService'
 import { formatDateTime, formatStatus } from '../../../shared/utils/formatters'
+import { hasAnyPermission } from '../../../shared/lib/permissions'
 import './UserHistoryPage.css'
 
-const RESERVATION_HISTORY_STATUSES = new Set(['rejected', 'cancelled', 'completed', 'absent'])
+const RESERVATION_HISTORY_STATUSES = new Set(['approved', 'in_progress', 'rejected', 'cancelled', 'completed', 'absent'])
 const FILTER_TYPES = {
   ALL: 'all',
   RESERVATIONS: 'reservations',
@@ -103,20 +104,22 @@ function UserHistoryPage({ user }) {
     }
   }, [])
 
+  const canManageTutorials = hasAnyPermission(user, ['gestionar_tutorias'])
+
   const loadTutorialsOnly = useCallback(async () => {
     try {
-      const [enrolledResult, taughtResult] = await Promise.allSettled([
-        listMyEnrolledTutorialSessions(),
-        listMyTutorialSessions(),
-      ])
+      const fetchers = [listMyEnrolledTutorialSessions()]
+      if (canManageTutorials) {
+        fetchers.push(listMyTutorialSessions())
+      }
+      const results = await Promise.allSettled(fetchers)
 
       const merged = []
-      if (enrolledResult.status === 'fulfilled' && Array.isArray(enrolledResult.value)) {
-        merged.push(...enrolledResult.value)
-      }
-      if (taughtResult.status === 'fulfilled' && Array.isArray(taughtResult.value)) {
-        merged.push(...taughtResult.value)
-      }
+      results.forEach((result) => {
+        if (result?.status === 'fulfilled' && Array.isArray(result.value)) {
+          merged.push(...result.value)
+        }
+      })
 
       const seenIds = new Set()
       setTutorials(merged.filter((item) => {
@@ -127,7 +130,7 @@ function UserHistoryPage({ user }) {
     } catch {
       setTutorials([])
     }
-  }, [])
+  }, [canManageTutorials])
 
   const loadHistory = useCallback(async (options = {}) => {
     setIsLoading(true)
@@ -345,7 +348,7 @@ function UserHistoryPage({ user }) {
       <section className="history-panel" aria-label="Historial de reservas">
         <div className="history-panel-head">
           <h3>Reservas</h3>
-          <p>Incluye reservas pasadas, canceladas o rechazadas.</p>
+          <p>Incluye tus reservas aprobadas, en curso, completadas, canceladas o rechazadas.</p>
         </div>
 
         {isLoading && filteredReservationHistory.length === 0 ? (

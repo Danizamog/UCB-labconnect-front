@@ -183,7 +183,8 @@ export function isLabAccessibleToUser(lab, user) {
   }
 
   const permissions = Array.isArray(user?.permissions) ? user.permissions : []
-  if (user?.role === 'admin' || permissions.includes('*')) {
+  const role = String(user?.role || '').toLowerCase().trim()
+  if (role === 'admin' || role === 'administrador' || permissions.includes('*')) {
     return true
   }
 
@@ -400,8 +401,12 @@ export async function listReservations(filters = {}) {
     })
 }
 
-export async function listMyReservations() {
-  const data = await request(`${reservationsBase}/reservations/mine`, { cacheTtlMs: 2000 })
+export async function listMyReservations(options = {}) {
+  const skipCache = Boolean(options?.skipCache)
+  const data = await request(`${reservationsBase}/reservations/mine`, {
+    cacheTtlMs: skipCache ? 0 : 2000,
+    skipCache,
+  })
   const mapped = Array.isArray(data) ? data.map(mapReservation) : []
   return mapped.sort((a, b) => {
     if (a.date === b.date) {
@@ -434,6 +439,19 @@ export async function listReservationsPage(filters = {}) {
 
   const data = await request(`${reservationsBase}/reservations/search?${search.toString()}`, { cacheTtlMs: 2000 })
   return mapReservationPage(data || {})
+}
+
+export async function getReservationStats(options = {}) {
+  const skipCache = Boolean(options?.skipCache)
+  const data = await request(`${reservationsBase}/reservations/stats`, {
+    cacheTtlMs: skipCache ? 0 : 1500,
+    skipCache,
+  })
+  return {
+    total: Number(data?.total || 0),
+    pending: Number(data?.pending || 0),
+    walk_in: Number(data?.walk_in || 0),
+  }
 }
 
 export async function getMyAgendaSummary(options = {}) {

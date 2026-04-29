@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import { listAdminLabs, listAssetMaintenanceTickets, listAssets } from '../../admin/services/infrastructureService'
 import { listUserProfiles } from '../../admin/services/profileService'
@@ -166,6 +166,8 @@ function AdminPenaltiesPage({ user }) {
   const [isLifting, setIsLifting] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [isLoadingModalData, setIsLoadingModalData] = useState(false)
+  const modalDataLoadedRef = useRef(false)
 
   const canManage = hasAnyPermission(user, ['gestionar_penalizaciones'])
 
@@ -174,37 +176,16 @@ function AdminPenaltiesPage({ user }) {
     setPenalties(Array.isArray(data) ? data : [])
   }, [])
 
-  const loadSupportData = useCallback(async () => {
-    const [reservationsResult, assetsResult, ticketsResult, profilesResult, labsResult] = await Promise.allSettled([
-      listReservationsPage({ pageSize: 200, sortBy: 'updated', sortType: 'DESC' }),
+  const loadDisplaySupportData = useCallback(async () => {
+    const [assetsResult, labsResult] = await Promise.allSettled([
       listAssets(),
-      listAssetMaintenanceTickets(),
-      listUserProfiles(),
       listAdminLabs(),
     ])
-
-    if (reservationsResult.status === 'fulfilled') {
-      setReservations(Array.isArray(reservationsResult.value?.items) ? reservationsResult.value.items : [])
-    } else {
-      setReservations([])
-    }
 
     if (assetsResult.status === 'fulfilled') {
       setAssets(Array.isArray(assetsResult.value) ? assetsResult.value : [])
     } else {
       setAssets([])
-    }
-
-    if (ticketsResult.status === 'fulfilled') {
-      setTickets(Array.isArray(ticketsResult.value) ? ticketsResult.value : [])
-    } else {
-      setTickets([])
-    }
-
-    if (profilesResult.status === 'fulfilled') {
-      setProfiles(Array.isArray(profilesResult.value) ? profilesResult.value : [])
-    } else {
-      setProfiles([])
     }
 
     if (labsResult.status === 'fulfilled') {
@@ -214,8 +195,36 @@ function AdminPenaltiesPage({ user }) {
     }
   }, [])
 
+  const loadModalData = useCallback(async (options = {}) => {
+    if (modalDataLoadedRef.current && !options.force) return
+    setIsLoadingModalData(true)
+    try {
+      const [reservationsResult, ticketsResult, profilesResult] = await Promise.allSettled([
+        listReservationsPage({ pageSize: 200, sortBy: 'updated', sortType: 'DESC' }),
+        listAssetMaintenanceTickets(),
+        listUserProfiles(),
+      ])
+
+      if (reservationsResult.status === 'fulfilled') {
+        setReservations(Array.isArray(reservationsResult.value?.items) ? reservationsResult.value.items : [])
+      }
+
+      if (ticketsResult.status === 'fulfilled') {
+        setTickets(Array.isArray(ticketsResult.value) ? ticketsResult.value : [])
+      }
+
+      if (profilesResult.status === 'fulfilled') {
+        setProfiles(Array.isArray(profilesResult.value) ? profilesResult.value : [])
+      }
+
+      modalDataLoadedRef.current = true
+    } finally {
+      setIsLoadingModalData(false)
+    }
+  }, [])
+
   useEffect(() => {
-    Promise.all([loadPenalties(), loadSupportData()]).catch((err) => {
+    Promise.all([loadPenalties(), loadDisplaySupportData()]).catch((err) => {
       setError(err?.message || 'No se pudo cargar el panel de penalizaciones.')
     })
 
@@ -229,7 +238,7 @@ function AdminPenaltiesPage({ user }) {
     })
 
     return () => unsubscribe?.()
-  }, [loadPenalties, loadSupportData])
+  }, [loadPenalties, loadDisplaySupportData])
 
   const assetById = useMemo(() => {
     const mapped = new Map()
@@ -368,6 +377,9 @@ function AdminPenaltiesPage({ user }) {
     setIsModalOpen(true)
     setError('')
     setMessage('')
+    loadModalData().catch((err) => {
+      setError(err?.message || 'No se pudo cargar la informacion auxiliar para registrar la penalizacion.')
+    })
   }
 
   const closeModal = () => {
@@ -626,6 +638,7 @@ function AdminPenaltiesPage({ user }) {
         onSubmit={handleCreatePenalty}
         onClose={closeModal}
         isSubmitting={isSubmitting}
+        isLoadingData={isLoadingModalData}
       />
 
       {penaltyToLift ? (

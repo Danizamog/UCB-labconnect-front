@@ -41,12 +41,13 @@ function PenaltyModal({
   onSubmit,
   onClose,
   isSubmitting = false,
+  isLoadingData = false,
 }) {
   if (!isOpen) {
     return null
   }
 
-  const submitDisabled = isSubmitting || Boolean(validationMessage)
+  const submitDisabled = isSubmitting || isLoadingData || Boolean(validationMessage)
 
   return (
     <div className="reservation-modal-backdrop penalty-backdrop" onClick={onClose} role="dialog" aria-modal="true">

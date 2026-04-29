@@ -4,11 +4,19 @@ import TutorialSessionDetailModal from '../../tutorials/pages/TutorialSessionDet
 import { openTutorialSessionFlow } from '../../tutorials/utils/focusTutorialNavigation'
 import {
   getLabAvailability,
+  getMyAgendaSummary,
   listAvailableLabs,
   prefetchLabAvailability,
   subscribeReservationsRealtime,
 } from '../services/reservationsService'
 import './ReservationsPages.css'
+
+const RESERVATION_STATUS_LABELS = {
+  pending: 'Pendiente',
+  approved: 'Aprobada',
+  in_progress: 'En curso',
+}
+const RESERVATIONS_REFRESH_DEBOUNCE_MS = 1500
 
 const DIAS_CORTOS = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
 const DIAS_LARGOS = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado']
@@ -135,6 +143,8 @@ function UserAvailabilityCalendarPage({ user }) {
   const [error, setError] = useState('')
   const [focusedTutorial, setFocusedTutorial] = useState(null)
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false)
+  const [myReservations, setMyReservations] = useState([])
+  const [isLoadingReservations, setIsLoadingReservations] = useState(false)
 
   const loadLabs = useCallback(async () => {
     try {
@@ -147,12 +157,36 @@ function UserAvailabilityCalendarPage({ user }) {
     }
   }, [user])
 
+  const loadMyReservations = useCallback(async (options = {}) => {
+    setIsLoadingReservations(true)
+    try {
+      const summary = await getMyAgendaSummary({ limit: 6, skipCache: options.skipCache })
+      setMyReservations(Array.isArray(summary?.upcoming_reservations) ? summary.upcoming_reservations : [])
+    } catch {
+      setMyReservations([])
+    } finally {
+      setIsLoadingReservations(false)
+    }
+  }, [])
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       loadLabs()
     }, 0)
     return () => window.clearTimeout(timer)
   }, [loadLabs])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      loadMyReservations()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadMyReservations, user?.user_id])
+
+  const labNameById = useMemo(
+    () => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])),
+    [labs],
+  )
 
   const weekDays = useMemo(() => {
     const days = []
@@ -208,6 +242,12 @@ function UserAvailabilityCalendarPage({ user }) {
   }, [selectedLab, weekDays])
 
   const slotsRefreshTimerRef = useRef(null)
+  const reservationsRefreshTimerRef = useRef(null)
+  const userIdRef = useRef(String(user?.user_id || ''))
+
+  useEffect(() => {
+    userIdRef.current = String(user?.user_id || '')
+  }, [user?.user_id])
 
   useEffect(() => {
     if (!selectedLab) return undefined
@@ -215,6 +255,16 @@ function UserAvailabilityCalendarPage({ user }) {
     const unsubscribe = subscribeReservationsRealtime((event) => {
       if (!event?.topic || (event.topic !== 'lab_reservation' && event.topic !== 'tutorial_session')) {
         return
+      }
+
+      if (event.topic === 'lab_reservation') {
+        const requestedBy = String(event?.record?.requested_by || '')
+        if (requestedBy && requestedBy === userIdRef.current) {
+          window.clearTimeout(reservationsRefreshTimerRef.current)
+          reservationsRefreshTimerRef.current = window.setTimeout(() => {
+            loadMyReservations({ skipCache: true })
+          }, RESERVATIONS_REFRESH_DEBOUNCE_MS)
+        }
       }
 
       const eventLabId = String(event?.record?.laboratory_id || '')
@@ -244,14 +294,16 @@ function UserAvailabilityCalendarPage({ user }) {
             .then((payload) => setSlots(Array.isArray(payload?.slots) ? payload.slots : []))
             .catch(() => {})
         }
+        loadMyReservations({ skipCache: true })
       },
     })
 
     return () => {
       window.clearTimeout(slotsRefreshTimerRef.current)
+      window.clearTimeout(reservationsRefreshTimerRef.current)
       unsubscribe?.()
     }
-  }, [selectedDate, selectedLab])
+  }, [loadMyReservations, selectedDate, selectedLab])
 
   const mappedSlots = useMemo(
     () => slots.map((slot) => ({
@@ -308,6 +360,43 @@ function UserAvailabilityCalendarPage({ user }) {
       </header>
 
       {error ? <p className="reservations-message error">{error}</p> : null}
+
+      <section className="reservations-panel">
+        <div className="reservations-panel-header">
+          <h3>Tus próximas reservas</h3>
+          <p className="reservations-panel-subtitle">
+            Vista rápida de tus reservas pendientes, aprobadas o en curso. {isLoadingReservations ? 'Actualizando...' : ''}
+          </p>
+        </div>
+        {myReservations.length === 0 ? (
+          <p className="reservations-empty">
+            {isLoadingReservations ? 'Cargando tus reservas...' : 'No tienes reservas próximas registradas.'}
+          </p>
+        ) : (
+          <div className="reservation-card-grid">
+            {myReservations.map((reservation) => {
+              const labName = reservation.laboratory_name || labNameById[String(reservation.laboratory_id)] || 'Laboratorio'
+              const statusLabel = RESERVATION_STATUS_LABELS[reservation.status] || reservation.status
+              return (
+                <article key={reservation.id} className="reservation-user-card">
+                  <div className="reservation-user-card-head">
+                    <div>
+                      <span className="reservation-user-card-kicker">Reserva</span>
+                      <h4>{labName}</h4>
+                    </div>
+                    <span className={`reservations-status ${reservation.status}`}>{statusLabel}</span>
+                  </div>
+                  <div className="reservation-user-card-meta">
+                    <span>{reservation.date}</span>
+                    <span>{reservation.start_time} - {reservation.end_time}</span>
+                    <span>{reservation.purpose || 'Sin motivo registrado'}</span>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
+      </section>
 
       <section className="reservations-panel">
         <div className="reservations-controls cal-lab-controls">

@@ -273,6 +273,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
   const [availabilityRefreshNonce, setAvailabilityRefreshNonce] = useState(0)
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
+  const [isSubmittingReservation, setIsSubmittingReservation] = useState(false)
   const [focusedTutorial, setFocusedTutorial] = useState(null)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -312,6 +313,15 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     }
   }, [user])
 
+  const loadPenaltiesOnly = useCallback(async () => {
+    try {
+      const penaltiesData = await listMyPenalties()
+      setPenalties(Array.isArray(penaltiesData) ? penaltiesData : [])
+    } catch {
+      // ignore — el banner de penalizacion no es critico para el flujo
+    }
+  }, [])
+
   useEffect(() => {
     loadData()
 
@@ -333,7 +343,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
           recipients.includes(user?.user_id || '')
 
         if (isCurrentUserPenalty) {
-          loadData()
+          loadPenaltiesOnly()
           setMessage('Tu estado de penalizacion fue actualizado.')
         }
         return
@@ -358,7 +368,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     })
 
     return () => unsubscribe?.()
-  }, [loadData, user?.user_id])
+  }, [loadData, loadPenaltiesOnly, user?.user_id])
 
   useEffect(() => {
     const applyFocus = (reservationId) => {
@@ -786,6 +796,9 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    if (isSubmittingReservation) {
+      return
+    }
     setError('')
     setMessage('')
 
@@ -799,6 +812,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       return
     }
 
+    setIsSubmittingReservation(true)
     try {
       await createReservation(
         {
@@ -821,6 +835,8 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       await loadData()
     } catch (err) {
       setError(err.message || 'No se pudo crear la reserva.')
+    } finally {
+      setIsSubmittingReservation(false)
     }
   }
 
@@ -1390,8 +1406,17 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
           </div>
 
           <div className="reservations-actions">
-            <button type="submit" className="reservations-primary" disabled={!canSubmitReservation}>
-              {activePenalty ? 'Reserva bloqueada' : 'Enviar solicitud'}
+            <button
+              type="submit"
+              className="reservations-primary"
+              disabled={!canSubmitReservation || isSubmittingReservation}
+              aria-busy={isSubmittingReservation}
+            >
+              {activePenalty
+                ? 'Reserva bloqueada'
+                : isSubmittingReservation
+                  ? 'Enviando solicitud...'
+                  : 'Enviar solicitud'}
             </button>
           </div>
         </form>

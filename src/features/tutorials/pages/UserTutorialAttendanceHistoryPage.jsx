@@ -5,6 +5,7 @@ import {
   subscribeTutorialSessionsRealtime,
 } from '../services/tutorialSessionsService'
 import { formatDateTime } from '../../../shared/utils/formatters'
+import { hasAnyPermission } from '../../../shared/lib/permissions'
 import './UserTutorialAttendanceHistoryPage.css'
 
 function parseDateTimeValue(value) {
@@ -75,22 +76,25 @@ function UserTutorialAttendanceHistoryPage({ user }) {
   const [sessions, setSessions] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const canManageTutorials = hasAnyPermission(user, ['gestionar_tutorias'])
 
   const loadSessions = useCallback(async () => {
     setIsLoading(true)
     setError('')
 
     try {
-      const [enrolledResult, taughtResult] = await Promise.allSettled([
-        listMyEnrolledTutorialSessions(),
-        listMyTutorialSessions(),
-      ])
+      const fetchers = [listMyEnrolledTutorialSessions()]
+      if (canManageTutorials) {
+        fetchers.push(listMyTutorialSessions())
+      }
+      const results = await Promise.allSettled(fetchers)
+      const [enrolledResult, taughtResult] = results
 
       const merged = []
-      if (enrolledResult.status === 'fulfilled' && Array.isArray(enrolledResult.value)) {
+      if (enrolledResult?.status === 'fulfilled' && Array.isArray(enrolledResult.value)) {
         merged.push(...enrolledResult.value)
       }
-      if (taughtResult.status === 'fulfilled' && Array.isArray(taughtResult.value)) {
+      if (taughtResult?.status === 'fulfilled' && Array.isArray(taughtResult.value)) {
         merged.push(...taughtResult.value)
       }
 
@@ -111,7 +115,7 @@ function UserTutorialAttendanceHistoryPage({ user }) {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [canManageTutorials])
 
   const reloadTimerRef = useRef(null)
 

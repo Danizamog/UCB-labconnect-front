@@ -21,7 +21,7 @@ import {
   getSectionIdFromPath,
   normalizePath,
 } from '../../../shared/config/navigationLinks'
-import { hasAnyPermission } from '../../../shared/lib/permissions'
+import { hasAnyPermission, isAdminUser } from '../../../shared/lib/permissions'
 import {
   getOccupancyDashboard,
   getMyAgendaSummary,
@@ -130,14 +130,14 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     active_sessions: [],
     lab_breakdown: [],
   })
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = isAdminUser(user)
   const canManageRoles = hasAnyPermission(user, ['gestionar_roles_permisos'])
   const canManageProfiles = hasAnyPermission(user, ['gestionar_roles_permisos', 'reactivar_cuentas'])
   const canManageStructure = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
   const canManagePenalties = hasAnyPermission(user, ['gestionar_penalizaciones'])
-  const canViewPenalties = Boolean(user?.user_id)
+  const canViewPenalties = canManagePenalties
   const canManageEquipos = hasAnyPermission(user, ['gestionar_inventario', 'gestionar_estado_equipos', 'gestionar_mantenimiento'])
-  const canManageMateriales = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos'])
+  const canManageMateriales = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos', 'gestionar_reservas_materiales'])
   const canManageTutorials = hasAnyPermission(user, ['gestionar_tutorias'])
   const hasManagementModules =
     canManageRoles || canManageProfiles || canManageStructure || canManagePenalties || canManageEquipos || canManageMateriales || canManageTutorials
@@ -449,7 +449,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
                     <div className="home-agenda-head">
                       <div className="home-agenda-copy">
                         <p className="home-modern-kicker">Mi agenda</p>
-                        <h2>Reservas y tutorías próximas en una sola pantalla.</h2>
+                        <h2>Tus próximas reservas y tutorías</h2>
                         <p>
                           Organiza tu tiempo con un resumen directo de lo que viene en los próximos días.
                         </p>
@@ -558,9 +558,9 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
                   <div className="home-modern-hero-panel" aria-label="Resumen rapido">
                     <article>
                       <CalendarDays size={24} />
-                      <span>{isAdmin ? 'Usuarios dentro' : 'Reservas'}</span>
-                      <strong>{isAdmin ? operationsSnapshot.current_occupancy : 'Por bloques'}</strong>
-                      <p>{isAdmin ? 'Ocupacion actual de laboratorios.' : 'Elige laboratorio, fecha y hora.'}</p>
+                      <span>{isAdmin ? 'Usuarios dentro' : 'Reservas próximas'}</span>
+                      <strong>{isAdmin ? operationsSnapshot.current_occupancy : agendaSummary.reservation_count}</strong>
+                      <p>{isAdmin ? 'Ocupacion actual de laboratorios.' : 'Reservas activas en tu agenda.'}</p>
                     </article>
                     <article>
                       <ShieldCheck size={24} />
@@ -570,9 +570,9 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
                     </article>
                     <article>
                       <BookOpen size={24} />
-                      <span>{isAdmin ? 'Sesiones' : 'Tutorias'}</span>
-                      <strong>{isAdmin ? operationsSnapshot.active_sessions.length : 'Disponibles'}</strong>
-                      <p>{isAdmin ? 'Actividades en curso.' : 'Apoyo academico publicado.'}</p>
+                      <span>{isAdmin ? 'Sesiones' : 'Tutorías próximas'}</span>
+                      <strong>{isAdmin ? operationsSnapshot.active_sessions.length : agendaSummary.tutorial_count}</strong>
+                      <p>{isAdmin ? 'Actividades en curso.' : 'Sesiones vigentes para ti.'}</p>
                     </article>
                   </div>
                 </section>

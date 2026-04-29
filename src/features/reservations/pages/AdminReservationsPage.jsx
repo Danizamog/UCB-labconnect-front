@@ -13,6 +13,7 @@ import { listUserProfiles } from '../../admin/services/profileService'
 import {
   createWalkInReservation,
   getOccupancyDashboard,
+  getReservationStats,
   listReservationsPage,
   markReservationAbsent,
   registerReservationEntry,
@@ -226,11 +227,9 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   const loadOperationalData = useCallback(async () => {
     try {
       const today = todayDate()
-      const [todayPage, pendingCountPage, walkInPage, totalCountPage, occupancyResult] = await Promise.allSettled([
+      const [todayPage, statsResult, occupancyResult] = await Promise.allSettled([
         listReservationsPage({ date: today, pageSize: 100, sortBy: 'start_at', sortType: 'ASC' }),
-        listReservationsPage({ status: 'pending', pageSize: 1 }),
-        listReservationsPage({ where: 'is_walk_in=true', pageSize: 1 }),
-        listReservationsPage({ pageSize: 1 }),
+        getReservationStats(),
         getOccupancyDashboard(),
       ])
 
@@ -240,9 +239,9 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
 
       setTodaysReservations(todayPage.value.items)
       setReservationCounters({
-        total: totalCountPage.status === 'fulfilled' ? totalCountPage.value.totalElements : 0,
-        pending: pendingCountPage.status === 'fulfilled' ? pendingCountPage.value.totalElements : 0,
-        walkIn: walkInPage.status === 'fulfilled' ? walkInPage.value.totalElements : 0,
+        total: statsResult.status === 'fulfilled' ? statsResult.value.total : 0,
+        pending: statsResult.status === 'fulfilled' ? statsResult.value.pending : 0,
+        walkIn: statsResult.status === 'fulfilled' ? statsResult.value.walk_in : 0,
       })
       setOccupancy(occupancyResult.value)
       setError('')

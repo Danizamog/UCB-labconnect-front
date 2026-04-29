@@ -18,7 +18,7 @@ import {
   X,
 } from 'lucide-react'
 import { NAVIGATION_LINKS } from '../../config/navigationLinks'
-import { hasAnyPermission } from '../../lib/permissions'
+import { hasAnyPermission, isAdminUser } from '../../lib/permissions'
 import ucbShieldLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
 import './navbar.css'
 
@@ -73,7 +73,7 @@ function normalizeSearchText(value) {
 function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = isAdminUser(user)
   const navPriority = {
     home: 0,
     reserve: 1,
