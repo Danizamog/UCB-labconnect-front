@@ -11,7 +11,7 @@ import {
   updateMaterial,
 } from '../services/infrastructureService'
 import { listUsersWithRoles } from '../services/rolesService'
-import { hasAnyPermission } from '../../../shared/lib/permissions'
+import { hasAnyPermission, isAdminUser } from '../../../shared/lib/permissions'
 import { formatDateTime, movementTypeLabel } from '../../../shared/utils/formatters'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import './AdminAssetsPage.css'
@@ -55,6 +55,8 @@ function AdminMaterialesPage({ user }) {
   const [confirmModal, setConfirmModal] = useState(null)
 
   const canManage = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos'])
+  const canViewUserDirectory = hasAnyPermission(user, ['gestionar_roles_permisos', 'reactivar_cuentas'])
+  const isAdmin = isAdminUser(user)
 
   const fetchReportData = async () => {
     setReportLoading(true)
@@ -96,19 +98,28 @@ function AdminMaterialesPage({ user }) {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [labsData, materialsData, usersData] = await Promise.all([
+      const [labsData, materialsData] = await Promise.all([
         listAdminLabs(),
         listMaterials(),
-        listUsersWithRoles(),
       ])
       setLabs(labsData)
       setMaterials(materialsData)
-      setSystemUsers(usersData)
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudieron cargar los datos iniciales')
     } finally {
       setLoading(false)
+    }
+
+    if (canViewUserDirectory) {
+      try {
+        const usersData = await listUsersWithRoles()
+        setSystemUsers(usersData)
+      } catch {
+        setSystemUsers([])
+      }
+    } else {
+      setSystemUsers([])
     }
 
     await fetchReportData()
@@ -125,11 +136,33 @@ function AdminMaterialesPage({ user }) {
   useEffect(() => { loadData() }, [])
 
   useEffect(() => {
-    if (!movementForm.stock_item_id && materials.length > 0) {
-      setMovementForm((prev) => ({ ...prev, stock_item_id: String(materials[0].id) }))
+    if (!movementForm.stock_item_id && visibleMaterials.length > 0) {
+      setMovementForm((prev) => ({ ...prev, stock_item_id: String(visibleMaterials[0].id) }))
     }
-  }, [materials, movementForm.stock_item_id])
+  }, [visibleMaterials, movementForm.stock_item_id])
 
+  const managedLabIds = useMemo(() => {
+    const currentUserId = String(user?.user_id || '')
+    if (!currentUserId) return []
+    return labs
+      .filter((lab) => String(lab?.manager || '') === currentUserId)
+      .map((lab) => String(lab.id))
+  }, [labs, user?.user_id])
+  const restrictToManagedLabs = !isAdmin
+  const visibleLabs = useMemo(() => {
+    if (!restrictToManagedLabs) return labs
+    return labs.filter((lab) => managedLabIds.includes(String(lab.id)))
+  }, [labs, managedLabIds, restrictToManagedLabs])
+  const visibleMaterials = useMemo(() => {
+    if (isAdmin) return materials
+    if (managedLabIds.length === 0) {
+      return materials.filter((material) => !String(material.laboratory_id || ''))
+    }
+    return materials.filter((material) => {
+      const labId = String(material.laboratory_id || '')
+      return !labId || managedLabIds.includes(labId)
+    })
+  }, [isAdmin, managedLabIds, materials])
   const labNameById = useMemo(
     () => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])),
     [labs],
@@ -141,12 +174,12 @@ function AdminMaterialesPage({ user }) {
   )
 
   const lowStockMaterials = useMemo(
-    () => materials.filter((m) => {
+    () => visibleMaterials.filter((m) => {
       const qty = Number(m.quantity_available)
       const min = Number(m.minimum_stock || 0)
       return min > 0 && qty < min
     }),
-    [materials],
+    [visibleMaterials],
   )
 
   const movementWillExceedStock = useMemo(() => {
@@ -160,8 +193,8 @@ function AdminMaterialesPage({ user }) {
   }
 
   const outOfStockCount = useMemo(
-    () => materials.filter((m) => Number(m.quantity_available) <= 0).length,
-    [materials],
+    () => visibleMaterials.filter((m) => Number(m.quantity_available) <= 0).length,
+    [visibleMaterials],
   )
 
   const stockAlertsCount = useMemo(
@@ -180,6 +213,12 @@ function AdminMaterialesPage({ user }) {
     return reportItems.filter((item) => {
       const itemLaboratoryId = String(item.laboratory_id || '').trim()
       const isGeneralItem = !itemLaboratoryId
+
+      if (!isAdmin) {
+        if (itemLaboratoryId && !managedLabIds.includes(itemLaboratoryId)) {
+          return false
+        }
+      }
 
       if (selectedLaboratory) {
         if (selectedLaboratory === '__GENERAL__') {
@@ -214,7 +253,7 @@ function AdminMaterialesPage({ user }) {
 
       return true
     })
-  }, [reportFilters, reportItems])
+  }, [isAdmin, managedLabIds, reportFilters, reportItems])
 
   const reportSummary = useMemo(() => {
     const outOfStock = filteredReportItems.filter((item) => item.status === 'out_of_stock').length
@@ -291,7 +330,7 @@ function AdminMaterialesPage({ user }) {
     setMessage('')
     setMovementForm((prev) => ({
       ...prev,
-      stock_item_id: material?.id ? String(material.id) : prev.stock_item_id || (materials[0]?.id ? String(materials[0].id) : ''),
+      stock_item_id: material?.id ? String(material.id) : prev.stock_item_id || (visibleMaterials[0]?.id ? String(visibleMaterials[0].id) : ''),
     }))
     setActiveModal('movement')
   }
@@ -462,7 +501,7 @@ function AdminMaterialesPage({ user }) {
                       <span>Laboratorio</span>
                       <select value={materialForm.laboratory_id} onChange={(e) => setMaterialForm((prev) => ({ ...prev, laboratory_id: e.target.value }))} disabled={!canManage}>
                         <option value="">Disponible para cualquier laboratorio</option>
-                        {labs.map((lab) => (
+                        {visibleLabs.map((lab) => (
                           <option key={lab.id} value={lab.id}>{lab.name}</option>
                         ))}
                       </select>
@@ -510,7 +549,7 @@ function AdminMaterialesPage({ user }) {
                       <span>Material</span>
                       <select value={movementForm.stock_item_id} onChange={(e) => setMovementForm((prev) => ({ ...prev, stock_item_id: e.target.value }))} disabled={!canManage} required>
                         <option value="">Selecciona un material</option>
-                        {materials.map((m) => (
+                        {visibleMaterials.map((m) => (
                           <option key={m.id} value={m.id}>{m.name} ({m.quantity_available} {m.unit})</option>
                         ))}
                       </select>
@@ -582,7 +621,7 @@ function AdminMaterialesPage({ user }) {
           <p>Gestiona materiales, reactivos y alertas de stock para que las practicas tengan insumos disponibles.</p>
         </div>
         <div className="infra-summary">
-          <div><span>Total</span><strong>{materials.length}</strong></div>
+          <div><span>Total</span><strong>{visibleMaterials.length}</strong></div>
           <div><span>Alertas de stock</span><strong>{stockAlertsCount}</strong></div>
           <div><span>Sin stock</span><strong>{outOfStockCount}</strong></div>
         </div>
@@ -662,7 +701,7 @@ function AdminMaterialesPage({ user }) {
                     <span>Laboratorio</span>
                     <select value={materialForm.laboratory_id} onChange={(e) => setMaterialForm((prev) => ({ ...prev, laboratory_id: e.target.value }))} disabled={!canManage}>
                       <option value="">Disponible para cualquier laboratorio</option>
-                      {labs.map((lab) => (
+                      {visibleLabs.map((lab) => (
                         <option key={lab.id} value={lab.id}>{lab.name}</option>
                       ))}
                     </select>
@@ -710,7 +749,7 @@ function AdminMaterialesPage({ user }) {
                         <span>Material</span>
                         <select value={movementForm.stock_item_id} onChange={(e) => setMovementForm((prev) => ({ ...prev, stock_item_id: e.target.value }))} disabled={!canManage} required>
                           <option value="">Selecciona un material</option>
-                          {materials.map((m) => (
+                          {visibleMaterials.map((m) => (
                             <option key={m.id} value={m.id}>{m.name} ({m.quantity_available} {m.unit})</option>
                           ))}
                         </select>
@@ -848,7 +887,7 @@ function AdminMaterialesPage({ user }) {
                   >
                     <option value="">Todos los laboratorios</option>
                     <option value="__GENERAL__">Solo General</option>
-                    {labs.map((lab) => (
+                    {visibleLabs.map((lab) => (
                       <option key={lab.id} value={lab.id}>{lab.name}</option>
                     ))}
                   </select>
@@ -1077,14 +1116,14 @@ function AdminMaterialesPage({ user }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {materials.length === 0 ? (
+                  {visibleMaterials.length === 0 ? (
                     <tr>
                       <td colSpan="5">
                         Todavia no hay materiales registrados. Usa el boton "Nuevo material" para crear el primer recurso del inventario.
                       </td>
                     </tr>
                   ) : (
-                    materials.map((material) => (
+                    visibleMaterials.map((material) => (
                       <tr key={material.id}>
                         <td>{material.name}</td>
                         <td>{material.category}</td>

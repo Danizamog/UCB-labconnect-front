@@ -134,6 +134,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const canManageRoles = hasAnyPermission(user, ['gestionar_roles_permisos'])
   const canManageProfiles = hasAnyPermission(user, ['gestionar_roles_permisos', 'reactivar_cuentas'])
   const canManageStructure = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
+  const canManageSpaces = hasAnyPermission(user, ['gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
   const canManagePenalties = hasAnyPermission(user, ['gestionar_penalizaciones'])
   const canViewPenalties = canManagePenalties
   const canManageEquipos = hasAnyPermission(user, ['gestionar_inventario', 'gestionar_estado_equipos', 'gestionar_mantenimiento'])
@@ -206,8 +207,8 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
       (activeSection === 'profiles' && canManageProfiles) ||
       (activeSection === 'roles' && canManageRoles) ||
       (activeSection === 'penalties' && canViewPenalties) ||
-      (activeSection === 'areas' && canManageStructure) ||
-      (activeSection === 'laboratorios' && canManageStructure) ||
+      (activeSection === 'areas' && canManageSpaces) ||
+      (activeSection === 'laboratorios' && canManageSpaces) ||
       (activeSection === 'equipos' && canManageEquipos) ||
       (activeSection === 'materiales' && canManageMateriales) ||
       (activeSection === 'calendar' && !isAdmin) ||
@@ -232,6 +233,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     canViewPenalties,
     canManageProfiles,
     canManageRoles,
+    canManageSpaces,
     canManageStructure,
     canManageTutorials,
     currentPath,
@@ -425,8 +427,8 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
           ) : null}
           {canManageStructure && activeSection === 'analytics' ? <AdminLabAnalyticsPage user={user} /> : null}
           {canManageTutorials && activeSection === 'tutorials_manage' ? <TutorTutorialSessionsPage /> : null}
-          {canManageStructure && activeSection === 'areas' ? <AdminAreasPage user={user} /> : null}
-          {canManageStructure && activeSection === 'laboratorios' ? <AdminLaboratoriosPage user={user} /> : null}
+          {canManageSpaces && activeSection === 'areas' ? <AdminAreasPage user={user} /> : null}
+          {canManageSpaces && activeSection === 'laboratorios' ? <AdminLaboratoriosPage user={user} /> : null}
           {canManageEquipos && activeSection === 'equipos' ? <AdminEquiposPage user={user} /> : null}
           {canManageMateriales && activeSection === 'materiales' ? <AdminMaterialesPage user={user} /> : null}
           {!isAdmin && activeSection === 'calendar' ? <UserAvailabilityCalendarPage user={user} /> : null}

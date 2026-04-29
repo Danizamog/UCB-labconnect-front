@@ -16,7 +16,7 @@ import {
   updateAsset,
 } from '../services/infrastructureService'
 import { listUserProfiles } from '../services/profileService'
-import { hasAnyPermission } from '../../../shared/lib/permissions'
+import { hasAnyPermission, isAdminUser } from '../../../shared/lib/permissions'
 import { assetStatusBadgeClass, assetStatusLabel, formatDateTime, formatStatus } from '../../../shared/utils/formatters'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import LoanReturnModal from './LoanReturnModal'
@@ -130,13 +130,26 @@ function AdminEquiposPage({ user }) {
       }
 
       const nextAssets = assetsResult.value
-      setLabs(labsResult.value)
+      const nextLabs = labsResult.value
+      const currentUserId = String(user?.user_id || '')
+      const isAdminViewer = isAdminUser(user)
+      const nextManagedLabIds = currentUserId
+        ? nextLabs.filter((lab) => String(lab?.manager || '') === currentUserId).map((lab) => String(lab.id))
+        : []
+      const nextVisibleAssets = isAdminViewer
+        ? nextAssets
+        : nextAssets.filter((asset) => {
+            const labId = String(asset.laboratory_id || '')
+            if (!labId) return true
+            return nextManagedLabIds.includes(labId)
+          })
+      setLabs(nextLabs)
       setAssets(nextAssets)
       setActiveTickets(ticketsResult.value)
       setLoanDashboard(loansResult.value)
       setLoanForm((previous) => ({
         ...previous,
-        asset_id: previous.asset_id || nextAssets.find((asset) => asset.status === 'available')?.id || '',
+        asset_id: previous.asset_id || nextVisibleAssets.find((asset) => asset.status === 'available')?.id || '',
       }))
 
       if (profilesResult.status === 'fulfilled') {
@@ -153,12 +166,35 @@ function AdminEquiposPage({ user }) {
     } finally {
       setLoading(false)
     }
-  }, [canManageLoans])
+  }, [canManageLoans, user])
 
   useEffect(() => {
     loadData()
   }, [loadData])
 
+  const isAdmin = isAdminUser(user)
+  const managedLabIds = useMemo(() => {
+    const currentUserId = String(user?.user_id || '')
+    if (!currentUserId) return []
+    return labs
+      .filter((lab) => String(lab?.manager || '') === currentUserId)
+      .map((lab) => String(lab.id))
+  }, [labs, user?.user_id])
+  const restrictToManagedLabs = !isAdmin && managedLabIds.length > 0
+  const visibleLabs = useMemo(() => {
+    if (!restrictToManagedLabs) return labs
+    return labs.filter((lab) => managedLabIds.includes(String(lab.id)))
+  }, [labs, managedLabIds, restrictToManagedLabs])
+  const visibleAssets = useMemo(() => {
+    if (isAdmin) return assets
+    if (managedLabIds.length === 0) {
+      return assets.filter((asset) => !String(asset.laboratory_id || ''))
+    }
+    return assets.filter((asset) => {
+      const labId = String(asset.laboratory_id || '')
+      return !labId || managedLabIds.includes(labId)
+    })
+  }, [assets, isAdmin, managedLabIds])
   const labNameById = useMemo(() => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])), [labs])
   const assetNameById = useMemo(() => Object.fromEntries(assets.map((asset) => [String(asset.id), asset.name])), [assets])
   const selectedLoanAsset = useMemo(() => assets.find((asset) => String(asset.id) === String(loanForm.asset_id)) || null, [assets, loanForm.asset_id])
@@ -187,18 +223,18 @@ function AdminEquiposPage({ user }) {
       .slice(0, 6)
   }, [activeUserProfiles, userSearch])
   const assetCategories = useMemo(
-    () => Array.from(new Set(assets.map((asset) => String(asset.category || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
-    [assets],
+    () => Array.from(new Set(visibleAssets.map((asset) => String(asset.category || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [visibleAssets],
   )
   const filteredAssets = useMemo(
-    () => assets.filter((asset) => {
+    () => visibleAssets.filter((asset) => {
       const matchesSearch = assetMatchesSearch(asset, assetSearch)
       const matchesStatus = assetFilters.status === 'all' || asset.status === assetFilters.status
       const matchesLab = !assetFilters.laboratory_id || String(asset.laboratory_id || '') === String(assetFilters.laboratory_id)
       const matchesCategory = assetFilters.category === 'all' || String(asset.category || '') === assetFilters.category
       return matchesSearch && matchesStatus && matchesLab && matchesCategory
     }),
-    [assetFilters.category, assetFilters.laboratory_id, assetFilters.status, assetSearch, assets],
+    [assetFilters.category, assetFilters.laboratory_id, assetFilters.status, assetSearch, visibleAssets],
   )
   const paginatedAssets = useMemo(() => {
     const start = assetPage * ASSET_PAGE_SIZE
@@ -231,7 +267,7 @@ function AdminEquiposPage({ user }) {
   }
 
   const resetLoanForm = () => {
-    setLoanForm({ ...defaultLoanForm, asset_id: assets.find((asset) => asset.status === 'available')?.id || '' })
+    setLoanForm({ ...defaultLoanForm, asset_id: visibleAssets.find((asset) => asset.status === 'available')?.id || '' })
     setUserSearch('')
     setSelectedBorrowerProfileId('')
     setSavingLoan(false)
@@ -798,7 +834,7 @@ function AdminEquiposPage({ user }) {
                       <span>Laboratorio</span>
                       <select value={form.laboratory_id} onChange={(event) => setForm((previous) => ({ ...previous, laboratory_id: event.target.value }))}>
                         <option value="">Sin laboratorio fijo</option>
-                        {labs.map((lab) => <option key={lab.id} value={lab.id}>{lab.name}</option>)}
+                        {visibleLabs.map((lab) => <option key={lab.id} value={lab.id}>{lab.name}</option>)}
                       </select>
                     </label>
                     <label>
@@ -829,7 +865,7 @@ function AdminEquiposPage({ user }) {
                       <span>Equipo afectado</span>
                       <select value={ticketForm.asset_id} onChange={(event) => setTicketForm((previous) => ({ ...previous, asset_id: event.target.value }))} required>
                         <option value="">Selecciona un equipo</option>
-                        {assets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
+                        {visibleAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
                       </select>
                     </label>
                     <label>
@@ -888,7 +924,7 @@ function AdminEquiposPage({ user }) {
                       <span>Equipo</span>
                       <select value={loanForm.asset_id} onChange={(event) => setLoanForm((previous) => ({ ...previous, asset_id: event.target.value }))} required>
                         <option value="">Selecciona un equipo</option>
-                        {assets.map((asset) => (
+                        {visibleAssets.map((asset) => (
                           <option key={asset.id} value={asset.id}>{asset.name} {asset.serial_number ? `- ${asset.serial_number}` : ''} - {assetStatusLabel(asset.status)}</option>
                         ))}
                       </select>
@@ -1045,8 +1081,8 @@ function AdminEquiposPage({ user }) {
           <p>Controla disponibilidad, prestamos, devoluciones e incidentes desde un tablero operativo.</p>
         </div>
         <div className="infra-summary">
-          <div><span>Total</span><strong>{assets.length}</strong></div>
-          <div><span>Disponibles</span><strong>{assets.filter((asset) => asset.status === 'available').length}</strong></div>
+          <div><span>Total</span><strong>{visibleAssets.length}</strong></div>
+          <div><span>Disponibles</span><strong>{visibleAssets.filter((asset) => asset.status === 'available').length}</strong></div>
           <div><span>Prestamos activos</span><strong>{loanDashboard.active_count}</strong></div>
           <div><span>Tickets activos</span><strong>{activeTickets.length}</strong></div>
         </div>
@@ -1133,7 +1169,7 @@ function AdminEquiposPage({ user }) {
                       <span>Laboratorio</span>
                       <select value={form.laboratory_id} onChange={(event) => setForm((previous) => ({ ...previous, laboratory_id: event.target.value }))}>
                         <option value="">Sin laboratorio fijo</option>
-                        {labs.map((lab) => <option key={lab.id} value={lab.id}>{lab.name}</option>)}
+                        {visibleLabs.map((lab) => <option key={lab.id} value={lab.id}>{lab.name}</option>)}
                       </select>
                     </label>
                     <label>
@@ -1172,7 +1208,7 @@ function AdminEquiposPage({ user }) {
                     <span>Equipo afectado</span>
                     <select value={ticketForm.asset_id} onChange={(event) => setTicketForm((previous) => ({ ...previous, asset_id: event.target.value }))} required>
                       <option value="">Selecciona un equipo</option>
-                      {assets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
+                      {visibleAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
                     </select>
                   </label>
                   <label>
@@ -1280,7 +1316,7 @@ function AdminEquiposPage({ user }) {
                         <span>Equipo</span>
                         <select value={loanForm.asset_id} onChange={(event) => setLoanForm((previous) => ({ ...previous, asset_id: event.target.value }))} required>
                           <option value="">Selecciona un equipo</option>
-                          {assets.map((asset) => (
+                          {visibleAssets.map((asset) => (
                             <option key={asset.id} value={asset.id}>{asset.name} {asset.serial_number ? `- ${asset.serial_number}` : ''} - {assetStatusLabel(asset.status)}</option>
                           ))}
                         </select>
@@ -1394,7 +1430,7 @@ function AdminEquiposPage({ user }) {
                     onChange={(event) => setAssetFilters((previous) => ({ ...previous, laboratory_id: event.target.value }))}
                   >
                     <option value="">Todos</option>
-                    {labs.map((lab) => <option key={lab.id} value={lab.id}>{lab.name}</option>)}
+                    {visibleLabs.map((lab) => <option key={lab.id} value={lab.id}>{lab.name}</option>)}
                   </select>
                 </label>
                 <label>
