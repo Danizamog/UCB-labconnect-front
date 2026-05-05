@@ -872,6 +872,17 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                     <span>Estacion: {session.station_label || 'Sin estacion'}</span>
                     <span>{session.purpose || 'Sin motivo registrado'}</span>
                   </div>
+                  {canManage ? (
+                    <div className="reservation-user-card-actions">
+                      <button
+                        type="button"
+                        className="reservations-primary"
+                        onClick={() => handleRegisterExit(session.reservation_id || session.id)}
+                      >
+                        Registrar salida
+                      </button>
+                    </div>
+                  ) : null}
                 </article>
               ))}
             </div>
