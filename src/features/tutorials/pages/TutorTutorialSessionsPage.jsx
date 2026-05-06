@@ -145,6 +145,21 @@ function isPastSlotForDate(slot, dateValue, referenceNow = new Date()) {
   return slotStart.getTime() <= referenceNow.getTime()
 }
 
+function parseSessionDate(value) {
+  const parsed = new Date(value || '')
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function getSessionTimeState(session, referenceNow = new Date()) {
+  const sessionStart = parseSessionDate(session?.start_at)
+    || buildLocalDateTime(session?.session_date, session?.start_time)
+  const sessionEnd = parseSessionDate(session?.end_at)
+    || buildLocalDateTime(session?.session_date, session?.end_time)
+  const hasStarted = Boolean(sessionStart) && sessionStart.getTime() <= referenceNow.getTime()
+  const hasEnded = Boolean(sessionEnd) && sessionEnd.getTime() <= referenceNow.getTime()
+  return { hasStarted, hasEnded }
+}
+
 function getSlotKey(slot) {
   return `${slot.start_time}-${slot.end_time}`
 }
@@ -296,9 +311,14 @@ function TutorTutorialSessionsPage() {
     }
   }, [])
 
+  const visibleSessions = useMemo(
+    () => sessions.filter((session) => !getSessionTimeState(session, nowReference).hasEnded),
+    [nowReference, sessions],
+  )
+
   const totalSeats = useMemo(
-    () => sessions.reduce((sum, session) => sum + session.max_students, 0),
-    [sessions],
+    () => visibleSessions.reduce((sum, session) => sum + session.max_students, 0),
+    [visibleSessions],
   )
 
   const selectedLab = useMemo(
@@ -753,7 +773,7 @@ function TutorTutorialSessionsPage() {
           <p>Publica sesiones con fecha, hora y cupos. El sistema ayuda a evitar cruces con reservas de laboratorio.</p>
         </div>
         <div className="tutorials-summary">
-          <div><span>Sesiones</span><strong>{sessions.length}</strong></div>
+          <div><span>Sesiones</span><strong>{visibleSessions.length}</strong></div>
           <div><span>Cupos</span><strong>{totalSeats}</strong></div>
         </div>
       </header>
@@ -950,11 +970,13 @@ function TutorTutorialSessionsPage() {
           </p>
         </div>
 
-        {sessions.length === 0 ? (
-          <p className="tutorials-empty">Todavia no publicaste tutorias.</p>
+        {visibleSessions.length === 0 ? (
+          <p className="tutorials-empty">Todavia no publicaste tutorias activas.</p>
         ) : (
           <div className="tutorials-grid">
-            {sessions.map((session) => (
+            {visibleSessions.map((session) => {
+              const { hasStarted } = getSessionTimeState(session, nowReference)
+              return (
               <article key={session.id} className="tutorial-card tutor-card">
                 <div className="tutorial-card-head">
                   <div>
@@ -992,6 +1014,8 @@ function TutorTutorialSessionsPage() {
                   <button
                     type="button"
                     className="tutorials-secondary"
+                    disabled={hasStarted}
+                    title={hasStarted ? 'No puedes editar una tutoria que ya inicio.' : undefined}
                     onClick={() => handleStartEditing(session)}
                   >
                     Editar bloque
@@ -1006,7 +1030,8 @@ function TutorTutorialSessionsPage() {
                   </button>
                 </div>
               </article>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>
