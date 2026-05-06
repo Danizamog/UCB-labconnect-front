@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   createLab,
   deleteLab,
@@ -6,11 +7,10 @@ import {
   listAdminLabs,
   updateLab,
 } from '../services/infrastructureService'
+import { listUsersWithRoles } from '../services/rolesService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import './AdminAssetsPage.css'
-
-const ACCESS_ROLE_OPTIONS = ['Estudiante', 'Docente', 'Auxiliar', 'Encargado', 'Administrador']
 
 const defaultForm = {
   name: '',
@@ -18,44 +18,21 @@ const defaultForm = {
   capacity: 20,
   description: '',
   area_id: '',
+  manager: '',
   is_active: true,
-  allowed_roles: [],
-  allowed_user_ids: [],
-  required_permissions: [],
-}
-
-function parseAccessList(value) {
-  return Array.from(new Set(String(value || '')
-    .split(/[,\n]/)
-    .map((item) => item.trim())
-    .filter(Boolean)))
-}
-
-function formatAccessList(value) {
-  return Array.isArray(value) ? value.join(', ') : ''
-}
-
-function summarizeAccess(lab) {
-  const parts = []
-  if (Array.isArray(lab.allowed_roles) && lab.allowed_roles.length) {
-    parts.push(`Roles: ${lab.allowed_roles.join(', ')}`)
-  }
-  if (Array.isArray(lab.allowed_user_ids) && lab.allowed_user_ids.length) {
-    parts.push(`${lab.allowed_user_ids.length} usuario(s) especifico(s)`)
-  }
-  if (Array.isArray(lab.required_permissions) && lab.required_permissions.length) {
-    parts.push(`Permisos: ${lab.required_permissions.join(', ')}`)
-  }
-  return parts.length ? parts.join(' · ') : 'Acceso general para usuarios activos'
 }
 
 function AdminLaboratoriosPage({ user }) {
   const [areas, setAreas] = useState([])
   const [labs, setLabs] = useState([])
+  const [managers, setManagers] = useState([])
+  const [managerQuery, setManagerQuery] = useState('')
+  const [showManagerOptions, setShowManagerOptions] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [editingId, setEditingId] = useState(null)
+  const [isFormOpen, setIsFormOpen] = useState(false)
   const [form, setForm] = useState(defaultForm)
   const [confirmModal, setConfirmModal] = useState(null)
 
@@ -64,9 +41,19 @@ function AdminLaboratoriosPage({ user }) {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [areasData, labsData] = await Promise.all([listAdminAreas(), listAdminLabs()])
+      const [areasData, labsData, usersData] = await Promise.all([
+        listAdminAreas(),
+        listAdminLabs(),
+        listUsersWithRoles()
+      ])
       setAreas(areasData)
       setLabs(labsData)
+      
+      const potentialManagers = usersData.filter(
+        (u) => u.role?.nombre === 'Encargado de Laboratorio' || u.role?.nombre === 'Administrador'
+      )
+      setManagers(potentialManagers)
+      
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudieron cargar los laboratorios')
@@ -81,10 +68,23 @@ function AdminLaboratoriosPage({ user }) {
     () => Object.fromEntries(areas.map((area) => [String(area.id), area.name])),
     [areas],
   )
+  
+  const managerNameById = useMemo(
+    () => Object.fromEntries(managers.map((u) => [String(u.id), u.name || u.email || 'Usuario'])),
+    [managers],
+  )
 
   const resetForm = () => {
     setEditingId(null)
     setForm(defaultForm)
+    setIsFormOpen(false)
+    setManagerQuery('')
+    setShowManagerOptions(false)
+  }
+
+  const handleCreateNew = () => {
+    resetForm()
+    setIsFormOpen(true)
   }
 
   const handleSubmit = async (event) => {
@@ -92,7 +92,12 @@ function AdminLaboratoriosPage({ user }) {
     if (!canManage) return
     setError('')
     setMessage('')
-    const payload = { ...form, area_id: String(form.area_id || ''), capacity: Number(form.capacity) }
+    const payload = { 
+      ...form, 
+      area_id: String(form.area_id || ''), 
+      manager: form.manager ? String(form.manager) : '',
+      capacity: Number(form.capacity) 
+    }
     try {
       if (editingId) {
         await updateLab(editingId, payload)
@@ -102,6 +107,7 @@ function AdminLaboratoriosPage({ user }) {
         setMessage('Laboratorio creado correctamente.')
       }
       resetForm()
+      setIsFormOpen(false)
       await loadData()
     } catch (err) {
       setError(err.message || 'No se pudo guardar el laboratorio')
@@ -156,11 +162,19 @@ function AdminLaboratoriosPage({ user }) {
       ) : (
         <div className="infra-grid">
           <section className="infra-card infra-card-full">
-            <div className="infra-section-head">
+            <div className="infra-section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3>Laboratorios</h3>
                 <p>Cada laboratorio pertenece a un area y puede recibir reservas.</p>
               </div>
+              <button
+                type="button"
+                className="infra-primary"
+                disabled={!canManage}
+                onClick={handleCreateNew}
+              >
+                Crear laboratorio
+              </button>
             </div>
 
             <div className="infra-list">
@@ -169,8 +183,11 @@ function AdminLaboratoriosPage({ user }) {
                   <div>
                     <strong>{lab.name}</strong>
                     <p>{lab.location} · Capacidad {lab.capacity}</p>
-                    <small>{lab.area_name || areaNameById[String(lab.area_id)] || 'Sin area'}</small>
-                    <small>{summarizeAccess(lab)}</small>
+                      <small>
+                        {lab.area_name || areaNameById[String(lab.area_id)] || 'Sin area'}
+                        {lab.manager ? ` · Encargado: ${lab.manager_name || managerNameById[String(lab.manager)] || 'Desconocido'}` : ''}
+                      </small>
+
                   </div>
                   <div className="infra-actions compact">
                     <button
@@ -184,12 +201,15 @@ function AdminLaboratoriosPage({ user }) {
                           location: lab.location,
                           capacity: lab.capacity,
                           description: lab.description || '',
+                          manager: lab.manager || '',
                           area_id: String(lab.area_id),
                           is_active: lab.is_active !== false,
                           allowed_roles: Array.isArray(lab.allowed_roles) ? lab.allowed_roles : [],
                           allowed_user_ids: Array.isArray(lab.allowed_user_ids) ? lab.allowed_user_ids : [],
                           required_permissions: Array.isArray(lab.required_permissions) ? lab.required_permissions : [],
                         })
+                        setManagerQuery(lab.manager_name || managerNameById[String(lab.manager)] || '')
+                        setIsFormOpen(true)
                       }}
                     >
                       Editar
@@ -207,150 +227,135 @@ function AdminLaboratoriosPage({ user }) {
               ))}
             </div>
 
-            <details className="ux-extra-toggle" open={Boolean(editingId)}>
-              <summary>{editingId ? 'Editar laboratorio seleccionado' : 'Agregar laboratorio'}</summary>
-              <div className="ux-extra-toggle-content">
-                <form className="infra-form" onSubmit={handleSubmit}>
-                  <div className="infra-form-section">
-                    <span className="infra-form-section-label">1 — Identificacion y area</span>
-                    <div className="infra-form-grid">
-                      <label>
-                        <span>Nombre</span>
-                        <input
-                          value={form.name}
-                          onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                          required
-                          disabled={!canManage}
-                        />
-                      </label>
-                      <label>
-                        <span>Area</span>
-                        <select
-                          value={form.area_id}
-                          onChange={(event) => setForm((prev) => ({ ...prev, area_id: event.target.value }))}
-                          required
-                          disabled={!canManage}
-                        >
-                          <option value="">Selecciona un area</option>
-                          {areas.map((area) => (
-                            <option key={area.id} value={area.id}>{area.name}</option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
+            {isFormOpen && createPortal(
+              <div className="infra-modal-backdrop" onClick={resetForm} role="dialog" aria-modal="true">
+                <div className="infra-modal-content" onClick={(e) => e.stopPropagation()}>
+                  <header className="infra-modal-header">
+                    <h3>{editingId ? 'Editar laboratorio' : 'Crear laboratorio'}</h3>
+                    <button type="button" className="infra-modal-close" onClick={resetForm}>×</button>
+                  </header>
+                  <div className="infra-modal-body">
+                    <form className="infra-form" onSubmit={handleSubmit}>
+                      <div className="infra-form-section">
+                        <span className="infra-form-section-label">1 — Identificacion y area</span>
+                        <div className="infra-form-grid">
+                          <label>
+                            <span>Nombre</span>
+                            <input
+                              value={form.name}
+                              onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                              required
+                              disabled={!canManage}
+                            />
+                          </label>
+                          <label>
+                            <span>Area</span>
+                            <select
+                              value={form.area_id}
+                              onChange={(event) => setForm((prev) => ({ ...prev, area_id: event.target.value }))}
+                              required
+                              disabled={!canManage}
+                            >
+                              <option value="">Selecciona un area</option>
+                              {areas.map((area) => (
+                                <option key={area.id} value={area.id}>{area.name}</option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                      </div>
+                      <div className="infra-form-section">
+                        <span className="infra-form-section-label">2 — Ubicacion y capacidad</span>
+                        <div className="infra-form-grid">
+                          <label>
+                            <span>Ubicacion</span>
+                            <input
+                              value={form.location}
+                              onChange={(event) => setForm((prev) => ({ ...prev, location: event.target.value }))}
+                              required
+                              disabled={!canManage}
+                            />
+                          </label>
+                          <label>
+                            <span>Capacidad</span>
+                            <input
+                              type="number"
+                              min="1"
+                              value={form.capacity}
+                              onChange={(event) => setForm((prev) => ({ ...prev, capacity: event.target.value }))}
+                              required
+                              disabled={!canManage}
+                            />
+                          </label>
+                        </div>
+                        <label>
+                          <span>Descripcion</span>
+                          <textarea
+                            rows="3"
+                            value={form.description}
+                            onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
+                            disabled={!canManage}
+                          />
+                        </label>
+                      </div>
+                      <div className="infra-form-section">
+                        <span className="infra-form-section-label">3 — Configuracion</span>
+                        <div className="infra-form-grid" style={{ alignItems: 'end' }}>
+                          <label className="infra-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={form.is_active}
+                              onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
+                              disabled={!canManage}
+                            />
+                            <span>Laboratorio activo para reservas</span>
+                          </label>
+                            <label>
+                              <span>Encargado del laboratorio</span>
+                              <div className="infra-autocomplete" style={{ position: 'relative' }}>
+                                <input
+                                  value={managerQuery}
+                                  onChange={(e) => { setManagerQuery(e.target.value); setForm((prev) => ({ ...prev, manager: '' })); setShowManagerOptions(true) }}
+                                  onFocus={() => setShowManagerOptions(true)}
+                                  placeholder="Buscar encargado..."
+                                  disabled={!canManage}
+                                  aria-autocomplete="list"
+                                />
+                                {showManagerOptions && (
+                                  <ul className="infra-autocomplete-list" role="listbox">
+
+                                    {managers
+                                      .filter((m) => ((m.name || m.email || m.id) || '').toLowerCase().includes((managerQuery || '').toLowerCase()))
+                                      .slice(0, 12)
+                                      .map((m) => (
+                                        <li
+                                          key={m.id}
+                                          className="infra-autocomplete-item"
+                                          onMouseDown={(e) => { e.preventDefault(); setForm((prev) => ({ ...prev, manager: m.id })); setManagerQuery(m.name || m.email || m.id); setShowManagerOptions(false) }}
+                                        >
+                                          {m.name || m.email || m.id}
+                                        </li>
+                                      ))}
+                                  </ul>
+                                )}
+                              </div>
+                            </label>
+                        </div>
+                      </div>
+                      <div className="infra-actions">
+                        <button type="submit" className="infra-primary" disabled={!canManage}>
+                          {editingId ? 'Actualizar laboratorio' : 'Crear laboratorio'}
+                        </button>
+                        <button type="button" className="infra-secondary" onClick={resetForm} disabled={!canManage}>
+                          Cancelar
+                        </button>
+                      </div>
+                    </form>
                   </div>
-                  <div className="infra-form-section">
-                    <span className="infra-form-section-label">2 — Ubicacion y capacidad</span>
-                    <div className="infra-form-grid">
-                      <label>
-                        <span>Ubicacion</span>
-                        <input
-                          value={form.location}
-                          onChange={(event) => setForm((prev) => ({ ...prev, location: event.target.value }))}
-                          required
-                          disabled={!canManage}
-                        />
-                      </label>
-                      <label>
-                        <span>Capacidad</span>
-                        <input
-                          type="number"
-                          min="1"
-                          value={form.capacity}
-                          onChange={(event) => setForm((prev) => ({ ...prev, capacity: event.target.value }))}
-                          required
-                          disabled={!canManage}
-                        />
-                      </label>
-                    </div>
-                    <label>
-                      <span>Descripcion</span>
-                      <textarea
-                        rows="3"
-                        value={form.description}
-                        onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-                        disabled={!canManage}
-                      />
-                    </label>
-                  </div>
-                  <div className="infra-form-section">
-                    <span className="infra-form-section-label">3 — Configuracion</span>
-                    <label className="infra-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={form.is_active}
-                        onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
-                        disabled={!canManage}
-                      />
-                      <span>Laboratorio activo para reservas</span>
-                    </label>
-                  </div>
-                  <div className="infra-form-section">
-                    <span className="infra-form-section-label">4 — Acceso a reservas</span>
-                    <p className="infra-muted">
-                      Si dejas estos campos vacios, cualquier usuario activo con acceso al modulo podra ver y reservar este laboratorio.
-                    </p>
-                    <div className="infra-form-grid">
-                      <label>
-                        <span>Roles autorizados</span>
-                        <select
-                          multiple
-                          value={form.allowed_roles}
-                          onChange={(event) => setForm((prev) => ({
-                            ...prev,
-                            allowed_roles: Array.from(event.target.selectedOptions, (option) => option.value),
-                          }))}
-                          disabled={!canManage}
-                        >
-                          {ACCESS_ROLE_OPTIONS.map((role) => (
-                            <option key={role} value={role}>{role}</option>
-                          ))}
-                        </select>
-                        <small>Usa Ctrl o Shift para seleccionar varios roles.</small>
-                      </label>
-                      <label>
-                        <span>Permisos requeridos</span>
-                        <textarea
-                          rows="3"
-                          value={formatAccessList(form.required_permissions)}
-                          onChange={(event) => setForm((prev) => ({
-                            ...prev,
-                            required_permissions: parseAccessList(event.target.value),
-                          }))}
-                          placeholder="Ej. reservar_laboratorio_especial"
-                          disabled={!canManage}
-                        />
-                        <small>Opcional. Separa permisos con coma o salto de linea.</small>
-                      </label>
-                    </div>
-                    <label>
-                      <span>Usuarios autorizados especificos</span>
-                      <textarea
-                        rows="3"
-                        value={formatAccessList(form.allowed_user_ids)}
-                        onChange={(event) => setForm((prev) => ({
-                          ...prev,
-                          allowed_user_ids: parseAccessList(event.target.value),
-                        }))}
-                        placeholder="Ej. 3gyzwrw9yophi7r, je3b9oa1ilac1af"
-                        disabled={!canManage}
-                      />
-                      <small>Opcional. Sirve para laboratorios restringidos por usuario interno.</small>
-                    </label>
-                  </div>
-                  <div className="infra-actions">
-                    <button type="submit" className="infra-primary" disabled={!canManage}>
-                      {editingId ? 'Actualizar laboratorio' : 'Crear laboratorio'}
-                    </button>
-                    {editingId ? (
-                      <button type="button" className="infra-secondary" onClick={resetForm} disabled={!canManage}>
-                        Cancelar edicion
-                      </button>
-                    ) : null}
-                  </div>
-                </form>
-              </div>
-            </details>
+                </div>
+              </div>,
+              document.body
+            )}
           </section>
         </div>
       )}

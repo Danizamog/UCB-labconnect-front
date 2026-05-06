@@ -109,6 +109,7 @@ function AdminEquiposPage({ user }) {
   const [activeModal, setActiveModal] = useState(null)
   const [selectedManagedAssetId, setSelectedManagedAssetId] = useState(null)
   const [userDirectoryMessage, setUserDirectoryMessage] = useState('')
+  const [activeTab, setActiveTab] = useState('inventory') // 'inventory' | 'tickets' | 'loans'
 
   const canManage = hasAnyPermission(user, ['gestionar_inventario'])
   const canManageStatus = hasAnyPermission(user, ['gestionar_estado_equipos', 'gestionar_mantenimiento'])
@@ -1088,6 +1089,39 @@ function AdminEquiposPage({ user }) {
         </div>
       </header>
 
+      <nav className="infra-tabs" role="tablist" aria-label="Secciones de equipos">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'inventory'}
+          className={`infra-tab-button ${activeTab === 'inventory' ? 'is-active' : ''}`}
+          onClick={() => setActiveTab('inventory')}
+        >
+          <span>Equipos</span>
+          <span className="infra-tab-count">{visibleAssets.length}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'tickets'}
+          className={`infra-tab-button ${activeTab === 'tickets' ? 'is-active' : ''}`}
+          onClick={() => setActiveTab('tickets')}
+        >
+          <span>Tickets de mantenimiento</span>
+          <span className="infra-tab-count">{activeTickets.length}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'loans'}
+          className={`infra-tab-button ${activeTab === 'loans' ? 'is-active' : ''}`}
+          onClick={() => setActiveTab('loans')}
+        >
+          <span>Préstamos</span>
+          <span className="infra-tab-count">{loanDashboard.active_count}</span>
+        </button>
+      </nav>
+
       {message ? <p className="infra-alert infra-success">{message}</p> : null}
       {error ? <p className="infra-alert infra-error">{error}</p> : null}
 
@@ -1095,7 +1129,9 @@ function AdminEquiposPage({ user }) {
         <p className="infra-empty">Cargando equipos...</p>
       ) : (
         <div className="infra-grid">
-          <section className="infra-command-panel infra-card-full">
+          {activeTab === 'inventory' ? (
+            <>
+              <section className="infra-command-panel infra-card-full">
             <div className="infra-command-copy">
               <p className="infra-kicker">Centro de operaciones</p>
               <h3>Elige una tarea</h3>
@@ -1190,12 +1226,15 @@ function AdminEquiposPage({ user }) {
                 </div>
               </form>
             ) : null}
-          </section>
+            </section>
+          </>
+          ) : null}
 
-          <section className="infra-card">
-            <div className="infra-section-head">
-              <div>
-                <h3>Registrar mantenimiento o dano</h3>
+          {activeTab === 'tickets' ? (
+            <section className="infra-card">
+              <div className="infra-section-head">
+                <div>
+                  <h3>Registrar mantenimiento o dano</h3>
                 <p>Crear un ticket cambia automaticamente el equipo a mantenimiento y guarda el historial tecnico.</p>
               </div>
             </div>
@@ -1292,7 +1331,9 @@ function AdminEquiposPage({ user }) {
               </div>
             )}
           </section>
+          ) : null}
 
+          {activeTab === 'loans' ? (
           <section className="infra-card infra-card-full">
             <div className="infra-section-head">
               <div>
@@ -1301,7 +1342,7 @@ function AdminEquiposPage({ user }) {
               </div>
             </div>
 
-            <div className="infra-loan-ops">
+            <div className="infra-loan-ops" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
               <section className="infra-loan-panel">
                 <form className="infra-form" onSubmit={handleCreateLoan}>
                   <div className="infra-form-section">
@@ -1380,7 +1421,7 @@ function AdminEquiposPage({ user }) {
                         </div>
                         {loan.notes ? <p className="infra-ticket-copy">{loan.notes}</p> : null}
                         <div className="infra-actions">
-                          <button type="button" className="infra-primary" onClick={() => handleOpenReturnModal(loan)}>Registrar devolucion</button>
+                          <button type="button" className="infra-primary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }} onClick={() => handleOpenReturnModal(loan)}>Registrar devolucion</button>
                         </div>
                       </article>
                     ))}
@@ -1389,7 +1430,9 @@ function AdminEquiposPage({ user }) {
               </section>
             </div>
           </section>
+          ) : null}
 
+          {activeTab === 'inventory' ? (
           <section className="infra-card infra-card-full">
             <div className="infra-section-head">
               <div>
@@ -1538,6 +1581,7 @@ function AdminEquiposPage({ user }) {
               </div>
             ) : null}
           </section>
+          ) : null}
         </div>
       )}
     </section>

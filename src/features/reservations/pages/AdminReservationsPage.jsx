@@ -25,7 +25,7 @@ import {
   mapReservationRecord,
 } from '../services/reservationsService'
 import ReservationEditModal from './ReservationEditModal'
-import { hasAnyPermission } from '../../../shared/lib/permissions'
+import { hasAnyPermission, isAdminUser } from '../../../shared/lib/permissions'
 import { formatDate, formatDateTime } from '../../../shared/utils/formatters'
 import './ReservationsPages.css'
 
@@ -110,7 +110,8 @@ const defaultTableFilters = {
 }
 
 function todayDate() {
-  return new Date().toISOString().slice(0, 10)
+  const date = new Date()
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
 }
 
 function nowTime() {
@@ -190,12 +191,17 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     purpose: '',
     notes: '',
   })
+  const [isSavingWalkIn, setIsSavingWalkIn] = useState(false)
+  const [actioningId, setActioningId] = useState(null)
+  const [showUserDropdown, setShowUserDropdown] = useState(false)
+  const [userSearchTerm, setUserSearchTerm] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const tableQueryRef = useRef({ ...defaultTableFilters, pageNumber: 0 })
   const realtimeRefreshTimeoutRef = useRef(null)
 
   const canManage = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
+  const isAdmin = isAdminUser(user)
 
   const loadReferenceData = useCallback(async () => {
     try {
@@ -213,16 +219,20 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
 
       setLabs(labsData)
       setProfiles(profilesData)
+      const currentUserId = String(user?.user_id || '')
+      const eligibleLabs = isAdminUser(user)
+        ? labsData
+        : labsData.filter((lab) => String(lab?.manager || '') === currentUserId)
       setWalkInForm((previous) => ({
         ...previous,
-        laboratory_id: previous.laboratory_id || labsData[0]?.id || '',
+        laboratory_id: previous.laboratory_id || eligibleLabs[0]?.id || '',
         end_time: previous.end_time || timeWithOffset(60),
       }))
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudieron cargar los datos base del panel de reservas.')
     }
-  }, [])
+  }, [user])
 
   const loadOperationalData = useCallback(async () => {
     try {
@@ -348,6 +358,63 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     [profiles],
   )
 
+  const managedLabIds = useMemo(() => {
+    const currentUserId = String(user?.user_id || '')
+    if (!currentUserId) return []
+    return labs
+      .filter((lab) => String(lab?.manager || '') === currentUserId)
+      .map((lab) => String(lab.id))
+  }, [labs, user?.user_id])
+  const restrictToManagedLabs = !isAdmin
+  const visibleLabs = useMemo(() => {
+    if (!restrictToManagedLabs) return labs
+    return labs.filter((lab) => managedLabIds.includes(String(lab.id)))
+  }, [labs, managedLabIds, restrictToManagedLabs])
+  const isReservationVisible = useCallback((reservation) => {
+    if (!restrictToManagedLabs) return true
+    if (managedLabIds.length === 0) return false
+    return managedLabIds.includes(String(reservation?.laboratory_id || ''))
+  }, [restrictToManagedLabs, managedLabIds])
+  const visibleTodaysReservations = useMemo(
+    () => todaysReservations.filter(isReservationVisible),
+    [todaysReservations, isReservationVisible],
+  )
+  const visibleTableReservations = useMemo(
+    () => tableReservations.filter(isReservationVisible),
+    [tableReservations, isReservationVisible],
+  )
+  const visibleOccupancy = useMemo(() => {
+    if (!restrictToManagedLabs) return occupancy
+    const labBreakdown = (occupancy.lab_breakdown || []).filter((entry) =>
+      managedLabIds.includes(String(entry.laboratory_id || '')),
+    )
+    const activeSessions = (occupancy.active_sessions || []).filter((session) =>
+      managedLabIds.includes(String(session.laboratory_id || '')),
+    )
+    const currentOccupancy = labBreakdown.reduce(
+      (total, entry) => total + Number(entry.occupancy_count || 0),
+      0,
+    )
+    return { current_occupancy: currentOccupancy, lab_breakdown: labBreakdown, active_sessions: activeSessions }
+  }, [occupancy, restrictToManagedLabs, managedLabIds])
+  const visibleReservationCounters = useMemo(() => {
+    if (!restrictToManagedLabs) return reservationCounters
+    const total = visibleTableReservations.length
+    const pending = visibleTableReservations.filter((item) => item.status === 'pending').length
+    const walkIn = visibleTableReservations.filter((item) => item.is_walk_in).length
+    return { total, pending, walkIn }
+  }, [restrictToManagedLabs, reservationCounters, visibleTableReservations])
+
+  const filteredProfiles = useMemo(() => {
+    if (!userSearchTerm || userSearchTerm.trim() === '') return profiles.slice(0, 200)
+    const term = userSearchTerm.toLowerCase()
+    return profiles.filter((p) =>
+      (p.name && p.name.toLowerCase().includes(term)) ||
+      (p.username && p.username.toLowerCase().includes(term)) ||
+      (p.email && p.email.toLowerCase().includes(term))
+    ).slice(0, 200)
+  }, [profiles, userSearchTerm])
+
   const getReservationLabLabel = (reservation) =>
     reservation?.laboratory_name || labNameById[String(reservation?.laboratory_id || '')] || reservation?.laboratory_id || '-'
 
@@ -366,8 +433,8 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     onNavigate?.(`/app/admin/reservas#${workspaceId}`, { replace: true })
   }, [onNavigate])
 
-  const pendingCount = reservationCounters.pending
-  const walkInCount = reservationCounters.walkIn
+  const pendingCount = visibleReservationCounters.pending
+  const walkInCount = visibleReservationCounters.walkIn
   const selectedWalkInLab = labById[String(walkInForm.laboratory_id)] || null
   const selectedWalkInProfile = profileById[String(walkInForm.requested_by)] || null
   const selectedWalkInLabOccupancy =
@@ -394,8 +461,8 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   const editValidationMessage = !isEditChronologyValid ? 'La hora de fin debe ser mayor a la hora de inicio.' : ''
 
   const sortedTodaysReservations = useMemo(
-    () => [...todaysReservations].sort((a, b) => a.start_time.localeCompare(b.start_time)),
-    [todaysReservations],
+    () => [...visibleTodaysReservations].sort((a, b) => a.start_time.localeCompare(b.start_time)),
+    [visibleTodaysReservations],
   )
   const actionableTodaysReservations = useMemo(
     () => sortedTodaysReservations.filter((item) => item.status === 'approved' || item.status === 'in_progress'),
@@ -479,6 +546,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   const handleRegisterEntry = async (reservation) => {
     setError('')
     setMessage('')
+    setActioningId(reservation.id)
     try {
       const requesterEmail = getReservationRequesterEmail(reservation)
       await registerReservationEntry(reservation.id, {
@@ -490,30 +558,38 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
       await reloadAll()
     } catch (err) {
       setError(err.message || 'No se pudo registrar la entrada.')
+    } finally {
+      setActioningId(null)
     }
   }
 
   const handleRegisterExit = async (reservationId) => {
     setError('')
     setMessage('')
+    setActioningId(reservationId)
     try {
       await registerReservationExit(reservationId)
       setMessage('Salida registrada. La reserva cambio a Completada y el espacio quedo liberado.')
       await reloadAll()
     } catch (err) {
       setError(err.message || 'No se pudo registrar la salida.')
+    } finally {
+      setActioningId(null)
     }
   }
 
   const handleMarkAbsent = async (reservationId) => {
     setError('')
     setMessage('')
+    setActioningId(reservationId)
     try {
       await markReservationAbsent(reservationId)
       setMessage('Reserva marcada como Ausente. El bloque vuelve a quedar libre para nuevas asignaciones.')
       await reloadAll()
     } catch (err) {
       setError(err.message || 'No se pudo marcar la reserva como ausente.')
+    } finally {
+      setActioningId(null)
     }
   }
 
@@ -577,6 +653,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     event.preventDefault()
     setError('')
     setMessage('')
+    setIsSavingWalkIn(true)
     try {
       const currentDate = todayDate()
       const currentStartTime = nowTime()
@@ -618,9 +695,12 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
         station_label: '',
         end_time: timeWithOffset(60),
       }))
+      setUserSearchTerm('')
       await reloadAll()
     } catch (err) {
       setError(err.message || 'No se pudo registrar el walk-in.')
+    } finally {
+      setIsSavingWalkIn(false)
     }
   }
 
@@ -655,8 +735,13 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     }))
   }
 
-  const visibleRangeStart = tableMeta.totalElements === 0 ? 0 : tableMeta.pageNumber * tableMeta.pageSize + 1
-  const visibleRangeEnd = Math.min((tableMeta.pageNumber + 1) * tableMeta.pageSize, tableMeta.totalElements)
+  const visibleTotalElements = restrictToManagedLabs ? visibleTableReservations.length : tableMeta.totalElements
+  const visibleRangeStart = restrictToManagedLabs
+    ? (visibleTableReservations.length === 0 ? 0 : 1)
+    : (tableMeta.totalElements === 0 ? 0 : tableMeta.pageNumber * tableMeta.pageSize + 1)
+  const visibleRangeEnd = restrictToManagedLabs
+    ? visibleTableReservations.length
+    : Math.min((tableMeta.pageNumber + 1) * tableMeta.pageSize, tableMeta.totalElements)
   const activeWorkspaceMeta =
     ADMIN_RESERVATION_SECTIONS.find((section) => section.id === activeWorkspace) || ADMIN_RESERVATION_SECTIONS[0]
   const ActiveWorkspaceIcon = SECTION_ICON_MAP[activeWorkspaceMeta.id] || LayoutDashboard
@@ -676,7 +761,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
             <span className="reservations-summary-card-icon"><LayoutDashboard size={18} /></span>
             <div>
               <span>Reservas</span>
-              <strong>{reservationCounters.total}</strong>
+              <strong>{visibleReservationCounters.total}</strong>
             </div>
           </div>
           <div className="reservations-summary-card tone-requests">
@@ -690,7 +775,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
             <span className="reservations-summary-card-icon"><Users size={18} /></span>
             <div>
               <span>Dentro ahora</span>
-              <strong>{occupancy.current_occupancy}</strong>
+              <strong>{visibleOccupancy.current_occupancy}</strong>
             </div>
           </div>
           <div className="reservations-summary-card tone-control">
@@ -754,7 +839,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                 <span>Reservas</span>
                 <span className="reservations-task-card-icon"><LayoutDashboard size={18} /></span>
               </div>
-              <strong>{reservationCounters.total}</strong>
+              <strong>{visibleReservationCounters.total}</strong>
               <p>Total de solicitudes registradas.</p>
             </article>
             <article className="reservations-task-card tone-requests">
@@ -770,7 +855,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                 <span>Dentro ahora</span>
                 <span className="reservations-task-card-icon"><Users size={18} /></span>
               </div>
-              <strong>{occupancy.current_occupancy}</strong>
+              <strong>{visibleOccupancy.current_occupancy}</strong>
               <p>Usuarios que ya estan dentro de un laboratorio.</p>
             </article>
             <article className="reservations-task-card tone-control">
@@ -814,24 +899,24 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
           <div className="reservations-insight-grid">
             <article className="reservations-insight-card">
               <span>Usuarios dentro</span>
-              <strong>{occupancy.current_occupancy}</strong>
+              <strong>{visibleOccupancy.current_occupancy}</strong>
               <p>Actualizado con cada check-in y check-out.</p>
             </article>
             <article className="reservations-insight-card">
               <span>Laboratorios activos</span>
-              <strong>{occupancy.lab_breakdown.length}</strong>
+              <strong>{visibleOccupancy.lab_breakdown.length}</strong>
               <p>Espacios con movimiento o capacidad reportada ahora mismo.</p>
             </article>
             <article className="reservations-insight-card">
               <span>Sesiones abiertas</span>
-              <strong>{occupancy.active_sessions.length}</strong>
+              <strong>{visibleOccupancy.active_sessions.length}</strong>
               <p>Personas que siguen dentro con una reserva o walk-in abierto.</p>
             </article>
           </div>
 
-          {occupancy.lab_breakdown.length > 0 ? (
+          {visibleOccupancy.lab_breakdown.length > 0 ? (
             <div className="reservation-card-grid">
-              {occupancy.lab_breakdown.map((entry) => {
+              {visibleOccupancy.lab_breakdown.map((entry) => {
                 const capacity = Number(entry.capacity || labById[String(entry.laboratory_id)]?.capacity || 0)
                 const remainingCapacity = capacity > 0 ? Math.max(capacity - Number(entry.occupancy_count || 0), 0) : null
                 return (
@@ -855,10 +940,10 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
             <p className="reservations-empty">No hay laboratorios con ocupacion registrada en este momento.</p>
           )}
 
-          {occupancy.active_sessions.length > 0 ? (
+          {visibleOccupancy.active_sessions.length > 0 ? (
             <div className="reservation-card-grid">
-              {occupancy.active_sessions.map((session) => (
-                <article key={session.id || `${session.reservation_id}-${session.check_in_time}`} className="reservation-user-card">
+              {visibleOccupancy.active_sessions.map((session) => (
+                <article key={session.id || `${session.reservation_id}-${session.check_in_at || session.check_in_time}`} className="reservation-user-card">
                   <div className="reservation-user-card-head">
                     <div>
                       <span className="reservation-user-card-kicker">{session.is_walk_in ? 'Walk-in' : 'En curso'}</span>
@@ -868,7 +953,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                   </div>
                   <div className="reservation-user-card-meta">
                     <span>{session.laboratory_name || getReservationLabLabel(session)}</span>
-                    <span>Ingreso: {formatAccessTime(session.check_in_time)}</span>
+                    <span>Ingreso: {formatAccessTime(session.check_in_at || session.check_in_time)}</span>
                     <span>Estacion: {session.station_label || 'Sin estacion'}</span>
                     <span>{session.purpose || 'Sin motivo registrado'}</span>
                   </div>
@@ -877,9 +962,10 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                       <button
                         type="button"
                         className="reservations-primary"
+                        disabled={actioningId === (session.reservation_id || session.id)}
                         onClick={() => handleRegisterExit(session.reservation_id || session.id)}
                       >
-                        Registrar salida
+                        {actioningId === (session.reservation_id || session.id) ? 'Procesando...' : 'Registrar salida'}
                       </button>
                     </div>
                   ) : null}
@@ -912,32 +998,66 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                   required
                 >
                   <option value="">Selecciona un laboratorio</option>
-                  {labs.map((lab) => (
+                  {visibleLabs.map((lab) => (
                     <option key={lab.id} value={lab.id}>{lab.name}</option>
                   ))}
                 </select>
               </label>
 
-              <label>
-                <span>Usuario institucional</span>
-                <select
-                  value={walkInForm.requested_by}
-                  onChange={(event) => {
-                    const nextProfile = profileById[String(event.target.value)]
-                    setWalkInForm((previous) => ({
-                      ...previous,
-                      requested_by: event.target.value,
-                      occupant_name: nextProfile?.name || nextProfile?.username || '',
-                      occupant_email: nextProfile?.email || nextProfile?.username || '',
-                    }))
+              <label style={{ position: 'relative' }}>
+                <span>Buscar Usuario Institucional</span>
+                <input
+                  type="text"
+                  placeholder="Escribe nombre o correo para buscar..."
+                  value={userSearchTerm}
+                  onChange={(e) => {
+                    setUserSearchTerm(e.target.value)
+                    setShowUserDropdown(true)
+                    setWalkInForm((prev) => ({ ...prev, requested_by: '' }))
                   }}
-                  required
-                >
-                  <option value="">Selecciona un usuario</option>
-                  {profiles.map((profile) => (
-                    <option key={profile.id} value={profile.id}>{profile.name || profile.username || profile.id}</option>
-                  ))}
-                </select>
+                  onFocus={() => setShowUserDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowUserDropdown(false), 200)}
+                  required={!walkInForm.requested_by}
+                />
+                {showUserDropdown && filteredProfiles.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    backgroundColor: 'var(--brand-white, #ffffff)',
+                    border: '1px solid var(--border-color, #e2e8f0)',
+                    borderRadius: '0.375rem',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    zIndex: 50,
+                    marginTop: '4px'
+                  }}>
+                    {filteredProfiles.map((profile) => (
+                      <div
+                        key={profile.id}
+                        style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border-color, #f1f5f9)' }}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setWalkInForm((previous) => ({
+                            ...previous,
+                            requested_by: profile.id,
+                            occupant_name: profile.name || profile.username || '',
+                            occupant_email: profile.email || profile.username || '',
+                          }))
+                          setUserSearchTerm(profile.name || profile.username || profile.email)
+                          setShowUserDropdown(false)
+                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--surface-color, #f8fafc)'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                      >
+                        <div style={{ fontWeight: 500 }}>{profile.name || profile.username || profile.id}</div>
+                        <div style={{ fontSize: '0.85em', color: 'var(--text-secondary, #64748b)' }}>{profile.email}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </label>
 
               <label>
@@ -1008,8 +1128,8 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
             ) : null}
 
             <div className="reservations-actions">
-              <button type="submit" className="reservations-primary" disabled={!canManage || !isWalkInFormValid}>
-                Registrar walk-in
+              <button type="submit" className="reservations-primary" disabled={!canManage || !isWalkInFormValid || isSavingWalkIn}>
+                {isSavingWalkIn ? 'Registrando...' : 'Registrar walk-in'}
               </button>
             </div>
           </form>
@@ -1043,24 +1163,36 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                     <div className="reservation-user-card-meta">
                       <span>{getReservationLabLabel(reservation)}</span>
                       <span>{formatDate(reservation.date)} | {reservation.start_time} - {reservation.end_time}</span>
-                      <span>Ingreso: {formatAccessTime(reservation.check_in_time)} | Salida: {formatAccessTime(reservation.check_out_time)}</span>
+                      <span>Ingreso: {formatAccessTime(reservation.check_in_time || reservation.check_in_at)} | Salida: {formatAccessTime(reservation.check_out_time || reservation.check_out_at)}</span>
                       <span>Estacion: {reservation.station_label || 'Sin estacion'}</span>
                       <span>{reservation.purpose || 'Sin motivo registrado'}</span>
                     </div>
                     <div className="reservation-user-card-actions">
                       {reservation.status === 'approved' ? (
-                        <button type="button" className="reservations-primary" onClick={() => handleRegisterEntry(reservation)}>
-                          Registrar entrada
+                        <button 
+                          type="button" 
+                          className="reservations-primary" 
+                          disabled={actioningId === reservation.id}
+                          onClick={() => handleRegisterEntry(reservation)}>
+                          {actioningId === reservation.id ? 'Cargando...' : 'Registrar entrada'}
                         </button>
                       ) : null}
                       {reservation.status === 'in_progress' ? (
-                        <button type="button" className="reservations-primary" onClick={() => handleRegisterExit(reservation.id)}>
-                          Registrar salida
+                        <button 
+                          type="button" 
+                          className="reservations-primary" 
+                          disabled={actioningId === reservation.id}
+                          onClick={() => handleRegisterExit(reservation.id)}>
+                          {actioningId === reservation.id ? 'Cargando...' : 'Registrar salida'}
                         </button>
                       ) : null}
                       {absentEligible ? (
-                        <button type="button" className="reservations-danger" onClick={() => handleMarkAbsent(reservation.id)}>
-                          Marcar ausente
+                        <button 
+                          type="button" 
+                          className="reservations-danger" 
+                          disabled={actioningId === reservation.id}
+                          onClick={() => handleMarkAbsent(reservation.id)}>
+                          {actioningId === reservation.id ? 'Cargando...' : 'Marcar ausente'}
                         </button>
                       ) : null}
                     </div>
@@ -1114,7 +1246,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                   onChange={(event) => setTableFilters((previous) => ({ ...previous, laboratory_id: event.target.value }))}
                 >
                   <option value="">Todos</option>
-                  {labs.map((lab) => (
+                  {visibleLabs.map((lab) => (
                     <option key={lab.id} value={lab.id}>{lab.name}</option>
                   ))}
                 </select>
@@ -1214,7 +1346,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
 
           <div className="reservations-table-meta">
             <span>
-              Mostrando {visibleRangeStart}-{visibleRangeEnd} de {tableMeta.totalElements} reservas
+              Mostrando {visibleRangeStart}-{visibleRangeEnd} de {visibleTotalElements} reservas
             </span>
             <span>
               Pagina {tableMeta.totalPages === 0 ? 0 : tableMeta.pageNumber + 1} de {tableMeta.totalPages}
@@ -1236,7 +1368,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
 
           {tableLoading ? (
             <p className="reservations-empty">Cargando reservas...</p>
-          ) : tableReservations.length === 0 ? (
+          ) : visibleTableReservations.length === 0 ? (
             <p className="reservations-empty">No hay reservas para este filtro.</p>
           ) : (
             <div className="reservations-table-wrap">
@@ -1253,7 +1385,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {tableReservations.map((item) => (
+                  {visibleTableReservations.map((item) => (
                     <tr key={item.id} className={`reservations-table-row status-${item.status}`}>
                       <td>
                         <strong>{getReservationLabLabel(item)}</strong>

@@ -134,6 +134,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const canManageRoles = hasAnyPermission(user, ['gestionar_roles_permisos'])
   const canManageProfiles = hasAnyPermission(user, ['gestionar_roles_permisos', 'reactivar_cuentas'])
   const canManageStructure = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
+  const canViewAnalytics = hasAnyPermission(user, ['consultar_estadisticas'])
   const canManageSpaces = hasAnyPermission(user, ['gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
   const canManagePenalties = hasAnyPermission(user, ['gestionar_penalizaciones'])
   const canViewPenalties = canManagePenalties
@@ -202,7 +203,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     const canAccessCurrentSection =
       activeSection === 'home' ||
       (activeSection === 'admin_reservas' && canManageStructure) ||
-      (activeSection === 'analytics' && canManageStructure) ||
+      (activeSection === 'analytics' && canViewAnalytics) ||
       (activeSection === 'tutorials_manage' && canManageTutorials) ||
       (activeSection === 'profiles' && canManageProfiles) ||
       (activeSection === 'roles' && canManageRoles) ||
@@ -236,6 +237,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     canManageSpaces,
     canManageStructure,
     canManageTutorials,
+    canViewAnalytics,
     currentPath,
     isAdmin,
     onNavigate,
@@ -425,7 +427,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
           {canManageStructure && activeSection === 'admin_reservas' ? (
             <AdminReservationsPage user={user} currentHash={currentHash} onNavigate={onNavigate} />
           ) : null}
-          {canManageStructure && activeSection === 'analytics' ? <AdminLabAnalyticsPage user={user} /> : null}
+          {canViewAnalytics && activeSection === 'analytics' ? <AdminLabAnalyticsPage user={user} /> : null}
           {canManageTutorials && activeSection === 'tutorials_manage' ? <TutorTutorialSessionsPage /> : null}
           {canManageSpaces && activeSection === 'areas' ? <AdminAreasPage user={user} /> : null}
           {canManageSpaces && activeSection === 'laboratorios' ? <AdminLaboratoriosPage user={user} /> : null}

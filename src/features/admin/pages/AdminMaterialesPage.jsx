@@ -52,6 +52,7 @@ function AdminMaterialesPage({ user }) {
   const [materialForm, setMaterialForm] = useState(defaultMaterialForm)
   const [movementForm, setMovementForm] = useState(defaultMovementForm)
   const [activeModal, setActiveModal] = useState(null)
+  const [activeTab, setActiveTab] = useState('catalog')
 
   const [confirmModal, setConfirmModal] = useState(null)
 
@@ -646,6 +647,39 @@ function AdminMaterialesPage({ user }) {
         </div>
       </header>
 
+      <nav className="infra-tabs" role="tablist" aria-label="Secciones de materiales">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'catalog'}
+          className={`infra-tab-button ${activeTab === 'catalog' ? 'is-active' : ''}`}
+          onClick={() => setActiveTab('catalog')}
+        >
+          <span>Catálogo</span>
+          <span className="infra-tab-count">{visibleMaterials.length}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'movements'}
+          className={`infra-tab-button ${activeTab === 'movements' ? 'is-active' : ''}`}
+          onClick={() => setActiveTab('movements')}
+        >
+          <span>Movimientos de stock</span>
+          <span className="infra-tab-count">{materialMovements.length}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'reports'}
+          className={`infra-tab-button ${activeTab === 'reports' ? 'is-active' : ''}`}
+          onClick={() => setActiveTab('reports')}
+        >
+          <span>Reportes</span>
+          <span className="infra-tab-count">{stockAlertsCount}</span>
+        </button>
+      </nav>
+
       {message ? <p className="infra-alert infra-success">{message}</p> : null}
       {error ? <p className="infra-alert infra-error">{error}</p> : null}
 
@@ -653,6 +687,8 @@ function AdminMaterialesPage({ user }) {
         <p className="infra-empty">Cargando materiales...</p>
       ) : (
         <div className="infra-grid">
+          {activeTab === 'catalog' ? (
+            <>
           <section className="infra-command-panel infra-card-full">
             <div className="infra-command-copy">
               <p className="infra-kicker">Centro de stock</p>
@@ -749,7 +785,10 @@ function AdminMaterialesPage({ user }) {
               ) : null}
             </form>
           </section>
+            </>
+          ) : null}
 
+          {activeTab === 'movements' ? (
           <section className="infra-card">
             <section className="infra-stock-ops">
               <div className="infra-stock-panel">
@@ -887,7 +926,10 @@ function AdminMaterialesPage({ user }) {
               </div>
             </section>
           </section>
+          ) : null}
 
+          {activeTab === 'reports' ? (
+          <>
           <section className="infra-card">
             <div className="infra-section-head">
               <div>
@@ -1150,6 +1192,10 @@ function AdminMaterialesPage({ user }) {
             </div>
           </section>
 
+          </>
+          ) : null}
+
+          {activeTab === 'catalog' ? (
           <section className="infra-card infra-materials-catalog">
             <div className="infra-section-head">
               <div>
@@ -1212,6 +1258,7 @@ function AdminMaterialesPage({ user }) {
               </table>
             </div>
           </section>
+          ) : null}
         </div>
       )}
     </section>

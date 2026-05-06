@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   createArea,
   deleteArea,
@@ -17,6 +18,7 @@ function AdminAreasPage({ user }) {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [editingId, setEditingId] = useState(null)
+  const [isFormOpen, setIsFormOpen] = useState(false)
   const [form, setForm] = useState(defaultForm)
   const [confirmModal, setConfirmModal] = useState(null)
 
@@ -39,6 +41,12 @@ function AdminAreasPage({ user }) {
   const resetForm = () => {
     setEditingId(null)
     setForm(defaultForm)
+    setIsFormOpen(false)
+  }
+
+  const handleCreateNew = () => {
+    resetForm()
+    setIsFormOpen(true)
   }
 
   const handleSubmit = async (event) => {
@@ -55,6 +63,7 @@ function AdminAreasPage({ user }) {
         setMessage('Area creada correctamente.')
       }
       resetForm()
+      setIsFormOpen(false)
       await loadData()
     } catch (err) {
       setError(err.message || 'No se pudo guardar el area')
@@ -109,11 +118,19 @@ function AdminAreasPage({ user }) {
       ) : (
         <div className="infra-grid">
           <section className="infra-card infra-card-full">
-            <div className="infra-section-head">
+            <div className="infra-section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3>Areas academicas</h3>
                 <p>Cada area agrupa uno o mas laboratorios.</p>
               </div>
+              <button
+                type="button"
+                className="infra-primary"
+                disabled={!canManage}
+                onClick={handleCreateNew}
+              >
+                Crear area
+              </button>
             </div>
 
             <div className="infra-list">
@@ -132,6 +149,7 @@ function AdminAreasPage({ user }) {
                       onClick={() => {
                         setEditingId(area.id)
                         setForm({ name: area.name, description: area.description || '', is_active: area.is_active })
+                        setIsFormOpen(true)
                       }}
                     >
                       Editar
@@ -149,56 +167,62 @@ function AdminAreasPage({ user }) {
               ))}
             </div>
 
-            <details className="ux-extra-toggle" open={Boolean(editingId)}>
-              <summary>{editingId ? 'Editar area seleccionada' : 'Agregar nueva area'}</summary>
-              <div className="ux-extra-toggle-content">
-                <form className="infra-form" onSubmit={handleSubmit}>
-                  <div className="infra-form-section">
-                    <span className="infra-form-section-label">1 — Identificacion</span>
-                    <label>
-                      <span>Nombre del area</span>
-                      <input
-                        value={form.name}
-                        onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                        required
-                        disabled={!canManage}
-                      />
-                    </label>
-                    <label>
-                      <span>Descripcion</span>
-                      <textarea
-                        rows="3"
-                        value={form.description}
-                        onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-                        disabled={!canManage}
-                      />
-                    </label>
+            {isFormOpen && createPortal(
+              <div className="infra-modal-backdrop" onClick={resetForm} role="dialog" aria-modal="true">
+                <div className="infra-modal-content" onClick={(e) => e.stopPropagation()}>
+                  <header className="infra-modal-header">
+                    <h3>{editingId ? 'Editar area' : 'Nueva area'}</h3>
+                    <button type="button" className="infra-modal-close" onClick={resetForm}>×</button>
+                  </header>
+                  <div className="infra-modal-body">
+                    <form className="infra-form" onSubmit={handleSubmit}>
+                      <div className="infra-form-section">
+                        <span className="infra-form-section-label">1 — Identificacion</span>
+                        <label>
+                          <span>Nombre del area</span>
+                          <input
+                            value={form.name}
+                            onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                            required
+                            disabled={!canManage}
+                          />
+                        </label>
+                        <label>
+                          <span>Descripcion</span>
+                          <textarea
+                            rows="3"
+                            value={form.description}
+                            onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
+                            disabled={!canManage}
+                          />
+                        </label>
+                      </div>
+                      <div className="infra-form-section">
+                        <span className="infra-form-section-label">2 — Configuracion</span>
+                        <label className="infra-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={form.is_active}
+                            onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
+                            disabled={!canManage}
+                          />
+                          <span>Area activa para estudiantes</span>
+                        </label>
+                      </div>
+                      <div className="infra-actions">
+                        <button type="submit" className="infra-primary" disabled={!canManage}>
+                          {editingId ? 'Actualizar area' : 'Crear area'}
+                        </button>
+                        <button type="button" className="infra-secondary" onClick={resetForm} disabled={!canManage}>
+                          Cancelar
+                        </button>
+                      </div>
+                    </form>
                   </div>
-                  <div className="infra-form-section">
-                    <span className="infra-form-section-label">2 — Configuracion</span>
-                    <label className="infra-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={form.is_active}
-                        onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
-                        disabled={!canManage}
-                      />
-                      <span>Area activa para estudiantes</span>
-                    </label>
-                  </div>
-                  <div className="infra-actions">
-                    <button type="submit" className="infra-primary" disabled={!canManage}>
-                      {editingId ? 'Actualizar area' : 'Crear area'}
-                    </button>
-                    {editingId ? (
-                      <button type="button" className="infra-secondary" onClick={resetForm} disabled={!canManage}>
-                        Cancelar edicion
-                      </button>
-                    ) : null}
-                  </div>
-                </form>
-              </div>
-            </details>
+                </div>
+              </div>,
+              document.body
+            )}
           </section>
         </div>
       )}
