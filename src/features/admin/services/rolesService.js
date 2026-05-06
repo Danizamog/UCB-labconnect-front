@@ -2,7 +2,7 @@ import { getAuthToken } from '../../../shared/utils/storage'
 
 const API_BASE_URL = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
 const ROLES_ENDPOINT = import.meta.env.VITE_ROLES_ENDPOINT || '/roles'
-const USERS_ENDPOINT = import.meta.env.VITE_ROLE_USERS_ENDPOINT || '/users'
+const USERS_ENDPOINT = import.meta.env.VITE_ROLE_USERS_ENDPOINT || '/roles/users'
 const requestCache = new Map()
 const inFlightRequests = new Map()
 

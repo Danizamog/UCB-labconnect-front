@@ -261,6 +261,9 @@ function mapLoanDashboard(record) {
     returned_count: Number(record?.returned_count || 0),
     damaged_returns_count: Number(record?.damaged_returns_count || 0),
     active_loans: Array.isArray(record?.active_loans) ? record.active_loans.map(mapLoanRecord) : [],
+    active_loans_page: Number(record?.active_loans_page || 1),
+    active_loans_per_page: Number(record?.active_loans_per_page || 50),
+    active_loans_total_pages: Number(record?.active_loans_total_pages || 1),
   }
 }
 
@@ -372,14 +375,38 @@ function buildQuery(params = {}) {
   return queryString ? `?${queryString}` : ''
 }
 
-export async function listLoansDashboard() {
-  const data = await request(`${inventoryBase}/loans/dashboard`, { cacheTtlMs: 3000 })
+export async function listLoansDashboard({ page = 1, perPage = 50 } = {}) {
+  const data = await request(
+    `${inventoryBase}/loans/dashboard${buildQuery({ page, per_page: perPage })}`,
+    { cacheTtlMs: 3000 },
+  )
   return mapLoanDashboard(data || {})
 }
 
 export async function listLoanRecords(filters = {}) {
-  const data = await request(`${inventoryBase}/loans/${buildQuery(filters)}`, { cacheTtlMs: 3000 })
-  return Array.isArray(data) ? data.map(mapLoanRecord) : []
+  const { page = 1, perPage = 50, per_page, ...rest } = filters || {}
+  const query = buildQuery({ ...rest, page, per_page: per_page ?? perPage })
+  const data = await request(`${inventoryBase}/loans/${query}`, { cacheTtlMs: 3000 })
+
+  if (Array.isArray(data)) {
+    // Backward compat: legacy non-paginated response.
+    const items = data.map(mapLoanRecord)
+    return {
+      items,
+      page: 1,
+      per_page: items.length,
+      total_items: items.length,
+      total_pages: 1,
+    }
+  }
+
+  return {
+    items: Array.isArray(data?.items) ? data.items.map(mapLoanRecord) : [],
+    page: Number(data?.page || page),
+    per_page: Number(data?.per_page || per_page || perPage),
+    total_items: Number(data?.total_items || 0),
+    total_pages: Number(data?.total_pages || 0),
+  }
 }
 
 export async function listAssetLoanHistory(assetId) {

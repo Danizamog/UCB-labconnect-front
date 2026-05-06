@@ -25,9 +25,19 @@ import './AdminAssetsPage.css'
 const defaultForm = { name: '', category: '', location: '', description: '', serial_number: '', laboratory_id: '', status: 'available' }
 const defaultTicketForm = { asset_id: '', ticket_type: 'maintenance', title: '', description: '', severity: 'medium', evidence_report_id: '' }
 const defaultLoanForm = { asset_id: '', borrower_id: '', borrower_name: '', borrower_email: '', borrower_role: '', purpose: '', notes: '' }
-const defaultLoanDashboard = { total_records: 0, active_count: 0, returned_count: 0, damaged_returns_count: 0, active_loans: [] }
+const defaultLoanDashboard = {
+  total_records: 0,
+  active_count: 0,
+  returned_count: 0,
+  damaged_returns_count: 0,
+  active_loans: [],
+  active_loans_page: 1,
+  active_loans_per_page: 10,
+  active_loans_total_pages: 1,
+}
 const defaultAssetFilters = { status: 'all', laboratory_id: '', category: 'all' }
 const ASSET_PAGE_SIZE = 6
+const LOAN_PAGE_SIZE = 10
 
 function normalizeLabId(value) {
   return value === '' ? '' : String(value)
@@ -82,6 +92,8 @@ function AdminEquiposPage({ user }) {
   const [assets, setAssets] = useState([])
   const [activeTickets, setActiveTickets] = useState([])
   const [loanDashboard, setLoanDashboard] = useState(defaultLoanDashboard)
+  const [loanPage, setLoanPage] = useState(1)
+  const [loanPageLoading, setLoanPageLoading] = useState(false)
   const [userProfiles, setUserProfiles] = useState([])
   const [assetStatusHistory, setAssetStatusHistory] = useState({})
   const [assetLoanHistory, setAssetLoanHistory] = useState({})
@@ -122,7 +134,7 @@ function AdminEquiposPage({ user }) {
         listAdminLabs(),
         listAssets(),
         listAssetMaintenanceTickets({ status: 'open' }),
-        listLoansDashboard(),
+        listLoansDashboard({ page: 1, perPage: LOAN_PAGE_SIZE }),
         canManageLoans ? listUserProfiles() : Promise.resolve([]),
       ])
 
@@ -148,6 +160,7 @@ function AdminEquiposPage({ user }) {
       setAssets(nextAssets)
       setActiveTickets(ticketsResult.value)
       setLoanDashboard(loansResult.value)
+      setLoanPage(1)
       setLoanForm((previous) => ({
         ...previous,
         asset_id: previous.asset_id || nextVisibleAssets.find((asset) => asset.status === 'available')?.id || '',
@@ -172,6 +185,21 @@ function AdminEquiposPage({ user }) {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  const handleLoanPageChange = useCallback(async (nextPage) => {
+    const target = Math.max(1, Math.min(nextPage, loanDashboard.active_loans_total_pages || 1))
+    if (target === loanPage) return
+    setLoanPage(target)
+    setLoanPageLoading(true)
+    try {
+      const next = await listLoansDashboard({ page: target, perPage: LOAN_PAGE_SIZE })
+      setLoanDashboard(next)
+    } catch (err) {
+      setError(err.message || 'No se pudo cargar la pagina de prestamos')
+    } finally {
+      setLoanPageLoading(false)
+    }
+  }, [loanDashboard.active_loans_total_pages, loanPage])
 
   const isAdmin = isAdminUser(user)
   const managedLabIds = useMemo(() => {
@@ -1400,32 +1428,60 @@ function AdminEquiposPage({ user }) {
                 {loanDashboard.active_loans.length === 0 ? (
                   <p className="infra-empty">No hay prestamos activos en este momento.</p>
                 ) : (
-                  <div className="infra-list">
-                    {loanDashboard.active_loans.map((loan) => (
-                      <article key={loan.id} className="infra-ticket-card">
-                        <div className="infra-ticket-head">
-                          <div>
-                            <strong>{loan.asset_name}</strong>
-                            <p>{loan.borrower_name || loan.borrower_id}</p>
+                  <>
+                    <div className="infra-list">
+                      {loanDashboard.active_loans.map((loan) => (
+                        <article key={loan.id} className="infra-ticket-card">
+                          <div className="infra-ticket-head">
+                            <div>
+                              <strong>{loan.asset_name}</strong>
+                              <p>{loan.borrower_name || loan.borrower_id}</p>
+                            </div>
+                            <div className="infra-chip-list">
+                              <span className="infra-chip">{formatStatus(loan.status)}</span>
+                              {loan.asset_serial_number ? <span className="infra-chip">{loan.asset_serial_number}</span> : null}
+                            </div>
                           </div>
-                          <div className="infra-chip-list">
-                            <span className="infra-chip">{formatStatus(loan.status)}</span>
-                            {loan.asset_serial_number ? <span className="infra-chip">{loan.asset_serial_number}</span> : null}
+                          <div className="infra-ticket-meta">
+                            <span><strong>Salida:</strong> {formatDateTime(loan.loaned_at)}</span>
+                            <span><strong>Registrado por:</strong> {loan.loaned_by || 'Sistema'}</span>
+                            <span><strong>Correo:</strong> {loan.borrower_email || 'Sin correo'}</span>
+                            <span><strong>Motivo:</strong> {loan.purpose || 'Sin motivo registrado'}</span>
                           </div>
-                        </div>
-                        <div className="infra-ticket-meta">
-                          <span><strong>Salida:</strong> {formatDateTime(loan.loaned_at)}</span>
-                          <span><strong>Registrado por:</strong> {loan.loaned_by || 'Sistema'}</span>
-                          <span><strong>Correo:</strong> {loan.borrower_email || 'Sin correo'}</span>
-                          <span><strong>Motivo:</strong> {loan.purpose || 'Sin motivo registrado'}</span>
-                        </div>
-                        {loan.notes ? <p className="infra-ticket-copy">{loan.notes}</p> : null}
-                        <div className="infra-actions">
-                          <button type="button" className="infra-primary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }} onClick={() => handleOpenReturnModal(loan)}>Registrar devolucion</button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
+                          {loan.notes ? <p className="infra-ticket-copy">{loan.notes}</p> : null}
+                          <div className="infra-actions">
+                            <button type="button" className="infra-primary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }} onClick={() => handleOpenReturnModal(loan)}>Registrar devolucion</button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                    {loanDashboard.active_loans_total_pages > 1 ? (
+                      <div className="infra-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginTop: '0.75rem' }}>
+                        <button
+                          type="button"
+                          className="infra-secondary"
+                          style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}
+                          onClick={() => handleLoanPageChange(loanPage - 1)}
+                          disabled={loanPage <= 1 || loanPageLoading}
+                        >
+                          Anterior
+                        </button>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--infra-text-soft, #555)' }}>
+                          Pagina {loanDashboard.active_loans_page} de {loanDashboard.active_loans_total_pages}
+                          {loanPageLoading ? ' · cargando...' : ''}
+                        </span>
+                        <button
+                          type="button"
+                          className="infra-secondary"
+                          style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem' }}
+                          onClick={() => handleLoanPageChange(loanPage + 1)}
+                          disabled={loanPage >= loanDashboard.active_loans_total_pages || loanPageLoading}
+                        >
+                          Siguiente
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
                 )}
               </section>
             </div>
