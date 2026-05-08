@@ -1,12 +1,17 @@
 import { startTransition, useDeferredValue, useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
+  ArrowLeft,
   BarChart3,
   CalendarClock,
   CalendarDays,
   CalendarRange,
+  ChevronLeft,
+  ChevronRight,
   FlaskConical,
   Gauge,
+  Layers,
+  LayoutGrid,
   LoaderCircle,
   Search,
   SlidersHorizontal,
@@ -44,6 +49,9 @@ const OCCUPANCY_FILTERS = [
   { id: 'medium', label: 'Media', helper: 'Uso estable o equilibrado.' },
   { id: 'low', label: 'Baja', helper: 'Espacios con margen disponible.' },
 ]
+
+const PAGE_SIZE = 6
+const ALL_AREAS_ID = '__all__'
 
 const emptyAnalytics = {
   period: 'daily',
@@ -230,6 +238,66 @@ function RankingCard({ title, description, lab, tone = 'neutral', icon }) {
   )
 }
 
+function buildAreasSummary(labs) {
+  const groups = new Map()
+
+  labs.forEach((lab) => {
+    const areaId = lab.area_id || lab.area_name || 'sin-area'
+    if (!groups.has(areaId)) {
+      groups.set(areaId, {
+        id: areaId,
+        name: lab.area_name || 'Sin area',
+        labs: [],
+      })
+    }
+    groups.get(areaId).labs.push(lab)
+  })
+
+  return Array.from(groups.values())
+    .map((group) => {
+      const totalAvailable = group.labs.reduce((sum, lab) => sum + Number(lab.available_blocks || 0), 0)
+      const totalUsed = group.labs.reduce((sum, lab) => sum + Number(lab.used_blocks || 0), 0)
+      const occupancy = totalAvailable > 0 ? (totalUsed / totalAvailable) * 100 : 0
+
+      const highCount = group.labs.filter((lab) => getOccupancyBand(lab.occupancy_percentage) === 'high').length
+      const mediumCount = group.labs.filter((lab) => getOccupancyBand(lab.occupancy_percentage) === 'medium').length
+      const lowCount = group.labs.filter((lab) => getOccupancyBand(lab.occupancy_percentage) === 'low').length
+
+      return {
+        id: group.id,
+        name: group.name,
+        labCount: group.labs.length,
+        totalAvailable,
+        totalUsed,
+        occupancyPercentage: occupancy,
+        highCount,
+        mediumCount,
+        lowCount,
+      }
+    })
+    .sort((a, b) => b.occupancyPercentage - a.occupancyPercentage)
+}
+
+function getPageWindow(currentPage, totalPages) {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index)
+  }
+
+  const candidates = new Set([0, totalPages - 1, currentPage])
+  if (currentPage > 0) candidates.add(currentPage - 1)
+  if (currentPage < totalPages - 1) candidates.add(currentPage + 1)
+
+  const sorted = [...candidates].sort((a, b) => a - b)
+  const result = []
+  for (let index = 0; index < sorted.length; index += 1) {
+    if (index > 0 && sorted[index] - sorted[index - 1] > 1) {
+      result.push(`ellipsis-${index}`)
+    }
+    result.push(sorted[index])
+  }
+  return result
+}
+
 function LoadingState() {
   return (
     <section className="analytics-panel" aria-label="Cargando estadisticas">
@@ -259,6 +327,8 @@ function AdminLabAnalyticsPage() {
   const [analytics, setAnalytics] = useState(emptyAnalytics)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [selectedAreaId, setSelectedAreaId] = useState(ALL_AREAS_ID)
+  const [currentPage, setCurrentPage] = useState(0)
 
   useEffect(() => {
     let isMounted = true
@@ -298,10 +368,25 @@ function AdminLabAnalyticsPage() {
     [analytics]
   )
 
+  const areasSummary = useMemo(() => buildAreasSummary(rankedLabs), [rankedLabs])
+
+  const selectedArea = useMemo(() => {
+    if (selectedAreaId === ALL_AREAS_ID) return null
+    return areasSummary.find((area) => area.id === selectedAreaId) || null
+  }, [areasSummary, selectedAreaId])
+
+  useEffect(() => {
+    if (selectedAreaId !== ALL_AREAS_ID && !areasSummary.some((area) => area.id === selectedAreaId)) {
+      setSelectedAreaId(ALL_AREAS_ID)
+    }
+  }, [areasSummary, selectedAreaId])
+
   const filteredLabs = useMemo(() => {
     const normalizedSearch = normalizeSearchValue(deferredSearchTerm)
 
     return rankedLabs.filter((lab) => {
+      const matchesArea = selectedAreaId === ALL_AREAS_ID || lab.area_id === selectedAreaId
+
       const matchesSearch = !normalizedSearch || [
         lab.laboratory_name,
         lab.area_name,
@@ -312,9 +397,39 @@ function AdminLabAnalyticsPage() {
       const matchesOccupancy =
         occupancyFilter === 'all' || getOccupancyBand(lab.occupancy_percentage) === occupancyFilter
 
-      return matchesSearch && matchesOccupancy
+      return matchesArea && matchesSearch && matchesOccupancy
     })
-  }, [deferredSearchTerm, occupancyFilter, rankedLabs])
+  }, [deferredSearchTerm, occupancyFilter, rankedLabs, selectedAreaId])
+
+  const totalPages = Math.max(1, Math.ceil(filteredLabs.length / PAGE_SIZE))
+
+  useEffect(() => {
+    setCurrentPage(0)
+  }, [period, selectedAreaId, deferredSearchTerm, occupancyFilter])
+
+  useEffect(() => {
+    if (currentPage > totalPages - 1) {
+      setCurrentPage(Math.max(0, totalPages - 1))
+    }
+  }, [currentPage, totalPages])
+
+  const paginatedLabs = useMemo(() => {
+    const start = currentPage * PAGE_SIZE
+    return filteredLabs.slice(start, start + PAGE_SIZE)
+  }, [filteredLabs, currentPage])
+
+  const visibleStart = filteredLabs.length === 0 ? 0 : currentPage * PAGE_SIZE + 1
+  const visibleEnd = Math.min((currentPage + 1) * PAGE_SIZE, filteredLabs.length)
+  const pageWindow = useMemo(() => getPageWindow(currentPage, totalPages), [currentPage, totalPages])
+
+  const handleSelectArea = (areaId) => {
+    setSelectedAreaId(areaId)
+  }
+
+  const handlePageChange = (nextPage) => {
+    if (nextPage < 0 || nextPage > totalPages - 1) return
+    setCurrentPage(nextPage)
+  }
 
   const occupancySummary = useMemo(() => {
     const highCount = rankedLabs.filter((lab) => getOccupancyBand(lab.occupancy_percentage) === 'high').length
@@ -566,19 +681,105 @@ function AdminLabAnalyticsPage() {
           </section>
 
           <section className="analytics-panel">
+            <div className="analytics-panel-header">
+              <div>
+                <h3>Explora por area</h3>
+                <p className="analytics-panel-subtitle">
+                  Selecciona un area para enfocar el ranking solo en sus laboratorios. La opcion &laquo;Todas las areas&raquo; muestra el panorama global paginado.
+                </p>
+              </div>
+            </div>
+
+            <div className="analytics-areas-grid" role="tablist" aria-label="Filtro por area">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={selectedAreaId === ALL_AREAS_ID}
+                className={`analytics-area-card analytics-area-card-all ${selectedAreaId === ALL_AREAS_ID ? 'is-active' : ''}`}
+                onClick={() => handleSelectArea(ALL_AREAS_ID)}
+              >
+                <span className="analytics-area-icon">
+                  <LayoutGrid size={18} />
+                </span>
+                <div className="analytics-area-body">
+                  <strong>Todas las areas</strong>
+                  <span className="analytics-area-meta">
+                    {rankedLabs.length} laboratorios &middot; {areasSummary.length} areas
+                  </span>
+                  <span className="analytics-area-percent">
+                    {formatPercentage(analytics.totals.occupancy_percentage)}
+                  </span>
+                </div>
+              </button>
+
+              {areasSummary.map((area) => {
+                const isActive = selectedAreaId === area.id
+                const meta = getOccupancyMeta(area.occupancyPercentage)
+
+                return (
+                  <button
+                    key={area.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    className={`analytics-area-card tone-${meta.id} ${isActive ? 'is-active' : ''}`}
+                    onClick={() => handleSelectArea(area.id)}
+                  >
+                    <span className="analytics-area-icon">
+                      <Layers size={18} />
+                    </span>
+                    <div className="analytics-area-body">
+                      <strong>{area.name}</strong>
+                      <span className="analytics-area-meta">
+                        {area.labCount} laboratorios
+                      </span>
+                      <span className="analytics-area-percent">
+                        {formatPercentage(area.occupancyPercentage)}
+                      </span>
+                      <div className="analytics-area-distribution" aria-label="Distribucion por nivel de ocupacion">
+                        <span className="analytics-area-pill tone-high">{area.highCount} alta</span>
+                        <span className="analytics-area-pill tone-medium">{area.mediumCount} media</span>
+                        <span className="analytics-area-pill tone-low">{area.lowCount} baja</span>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+
+          <section className="analytics-panel">
             <div className="analytics-panel-header analytics-panel-header-with-meta">
               <div>
-                <h3>Ranking de ocupacion por laboratorio</h3>
+                {selectedArea ? (
+                  <button
+                    type="button"
+                    className="analytics-breadcrumb"
+                    onClick={() => handleSelectArea(ALL_AREAS_ID)}
+                  >
+                    <ArrowLeft size={14} />
+                    <span>Todas las areas</span>
+                    <span className="analytics-breadcrumb-separator">/</span>
+                    <strong>{selectedArea.name}</strong>
+                  </button>
+                ) : null}
+                <h3>
+                  {selectedArea
+                    ? `Laboratorios de ${selectedArea.name}`
+                    : 'Ranking de ocupacion por laboratorio'}
+                </h3>
                 <p className="analytics-panel-subtitle">
-                  El listado queda ordenado de mayor a menor porcentaje de ocupacion para facilitar la asignacion de recursos.
+                  {selectedArea
+                    ? 'Solo se muestran los laboratorios del area seleccionada, ordenados por ocupacion.'
+                    : 'El listado queda ordenado de mayor a menor porcentaje de ocupacion para facilitar la asignacion de recursos.'}
                 </p>
               </div>
               <div className="analytics-results-meta">
                 <strong>{filteredLabs.length}</strong>
                 <span>
-                  {filteredLabs.length === rankedLabs.length
-                    ? 'laboratorios visibles'
-                    : `de ${rankedLabs.length} laboratorios en el periodo`}
+                  {filteredLabs.length === 0
+                    ? 'sin resultados'
+                    : `mostrando ${visibleStart}-${visibleEnd} de ${filteredLabs.length}`}
                 </span>
               </div>
             </div>
@@ -592,14 +793,15 @@ function AdminLabAnalyticsPage() {
               </div>
             ) : (
               <div className="analytics-ranking-list">
-                {filteredLabs.map((lab, index) => {
+                {paginatedLabs.map((lab, index) => {
                   const occupancyMeta = getOccupancyMeta(lab.occupancy_percentage)
+                  const absoluteIndex = currentPage * PAGE_SIZE + index
 
                   return (
                     <article key={lab.laboratory_id} className="analytics-ranking-card">
                       <div className="analytics-ranking-head">
                         <div className="analytics-ranking-title">
-                          <span className="analytics-ranking-position">#{index + 1}</span>
+                          <span className="analytics-ranking-position">#{absoluteIndex + 1}</span>
                           <div>
                             <div className="analytics-ranking-name-row">
                               <h4>{lab.laboratory_name || lab.laboratory_id}</h4>
@@ -648,6 +850,56 @@ function AdminLabAnalyticsPage() {
                 })}
               </div>
             )}
+
+            {filteredLabs.length > 0 && totalPages > 1 ? (
+              <nav className="analytics-pagination" aria-label="Paginacion del ranking">
+                <div className="analytics-pagination-info">
+                  Pagina {currentPage + 1} de {totalPages}
+                </div>
+                <div className="analytics-pagination-controls">
+                  <button
+                    type="button"
+                    className="analytics-pagination-button"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage <= 0}
+                    aria-label="Pagina anterior"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <div className="analytics-pagination-chips">
+                    {pageWindow.map((entry) => {
+                      if (typeof entry !== 'number') {
+                        return (
+                          <span key={entry} className="analytics-pagination-ellipsis" aria-hidden="true">
+                            ...
+                          </span>
+                        )
+                      }
+                      return (
+                        <button
+                          key={entry}
+                          type="button"
+                          className={`analytics-pagination-chip ${currentPage === entry ? 'is-active' : ''}`}
+                          onClick={() => handlePageChange(entry)}
+                          aria-current={currentPage === entry ? 'page' : undefined}
+                        >
+                          {entry + 1}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    className="analytics-pagination-button"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage >= totalPages - 1}
+                    aria-label="Pagina siguiente"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </nav>
+            ) : null}
           </section>
         </>
       ) : null}

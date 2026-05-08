@@ -37,6 +37,7 @@ const AdminLabAnalyticsPage = lazy(() => import('../../analytics/pages/AdminLabA
 const AdminAreasPage = lazy(() => import('../../admin/pages/AdminAreasPage'))
 const AdminEquiposPage = lazy(() => import('../../admin/pages/AdminEquiposPage'))
 const AdminLaboratoriosPage = lazy(() => import('../../admin/pages/AdminLaboratoriosPage'))
+const AdminLabSchedulesPage = lazy(() => import('../../admin/pages/AdminLabSchedulesPage'))
 const AdminMaterialesPage = lazy(() => import('../../admin/pages/AdminMaterialesPage'))
 const AdminProfilesPage = lazy(() => import('../../admin/pages/AdminProfilesPage'))
 const AdminRolesPage = lazy(() => import('../../admin/pages/AdminRolesPage'))
@@ -210,6 +211,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
       (activeSection === 'penalties' && canViewPenalties) ||
       (activeSection === 'areas' && canManageSpaces) ||
       (activeSection === 'laboratorios' && canManageSpaces) ||
+      (activeSection === 'horarios_laboratorios' && canManageSpaces) ||
       (activeSection === 'equipos' && canManageEquipos) ||
       (activeSection === 'materiales' && canManageMateriales) ||
       (activeSection === 'calendar' && !isAdmin) ||
@@ -431,6 +433,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
           {canManageTutorials && activeSection === 'tutorials_manage' ? <TutorTutorialSessionsPage /> : null}
           {canManageSpaces && activeSection === 'areas' ? <AdminAreasPage user={user} /> : null}
           {canManageSpaces && activeSection === 'laboratorios' ? <AdminLaboratoriosPage user={user} /> : null}
+          {canManageSpaces && activeSection === 'horarios_laboratorios' ? <AdminLabSchedulesPage user={user} /> : null}
           {canManageEquipos && activeSection === 'equipos' ? <AdminEquiposPage user={user} /> : null}
           {canManageMateriales && activeSection === 'materiales' ? <AdminMaterialesPage user={user} /> : null}
           {!isAdmin && activeSection === 'calendar' ? <UserAvailabilityCalendarPage user={user} /> : null}

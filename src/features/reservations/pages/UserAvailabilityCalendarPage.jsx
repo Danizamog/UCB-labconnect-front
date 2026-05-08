@@ -63,6 +63,10 @@ function getSlotTone(slot) {
     return 'tutorial'
   }
 
+  if (slot.source === 'class') {
+    return 'class'
+  }
+
   if (slot.state === 'blocked' && slot.status === 'maintenance') {
     return 'maintenance'
   }
@@ -81,6 +85,10 @@ function getSlotTone(slot) {
 function getSlotLabel(slot) {
   if (slot.source === 'tutorial_session') {
     return 'Tutoria'
+  }
+
+  if (slot.source === 'class') {
+    return slot.status ? `Clase: ${slot.status}` : 'Clase'
   }
 
   if (slot.state === 'blocked' && slot.status === 'maintenance') {
@@ -461,6 +469,9 @@ function UserAvailabilityCalendarPage({ user }) {
                 <span className="cal-legend-item cal-legend--busy">
                   <span className="cal-legend-dot" /> {busyCount} ocupado{busyCount !== 1 ? 's' : ''}
                 </span>
+                <span className="reservation-slot-legend-item class">
+                  <span className="reservation-slot-legend-dot" /> Clase
+                </span>
                 <span className="reservation-slot-legend-item maintenance">
                   <span className="reservation-slot-legend-dot" /> Mantenimiento
                 </span>
@@ -493,6 +504,7 @@ function UserAvailabilityCalendarPage({ user }) {
                   <article
                     key={slot.start_time}
                     className={`reservations-slot ${getSlotTone(slot)}`}
+                    title={slot.source === 'class' && slot.status ? `Clase: ${slot.status}` : undefined}
                   >
                     <strong>{slot.start_time} - {slot.end_time}</strong>
                     <span>{getSlotLabel(slot)}</span>

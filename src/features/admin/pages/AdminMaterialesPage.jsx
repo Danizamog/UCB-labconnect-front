@@ -56,7 +56,9 @@ function AdminMaterialesPage({ user }) {
 
   const [confirmModal, setConfirmModal] = useState(null)
 
-  const canManage = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos'])
+  const canManageMaterials = hasAnyPermission(user, ['gestionar_reactivos_quimicos'])
+  const canMoveStock = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos'])
+  const canManage = canManageMaterials || canMoveStock
   const isAdmin = isAdminUser(user)
 
   const fetchReportData = async () => {
@@ -365,7 +367,7 @@ function AdminMaterialesPage({ user }) {
 
   const handleMaterialSubmit = async (event) => {
     event.preventDefault()
-    if (!canManage) return
+    if (!canManageMaterials) return
     setError('')
     setMessage('')
     const payload = {
@@ -391,6 +393,7 @@ function AdminMaterialesPage({ user }) {
   }
 
   const handleDelete = (materialId) => {
+    if (!canManageMaterials) return
     setConfirmModal({
       message: 'Esta accion no se puede deshacer.',
       onConfirm: async () => {
@@ -410,7 +413,7 @@ function AdminMaterialesPage({ user }) {
 
   const handleMovementSubmit = async (event) => {
     event.preventDefault()
-    if (!canManage) return
+    if (!canMoveStock) return
     setError('')
     setMessage('')
     if (!movementForm.stock_item_id) {
@@ -478,7 +481,7 @@ function AdminMaterialesPage({ user }) {
                         onChange={(e) => setMaterialForm((prev) => ({ ...prev, name: e.target.value }))}
                         placeholder="Ej. Alcohol isopropilico, cable UTP, resistencia 220 ohm"
                         required
-                        disabled={!canManage}
+                        disabled={!canManageMaterials}
                       />
                     </label>
                     <label>
@@ -488,7 +491,7 @@ function AdminMaterialesPage({ user }) {
                         onChange={(e) => setMaterialForm((prev) => ({ ...prev, category: e.target.value }))}
                         placeholder="Reactivo, electronica, redes, limpieza"
                         required
-                        disabled={!canManage}
+                        disabled={!canManageMaterials}
                       />
                     </label>
                   </div>
@@ -499,7 +502,7 @@ function AdminMaterialesPage({ user }) {
                       value={materialForm.description}
                       onChange={(e) => setMaterialForm((prev) => ({ ...prev, description: e.target.value }))}
                       placeholder="Agrega detalles utiles para docentes, auxiliares o encargados."
-                      disabled={!canManage}
+                      disabled={!canManageMaterials}
                     />
                   </label>
                 </div>
@@ -514,12 +517,12 @@ function AdminMaterialesPage({ user }) {
                         onChange={(e) => setMaterialForm((prev) => ({ ...prev, unit: e.target.value }))}
                         placeholder="unidad, ml, g, kit, metro"
                         required
-                        disabled={!canManage}
+                        disabled={!canManageMaterials}
                       />
                     </label>
                     <label>
                       <span>Laboratorio</span>
-                      <select value={materialForm.laboratory_id} onChange={(e) => setMaterialForm((prev) => ({ ...prev, laboratory_id: e.target.value }))} disabled={!canManage}>
+                      <select value={materialForm.laboratory_id} onChange={(e) => setMaterialForm((prev) => ({ ...prev, laboratory_id: e.target.value }))} disabled={!canManageMaterials}>
                         <option value="">Disponible para cualquier laboratorio</option>
                         {visibleLabs.map((lab) => (
                           <option key={lab.id} value={lab.id}>{lab.name}</option>
@@ -534,7 +537,7 @@ function AdminMaterialesPage({ user }) {
                         value={materialForm.quantity_available}
                         onChange={(e) => setMaterialForm((prev) => ({ ...prev, quantity_available: e.target.value }))}
                         required
-                        disabled={!canManage}
+                        disabled={!canManageMaterials}
                       />
                     </label>
                     <label>
@@ -545,7 +548,7 @@ function AdminMaterialesPage({ user }) {
                         value={materialForm.minimum_stock}
                         onChange={(e) => setMaterialForm((prev) => ({ ...prev, minimum_stock: e.target.value }))}
                         required
-                        disabled={!canManage}
+                        disabled={!canManageMaterials}
                       />
                     </label>
                   </div>
@@ -555,7 +558,7 @@ function AdminMaterialesPage({ user }) {
                   <button type="button" className="infra-secondary" onClick={closeWorkflowModal}>
                     Cerrar
                   </button>
-                  <button type="submit" className="infra-primary" disabled={!canManage}>
+                  <button type="submit" className="infra-primary" disabled={!canManageMaterials}>
                     {editingId ? 'Actualizar material' : 'Crear material'}
                   </button>
                 </div>
@@ -567,7 +570,7 @@ function AdminMaterialesPage({ user }) {
                   <div className="infra-form-grid">
                     <label>
                       <span>Material</span>
-                      <select value={movementForm.stock_item_id} onChange={(e) => setMovementForm((prev) => ({ ...prev, stock_item_id: e.target.value }))} disabled={!canManage} required>
+                      <select value={movementForm.stock_item_id} onChange={(e) => setMovementForm((prev) => ({ ...prev, stock_item_id: e.target.value }))} disabled={!canMoveStock} required>
                         <option value="">Selecciona un material</option>
                         {visibleMaterials.map((m) => (
                           <option key={m.id} value={m.id}>{m.name} ({m.quantity_available} {m.unit})</option>
@@ -576,7 +579,7 @@ function AdminMaterialesPage({ user }) {
                     </label>
                     <label>
                       <span>Tipo de movimiento</span>
-                      <select value={movementForm.movement_type} onChange={(e) => setMovementForm((prev) => ({ ...prev, movement_type: e.target.value }))} disabled={!canManage}>
+                      <select value={movementForm.movement_type} onChange={(e) => setMovementForm((prev) => ({ ...prev, movement_type: e.target.value }))} disabled={!canMoveStock}>
                         <option value="entry">Ingreso / compra</option>
                         <option value="return">Devolucion</option>
                         <option value="consumption">Consumo / merma</option>
@@ -596,7 +599,7 @@ function AdminMaterialesPage({ user }) {
                         max={movementForm.movement_type === 'consumption' ? selectedMovementMaterial?.quantity_available || 1 : undefined}
                         value={movementForm.quantity}
                         onChange={(e) => setMovementForm((prev) => ({ ...prev, quantity: e.target.value }))}
-                        disabled={!canManage}
+                        disabled={!canMoveStock}
                         required
                       />
                     </label>
@@ -612,7 +615,7 @@ function AdminMaterialesPage({ user }) {
                       value={movementForm.notes}
                       onChange={(e) => setMovementForm((prev) => ({ ...prev, notes: e.target.value }))}
                       placeholder="Ej. consumo en practica de quimica, compra semestral o devolucion del grupo 2"
-                      disabled={!canManage}
+                      disabled={!canMoveStock}
                     />
                   </label>
                 </div>
@@ -625,7 +628,7 @@ function AdminMaterialesPage({ user }) {
                   <button type="button" className="infra-secondary" onClick={closeWorkflowModal}>
                     Cerrar
                   </button>
-                  <button type="submit" className="infra-primary" disabled={!canManage || movementWillExceedStock || !movementForm.stock_item_id}>
+                  <button type="submit" className="infra-primary" disabled={!canMoveStock || movementWillExceedStock || !movementForm.stock_item_id}>
                     Registrar movimiento
                   </button>
                 </div>
@@ -700,16 +703,20 @@ function AdminMaterialesPage({ user }) {
             </div>
             {canManage ? (
               <div className="infra-action-grid">
-                <button type="button" className="infra-action-card is-primary" onClick={() => openMaterialModal()}>
-                  <span>1</span>
-                  <strong>Nuevo material</strong>
-                  <small>Registra stock, unidad, categoria y laboratorio asignado.</small>
-                </button>
-                <button type="button" className="infra-action-card" onClick={() => openMovementModal()}>
-                  <span>2</span>
-                  <strong>Movimiento de stock</strong>
-                  <small>Ingreso, devolucion o consumo con trazabilidad.</small>
-                </button>
+                {canManageMaterials ? (
+                  <button type="button" className="infra-action-card is-primary" onClick={() => openMaterialModal()}>
+                    <span>1</span>
+                    <strong>Nuevo material</strong>
+                    <small>Registra stock, unidad, categoria y laboratorio asignado.</small>
+                  </button>
+                ) : null}
+                {canMoveStock ? (
+                  <button type="button" className="infra-action-card" onClick={() => openMovementModal()}>
+                    <span>2</span>
+                    <strong>Movimiento de stock</strong>
+                    <small>Ingreso, devolucion o consumo con trazabilidad.</small>
+                  </button>
+                ) : null}
                 <button type="button" className="infra-action-card" onClick={() => document.querySelector('.infra-materials-catalog')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
                   <span>3</span>
                   <strong>Revisar catalogo</strong>
@@ -719,6 +726,7 @@ function AdminMaterialesPage({ user }) {
             ) : null}
           </section>
 
+          {canManageMaterials ? (
           <section className="infra-card">
             <div className="infra-section-head">
               <div>
@@ -733,16 +741,16 @@ function AdminMaterialesPage({ user }) {
                 <div className="infra-form-grid">
                   <label>
                     <span>Nombre del material</span>
-                    <input value={materialForm.name} onChange={(e) => setMaterialForm((prev) => ({ ...prev, name: e.target.value }))} required disabled={!canManage} />
+                    <input value={materialForm.name} onChange={(e) => setMaterialForm((prev) => ({ ...prev, name: e.target.value }))} required />
                   </label>
                   <label>
                     <span>Categoria</span>
-                    <input value={materialForm.category} onChange={(e) => setMaterialForm((prev) => ({ ...prev, category: e.target.value }))} required disabled={!canManage} />
+                    <input value={materialForm.category} onChange={(e) => setMaterialForm((prev) => ({ ...prev, category: e.target.value }))} required />
                   </label>
                 </div>
                 <label>
                   <span>Descripcion</span>
-                  <textarea rows="3" value={materialForm.description} onChange={(e) => setMaterialForm((prev) => ({ ...prev, description: e.target.value }))} disabled={!canManage} />
+                  <textarea rows="3" value={materialForm.description} onChange={(e) => setMaterialForm((prev) => ({ ...prev, description: e.target.value }))} />
                 </label>
               </div>
               <div className="infra-form-section">
@@ -750,11 +758,11 @@ function AdminMaterialesPage({ user }) {
                 <div className="infra-form-grid">
                   <label>
                     <span>Unidad</span>
-                    <input value={materialForm.unit} onChange={(e) => setMaterialForm((prev) => ({ ...prev, unit: e.target.value }))} required disabled={!canManage} />
+                    <input value={materialForm.unit} onChange={(e) => setMaterialForm((prev) => ({ ...prev, unit: e.target.value }))} required />
                   </label>
                   <label>
                     <span>Laboratorio</span>
-                    <select value={materialForm.laboratory_id} onChange={(e) => setMaterialForm((prev) => ({ ...prev, laboratory_id: e.target.value }))} disabled={!canManage}>
+                    <select value={materialForm.laboratory_id} onChange={(e) => setMaterialForm((prev) => ({ ...prev, laboratory_id: e.target.value }))}>
                       <option value="">Disponible para cualquier laboratorio</option>
                       {visibleLabs.map((lab) => (
                         <option key={lab.id} value={lab.id}>{lab.name}</option>
@@ -763,34 +771,34 @@ function AdminMaterialesPage({ user }) {
                   </label>
                   <label>
                     <span>Stock disponible</span>
-                    <input type="number" min="0" value={materialForm.quantity_available} onChange={(e) => setMaterialForm((prev) => ({ ...prev, quantity_available: e.target.value }))} required disabled={!canManage} />
+                    <input type="number" min="0" value={materialForm.quantity_available} onChange={(e) => setMaterialForm((prev) => ({ ...prev, quantity_available: e.target.value }))} required />
                   </label>
                   <label>
                     <span>Stock minimo</span>
-                    <input type="number" min="0" value={materialForm.minimum_stock} onChange={(e) => setMaterialForm((prev) => ({ ...prev, minimum_stock: e.target.value }))} required disabled={!canManage} />
+                    <input type="number" min="0" value={materialForm.minimum_stock} onChange={(e) => setMaterialForm((prev) => ({ ...prev, minimum_stock: e.target.value }))} required />
                   </label>
                 </div>
               </div>
-              {canManage ? (
-                <div className="infra-actions">
-                  <button type="submit" className="infra-primary">
-                    {editingId ? 'Actualizar material' : 'Crear material'}
+              <div className="infra-actions">
+                <button type="submit" className="infra-primary">
+                  {editingId ? 'Actualizar material' : 'Crear material'}
+                </button>
+                {editingId ? (
+                  <button type="button" className="infra-secondary" onClick={resetMaterialForm}>
+                    Cancelar edicion
                   </button>
-                  {editingId ? (
-                    <button type="button" className="infra-secondary" onClick={resetMaterialForm}>
-                      Cancelar edicion
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
+                ) : null}
+              </div>
             </form>
           </section>
+          ) : null}
             </>
           ) : null}
 
           {activeTab === 'movements' ? (
           <section className="infra-card">
             <section className="infra-stock-ops">
+              {canMoveStock ? (
               <div className="infra-stock-panel">
                 <div className="infra-section-head">
                   <div>
@@ -805,7 +813,7 @@ function AdminMaterialesPage({ user }) {
                     <div className="infra-form-grid">
                       <label>
                         <span>Material</span>
-                        <select value={movementForm.stock_item_id} onChange={(e) => setMovementForm((prev) => ({ ...prev, stock_item_id: e.target.value }))} disabled={!canManage} required>
+                        <select value={movementForm.stock_item_id} onChange={(e) => setMovementForm((prev) => ({ ...prev, stock_item_id: e.target.value }))} required>
                           <option value="">Selecciona un material</option>
                           {visibleMaterials.map((m) => (
                             <option key={m.id} value={m.id}>{m.name} ({m.quantity_available} {m.unit})</option>
@@ -814,7 +822,7 @@ function AdminMaterialesPage({ user }) {
                       </label>
                       <label>
                         <span>Tipo de movimiento</span>
-                        <select value={movementForm.movement_type} onChange={(e) => setMovementForm((prev) => ({ ...prev, movement_type: e.target.value }))} disabled={!canManage}>
+                        <select value={movementForm.movement_type} onChange={(e) => setMovementForm((prev) => ({ ...prev, movement_type: e.target.value }))}>
                           <option value="entry">Ingreso / compra</option>
                           <option value="return">Devolucion</option>
                           <option value="consumption">Consumo / merma</option>
@@ -833,7 +841,6 @@ function AdminMaterialesPage({ user }) {
                           max={movementForm.movement_type === 'consumption' ? selectedMovementMaterial?.quantity_available || 1 : undefined}
                           value={movementForm.quantity}
                           onChange={(e) => setMovementForm((prev) => ({ ...prev, quantity: e.target.value }))}
-                          disabled={!canManage}
                           required
                         />
                       </label>
@@ -844,22 +851,23 @@ function AdminMaterialesPage({ user }) {
                     </div>
                     <label>
                       <span>Motivo u observaciones</span>
-                      <textarea rows="3" value={movementForm.notes} onChange={(e) => setMovementForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="Ej. consumo en practica de quimica, compra semestral o devolucion del grupo 2" disabled={!canManage} />
+                      <textarea rows="3" value={movementForm.notes} onChange={(e) => setMovementForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="Ej. consumo en practica de quimica, compra semestral o devolucion del grupo 2" />
                     </label>
                   </div>
                   {movementWillExceedStock ? (
                     <p className="infra-inline-error">La cantidad a descontar supera el stock disponible del material seleccionado.</p>
                   ) : null}
                   <div className="infra-actions">
-                    <button type="submit" className="infra-primary" disabled={!canManage || movementWillExceedStock || !movementForm.stock_item_id}>
+                    <button type="submit" className="infra-primary" disabled={movementWillExceedStock || !movementForm.stock_item_id}>
                       Registrar movimiento
                     </button>
-                    <button type="button" className="infra-secondary" onClick={() => setMovementForm(defaultMovementForm)} disabled={!canManage}>
+                    <button type="button" className="infra-secondary" onClick={() => setMovementForm(defaultMovementForm)}>
                       Limpiar
                     </button>
                   </div>
                 </form>
               </div>
+              ) : null}
 
               <div className="infra-stock-panel">
                 <div className="infra-section-head">
@@ -1232,11 +1240,13 @@ function AdminMaterialesPage({ user }) {
                         </td>
                         <td>
                           <div className="infra-actions compact">
-                            {canManage ? (
+                            {canMoveStock ? (
+                              <button type="button" className="infra-secondary" onClick={() => openMovementModal(material)}>
+                                Mover stock
+                              </button>
+                            ) : null}
+                            {canManageMaterials ? (
                               <>
-                                <button type="button" className="infra-secondary" onClick={() => openMovementModal(material)}>
-                                  Mover stock
-                                </button>
                                 <button
                                   type="button"
                                   className="infra-secondary"

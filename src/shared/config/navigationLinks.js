@@ -11,6 +11,7 @@ export const NAVIGATION_LINKS = [
   { id: 'penalties', label: 'Sanciones y bloqueos', icon: 'penalties', path: '/app/admin/penalizaciones', requiredAnyPermission: ['*', 'gestionar_penalizaciones'] },
   { id: 'areas', label: 'Areas academicas', icon: 'areas', path: '/app/admin/areas', requiredAnyPermission: ['*', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'] },
   { id: 'laboratorios', label: 'Espacios de laboratorio', icon: 'laboratorios', path: '/app/admin/laboratorios', requiredAnyPermission: ['*', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'] },
+  { id: 'horarios_laboratorios', label: 'Horarios de laboratorios', icon: 'horarios_laboratorios', path: '/app/admin/horarios-laboratorios', requiredAnyPermission: ['*', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'] },
   { id: 'equipos', label: 'Equipos y prestamos', icon: 'equipos', path: '/app/admin/equipos', requiredAnyPermission: ['*', 'gestionar_inventario', 'gestionar_estado_equipos', 'gestionar_mantenimiento'] },
   { id: 'materiales', label: 'Materiales y stock', icon: 'materiales', path: '/app/admin/materiales', requiredAnyPermission: ['*', 'gestionar_stock', 'gestionar_reactivos_quimicos', 'gestionar_reservas_materiales'] },
   { id: 'calendar', label: 'Ver disponibilidad', icon: 'calendar', path: '/app/reservas/calendario', userOnly: true },

@@ -204,6 +204,10 @@ function getSlotTone(slot) {
     return 'tutorial'
   }
 
+  if (slot.source === 'class') {
+    return 'class'
+  }
+
   if (slot.state === 'blocked' && slot.status === 'past') {
     return 'past'
   }
@@ -226,6 +230,10 @@ function getSlotTone(slot) {
 function getSlotLabel(slot) {
   if (slot.source === 'tutorial_session') {
     return 'Tutoria'
+  }
+
+  if (slot.source === 'class') {
+    return slot.status ? `Clase: ${slot.status}` : 'Clase'
   }
 
   if (slot.state === 'blocked' && slot.status === 'past') {
@@ -651,6 +659,9 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
   const getEditSlotDisabledHint = useCallback((slot) => {
     if (isPastSlotForDate(slot, editForm.date, nowReference)) {
       return 'Esta hora ya paso y no se puede usar para reprogramar.'
+    }
+    if (slot?.source === 'class') {
+      return slot.status ? `Bloque ocupado por la clase: ${slot.status}` : 'Bloque ocupado por una clase recurrente.'
     }
     if (slot?.state === 'occupied') {
       return 'Este bloque ya esta ocupado.'
@@ -1316,6 +1327,9 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                     <span className="cal-legend-item cal-legend--busy">
                       <span className="cal-legend-dot" /> Ocupado
                     </span>
+                    <span className="reservation-slot-legend-item class">
+                      <span className="reservation-slot-legend-dot" /> Clase
+                    </span>
                     <span className="reservation-slot-legend-item maintenance">
                       <span className="reservation-slot-legend-dot" /> Mantenimiento
                     </span>
@@ -1351,7 +1365,13 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                           className={`reservations-slot ${getSlotTone(slot)}${isSelected ? ' is-selected' : ''}`}
                           disabled={isDisabled}
                           aria-disabled={isDisabled}
-                          title={isPast && !isTutorial ? 'Esta hora ya paso y no se puede reservar.' : undefined}
+                          title={
+                            isPast && !isTutorial
+                              ? 'Esta hora ya paso y no se puede reservar.'
+                              : slot.source === 'class' && slot.status
+                                ? `Bloque ocupado por la clase: ${slot.status}`
+                                : undefined
+                          }
                           onClick={() => {
                             if (isDisabled) {
                               return

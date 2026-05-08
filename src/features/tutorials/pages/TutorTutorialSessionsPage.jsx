@@ -169,6 +169,10 @@ function getSlotTone(slot, dateValue, referenceNow) {
     return 'tutorial'
   }
 
+  if (slot.source === 'class') {
+    return 'class'
+  }
+
   if (isPastSlotForDate(slot, dateValue, referenceNow) || (slot.state === 'blocked' && slot.status === 'past')) {
     return 'past'
   }
@@ -191,6 +195,10 @@ function getSlotTone(slot, dateValue, referenceNow) {
 function getSlotLabel(slot, dateValue, referenceNow) {
   if (slot.source === 'tutorial_session') {
     return 'Tutoria'
+  }
+
+  if (slot.source === 'class') {
+    return slot.status ? `Clase: ${slot.status}` : 'Clase'
   }
 
   if (isPastSlotForDate(slot, dateValue, referenceNow) || (slot.state === 'blocked' && slot.status === 'past')) {
@@ -881,6 +889,9 @@ function TutorTutorialSessionsPage() {
                   <span className="tutorial-slot-legend-item busy">
                     <span className="tutorial-slot-legend-dot" /> Ocupado
                   </span>
+                  <span className="tutorial-slot-legend-item class">
+                    <span className="tutorial-slot-legend-dot" /> Clase
+                  </span>
                   <span className="tutorial-slot-legend-item maintenance">
                     <span className="tutorial-slot-legend-dot" /> Mantenimiento
                   </span>
@@ -911,6 +922,7 @@ function TutorTutorialSessionsPage() {
                         type="button"
                         className={`tutorial-slot ${getSlotTone(slot, form.session_date, nowReference)}${isSelected ? ' is-selected' : ''}`}
                         disabled={!isAvailable && !isTutorial}
+                        title={slot.source === 'class' && slot.status ? `Clase: ${slot.status}` : undefined}
                         onClick={() => {
                           if (isTutorial && !isCurrentTutorial) {
                             handleOpenTutorialDetails(slot.source_id)

@@ -1,0 +1,316 @@
+.schedules-body {
+  gap: 20px;
+}
+
+.schedules-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 16px;
+}
+
+.schedules-lab-picker {
+  display: grid;
+  gap: 6px;
+  min-width: 240px;
+}
+
+.schedules-lab-picker span {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #1f2937;
+}
+
+.schedules-lab-picker select {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font-size: 0.95rem;
+}
+
+.schedules-lab-meta {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.9rem;
+}
+
+.schedules-empty {
+  margin: 0;
+  padding: 30px 16px;
+  text-align: center;
+  color: #6b7280;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 1px dashed #d1d5db;
+}
+
+.schedules-grid-wrapper {
+  overflow-x: auto;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.schedules-grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 760px;
+}
+
+.schedules-grid thead th {
+  background: #0f3260;
+  color: #fff;
+  text-align: center;
+  padding: 12px 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.schedules-grid-day-short {
+  display: none;
+}
+
+.schedules-grid-day-label {
+  display: inline;
+}
+
+.schedules-grid-time {
+  background: #f3f4f6;
+  text-align: center;
+  font-weight: 600;
+  color: #1f2937;
+  padding: 6px 8px;
+  border-bottom: 1px solid #e5e7eb;
+  border-right: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.schedules-grid-time small {
+  display: block;
+  font-weight: 500;
+  font-size: 0.72rem;
+  color: #6b7280;
+}
+
+.schedules-cell {
+  padding: 0;
+  border-bottom: 1px solid #f1f5f9;
+  border-right: 1px solid #f1f5f9;
+  vertical-align: stretch;
+  height: 56px;
+}
+
+.schedules-cell-btn {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 6px 8px;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+}
+
+.schedules-cell-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.schedules-cell--free .schedules-cell-btn {
+  color: #9ca3af;
+  transition: background 0.15s;
+}
+
+.schedules-cell--free .schedules-cell-btn:hover:not(:disabled) {
+  background: #eef2ff;
+  color: #1e40af;
+}
+
+.schedules-cell-add {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.schedules-cell--class {
+  background: #ede9fe;
+  color: #4c1d95;
+}
+
+.schedules-cell--class .schedules-cell-btn:hover:not(:disabled) {
+  background: #ddd6fe;
+}
+
+.schedules-cell--head strong {
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.15;
+  display: block;
+  word-break: break-word;
+}
+
+.schedules-cell--head small {
+  font-size: 0.7rem;
+  color: #5b21b6;
+}
+
+.schedules-cell--continuation {
+  background: #f5f3ff;
+}
+
+.schedules-cell-cont-dot {
+  color: transparent;
+}
+
+.schedules-hint {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.85rem;
+}
+
+/* ── Modal ──────────────────────────────────────────────── */
+.schedules-modal {
+  background: #fff;
+  border-radius: 16px;
+  width: min(520px, 92vw);
+  padding: 22px;
+  display: grid;
+  gap: 16px;
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.32);
+}
+
+.schedules-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.schedules-modal-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #0f172a;
+}
+
+.schedules-modal-close {
+  background: transparent;
+  border: 0;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: #475569;
+}
+
+.schedules-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.schedules-modal-grid label,
+.schedules-modal-field {
+  display: grid;
+  gap: 6px;
+}
+
+.schedules-modal-grid span,
+.schedules-modal-field span {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.schedules-modal-grid select,
+.schedules-modal-field input,
+.schedules-modal-field textarea {
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font-size: 0.92rem;
+  font: inherit;
+}
+
+.schedules-modal-field textarea {
+  resize: vertical;
+  min-height: 70px;
+}
+
+.schedules-modal-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.schedules-modal-primary-actions {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.schedules-modal-secondary,
+.schedules-modal-primary,
+.schedules-modal-danger {
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border: 0;
+}
+
+.schedules-modal-secondary {
+  background: #e2e8f0;
+  color: #1f2937;
+}
+
+.schedules-modal-primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.schedules-modal-primary:hover {
+  background: #1d4ed8;
+}
+
+.schedules-modal-danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.schedules-modal-danger:hover {
+  background: #fecaca;
+}
+
+@media (max-width: 720px) {
+  .schedules-modal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .schedules-grid-day-short {
+    display: inline;
+  }
+
+  .schedules-grid-day-label {
+    display: none;
+  }
+
+  .schedules-cell {
+    height: 48px;
+  }
+
+  .schedules-cell--head strong {
+    font-size: 0.75rem;
+  }
+}

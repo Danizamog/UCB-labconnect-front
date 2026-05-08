@@ -278,6 +278,12 @@
   color: #0a3559;
 }
 
+.tutorial-slot.class {
+  border-left-color: #c026d3;
+  background: rgba(192, 38, 211, 0.12);
+  color: #86198f;
+}
+
 .tutorial-slot.blocked-other {
   border-left-color: #7c3aed;
   background: rgba(124, 58, 237, 0.06);
@@ -302,6 +308,14 @@
 
 .tutorial-slot-legend-item.tutorial .tutorial-slot-legend-dot {
   background: #0a3559;
+}
+
+.tutorial-slot-legend-item.class {
+  color: #86198f;
+}
+
+.tutorial-slot-legend-item.class .tutorial-slot-legend-dot {
+  background: #c026d3;
 }
 
 .tutorials-inline-meta,

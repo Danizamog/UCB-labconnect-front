@@ -331,6 +331,12 @@
   color: #0a3559;
 }
 
+.reservations-slot.class {
+  border-left-color: #c026d3;
+  background: rgba(192, 38, 211, 0.12);
+  color: #86198f;
+}
+
 .reservations-slot.blocked-other {
   border-left-color: #7c3aed;
   background: rgba(124, 58, 237, 0.06);
@@ -404,6 +410,10 @@
   color: #0a3559;
 }
 
+.reservation-slot-legend-item.class {
+  color: #86198f;
+}
+
 .reservation-slot-legend-item.past {
   color: #334155;
 }
@@ -425,6 +435,10 @@
 
 .reservation-slot-legend-item.tutorial .reservation-slot-legend-dot {
   background: #0a3559;
+}
+
+.reservation-slot-legend-item.class .reservation-slot-legend-dot {
+  background: #c026d3;
 }
 
 .reservation-slot-legend-item.past .reservation-slot-legend-dot {

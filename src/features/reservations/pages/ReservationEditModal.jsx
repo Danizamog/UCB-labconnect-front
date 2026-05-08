@@ -120,6 +120,9 @@ function ReservationEditModal({
                   <span className="cal-legend-item cal-legend--busy">
                     <span className="cal-legend-dot" /> Ocupado
                   </span>
+                  <span className="reservation-slot-legend-item class">
+                    <span className="reservation-slot-legend-dot" /> Clase
+                  </span>
                   <span className="reservation-slot-legend-item maintenance">
                     <span className="reservation-slot-legend-dot" /> Mantenimiento
                   </span>
@@ -183,7 +186,7 @@ function ReservationEditModal({
 
           {slotPickerEnabled ? (
             <p className="reservation-inline-hint">
-              El sistema valida bloques exactos del laboratorio. Horas parciales como 14:45 - 15:00 no son aceptables.
+              Solo se aceptan los bloques academicos del laboratorio. Los bloques con clase, mantenimiento u otra reserva quedan deshabilitados.
             </p>
           ) : null}
 
