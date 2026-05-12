@@ -10,6 +10,7 @@ import {
   listMyTutorialSessions,
   subscribeTutorialSessionsRealtime,
   updateTutorialSession,
+  updateTutorialSessionObservation,
 } from '../services/tutorialSessionsService'
 import TutorialSessionDetailModal from './TutorialSessionDetailModal'
 import './TutorialPages.css'
@@ -236,6 +237,8 @@ function TutorTutorialSessionsPage() {
   const [clockTick, setClockTick] = useState(Date.now())
   const [focusedSession, setFocusedSession] = useState(null)
   const [isLoadingFocusedSession, setIsLoadingFocusedSession] = useState(false)
+  const [observationDraft, setObservationDraft] = useState('')
+  const [isSavingObservation, setIsSavingObservation] = useState(false)
   const todayIso = todayLocalDateString()
   const maxReservationIso = maxReservableDateString()
   const nowReference = useMemo(() => new Date(clockTick), [clockTick])
@@ -319,10 +322,13 @@ function TutorTutorialSessionsPage() {
     }
   }, [])
 
-  const visibleSessions = useMemo(
-    () => sessions.filter((session) => !getSessionTimeState(session, nowReference).hasEnded),
-    [nowReference, sessions],
-  )
+  const visibleSessions = useMemo(() => {
+    return [...sessions].sort((left, right) => {
+      const leftEnd = parseSessionDate(left?.end_at)?.getTime() || 0
+      const rightEnd = parseSessionDate(right?.end_at)?.getTime() || 0
+      return rightEnd - leftEnd
+    })
+  }, [sessions])
 
   const totalSeats = useMemo(
     () => visibleSessions.reduce((sum, session) => sum + session.max_students, 0),
@@ -554,6 +560,30 @@ function TutorTutorialSessionsPage() {
       setError(err.message || 'No se pudo cargar el detalle de la tutoria.')
     } finally {
       setIsLoadingFocusedSession(false)
+    }
+  }
+
+  useEffect(() => {
+    setObservationDraft(String(focusedSession?.tutor_observation || ''))
+  }, [focusedSession])
+
+  const handleSaveObservation = async () => {
+    if (!focusedSession?.id) {
+      return
+    }
+
+    setError('')
+    setMessage('')
+    setIsSavingObservation(true)
+    try {
+      const updated = await updateTutorialSessionObservation(focusedSession.id, observationDraft)
+      setFocusedSession(updated)
+      setSessions((previous) => previous.map((session) => (session.id === updated.id ? updated : session)))
+      setMessage('Observacion de la tutoria guardada correctamente.')
+    } catch (err) {
+      setError(err.message || 'No se pudo guardar la observacion de la tutoria.')
+    } finally {
+      setIsSavingObservation(false)
     }
   }
 
@@ -978,21 +1008,21 @@ function TutorTutorialSessionsPage() {
         <div className="tutorials-panel-header">
           <h3>Mis tutorias publicadas</h3>
           <p className="tutorials-panel-subtitle">
-            Si eliminas una sesion con inscritos, el sistema cancela las inscripciones y notifica a los estudiantes afectados.
+            Consulta sesiones vigentes y finalizadas. Desde el detalle puedes registrar observaciones breves para el seguimiento academico.
           </p>
         </div>
 
         {visibleSessions.length === 0 ? (
-          <p className="tutorials-empty">Todavia no publicaste tutorias activas.</p>
+          <p className="tutorials-empty">Todavia no publicaste tutorias.</p>
         ) : (
           <div className="tutorials-grid">
             {visibleSessions.map((session) => {
-              const { hasStarted } = getSessionTimeState(session, nowReference)
+              const { hasStarted, hasEnded } = getSessionTimeState(session, nowReference)
               return (
               <article key={session.id} className="tutorial-card tutor-card">
                 <div className="tutorial-card-head">
                   <div>
-                    <span className="tutorial-badge">Publicada</span>
+                    <span className="tutorial-badge">{hasEnded ? 'Finalizada' : 'Publicada'}</span>
                     <h4>{session.topic}</h4>
                   </div>
                   <strong className="tutorial-seats">{session.enrolled_count}/{session.max_students}</strong>
@@ -1014,6 +1044,13 @@ function TutorTutorialSessionsPage() {
                       : 'Aun no hay estudiantes registrados.'}
                   </p>
                 </div>
+
+                {session.tutor_observation ? (
+                  <div className="tutorial-card-observation">
+                    <strong>Observacion guardada</strong>
+                    <p>{session.tutor_observation}</p>
+                  </div>
+                ) : null}
 
                 <div className="tutorials-actions">
                   <button
@@ -1053,6 +1090,11 @@ function TutorTutorialSessionsPage() {
           session={focusedSession}
           title="Bloque de tutoria"
           showEnrollmentDetails
+          observationDraft={observationDraft}
+          onObservationDraftChange={setObservationDraft}
+          onSaveObservation={handleSaveObservation}
+          isSavingObservation={isSavingObservation}
+          observationHint="Usa este campo para resumir avances, dudas recurrentes o acuerdos de seguimiento de la sesion."
           enrollmentDownloadActions={{
             onDownloadPdf: () => handleDownloadEnrolledPdf(focusedSession),
             onDownloadCsv: () => handleDownloadEnrolledCsv(focusedSession),

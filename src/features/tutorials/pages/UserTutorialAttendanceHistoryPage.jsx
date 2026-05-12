@@ -238,6 +238,13 @@ function UserTutorialAttendanceHistoryPage({ user }) {
                   <span><strong>Horario:</strong> {session.start_time} - {session.end_time}</span>
                   <span><strong>Lugar:</strong> {session.location || session.laboratory_id || 'Sin ubicacion'}</span>
                 </div>
+
+                {session.tutor_observation ? (
+                  <div className="tutorial-history-observation">
+                    <strong>Observacion del tutor</strong>
+                    <p>{session.tutor_observation}</p>
+                  </div>
+                ) : null}
               </article>
             ))}
           </div>

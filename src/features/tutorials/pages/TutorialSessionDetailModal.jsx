@@ -8,6 +8,11 @@ function TutorialSessionDetailModal({
   primaryActionHint = '',
   showEnrollmentDetails = false,
   enrollmentDownloadActions = null,
+  observationDraft = '',
+  onObservationDraftChange = null,
+  onSaveObservation = null,
+  isSavingObservation = false,
+  observationHint = '',
 }) {
   if (!session) {
     return null
@@ -56,6 +61,41 @@ function TutorialSessionDetailModal({
               <span className="tutorial-detail-badge">{session.location || 'Laboratorio por definir'}</span>
               <span className="tutorial-detail-badge subtle">{session.start_time} - {session.end_time}</span>
             </div>
+            {typeof onObservationDraftChange === 'function' ? (
+              <div className="tutorial-detail-observation">
+                <div className="tutorial-detail-observation-head">
+                  <strong>Observacion del tutor</strong>
+                  <span>Breve registro de avance o dificultades vistas en la sesion.</span>
+                </div>
+                <textarea
+                  rows="4"
+                  maxLength={1000}
+                  value={observationDraft}
+                  onChange={(event) => onObservationDraftChange(event.target.value)}
+                  placeholder="Ej. El estudiante comprendio los ejercicios base, pero aun necesita refuerzo en recursion."
+                />
+                <div className="tutorial-detail-observation-actions">
+                  {observationHint ? <p className="tutorial-detail-hint">{observationHint}</p> : null}
+                  {typeof onSaveObservation === 'function' ? (
+                    <button
+                      type="button"
+                      className="tutorials-primary tutorial-detail-primary"
+                      disabled={isSavingObservation}
+                      onClick={onSaveObservation}
+                    >
+                      {isSavingObservation ? 'Guardando observacion...' : 'Guardar observacion'}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ) : session.tutor_observation ? (
+              <div className="tutorial-detail-observation is-readonly">
+                <div className="tutorial-detail-observation-head">
+                  <strong>Observacion del tutor</strong>
+                </div>
+                <p>{session.tutor_observation}</p>
+              </div>
+            ) : null}
           </div>
           <button type="button" className="tutorial-detail-close" onClick={onClose} aria-label="Cerrar detalle">
             x

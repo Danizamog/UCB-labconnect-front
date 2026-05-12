@@ -318,6 +318,59 @@
   background: #c026d3;
 }
 
+.tutorial-detail-observation {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(10, 53, 89, 0.1);
+  background: rgba(6, 77, 144, 0.04);
+}
+
+.tutorial-detail-observation.is-readonly {
+  background: rgba(244, 197, 66, 0.1);
+}
+
+.tutorial-detail-observation-head {
+  display: grid;
+  gap: 4px;
+}
+
+.tutorial-detail-observation-head strong {
+  color: var(--ink-900);
+}
+
+.tutorial-detail-observation-head span {
+  color: var(--ink-700);
+  font-size: 0.84rem;
+}
+
+.tutorial-detail-observation textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 96px;
+  border: 1.5px solid rgba(10, 53, 89, 0.14);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--ink-900);
+  background: #fff;
+}
+
+.tutorial-detail-observation textarea:focus {
+  outline: none;
+  border-color: rgba(6, 77, 144, 0.45);
+  box-shadow: 0 0 0 3px rgba(6, 77, 144, 0.08);
+}
+
+.tutorial-detail-observation-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .tutorials-inline-meta,
 .tutorials-inline-hint {
   margin: 0;
@@ -420,6 +473,27 @@
   grid-template-columns: minmax(0, 1.7fr) minmax(200px, 0.9fr);
   gap: 16px;
   align-items: start;
+
+.tutorial-card-observation {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.9rem;
+  background: rgba(238, 244, 251, 0.95);
+  border: 1px solid rgba(169, 187, 214, 0.55);
+}
+
+.tutorial-card-observation strong {
+  color: #17325c;
+  font-size: 0.88rem;
+}
+
+.tutorial-card-observation p {
+  margin: 0;
+  color: #40536f;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
 }
 
 .tutorial-detail-hero-copy {
