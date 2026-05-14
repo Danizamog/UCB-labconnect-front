@@ -862,6 +862,63 @@
   font-weight: 700;
 }
 
+/* Peak Hours Chart Styles */
+.analytics-peak-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 240px; /* Altura fija */
+  padding: 30px 10px 10px;
+  background: rgba(246, 249, 253, 0.6);
+  border-radius: 22px;
+  border: 1px solid rgba(10, 53, 89, 0.06);
+  overflow-x: auto;
+}
+
+.analytics-peak-bar-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end; /* Alinea hacia abajo */
+  gap: 12px;
+  min-width: 40px;
+  height: 100%; /* Toma la altura del contenedor */
+}
+
+.analytics-peak-bar {
+  width: 100%;
+  max-width: 32px;
+  min-height: 4px;
+  background: linear-gradient(180deg, #f4c542 0%, #d97706 100%);
+  border-radius: 8px 8px 4px 4px;
+  position: relative;
+  transition: transform 0.2s ease;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+}
+
+.analytics-peak-bar:hover {
+  transform: scaleX(1.1);
+  filter: brightness(1.1);
+}
+
+.analytics-peak-count {
+  position: absolute;
+  top: -24px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--ink-900);
+}
+
+.analytics-peak-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--ink-700);
+  white-space: nowrap;
+}
+
 @keyframes analytics-spin {
   to {
     transform: rotate(360deg);

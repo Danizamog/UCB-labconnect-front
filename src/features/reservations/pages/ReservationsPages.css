@@ -1841,6 +1841,71 @@
   border-left: 4px solid #dc2626;
 }
 
+/* Lab Search & Sort Styles */
+.reservations-lab-finder {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.reservations-lab-finder .reservations-search-field {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1.5px solid var(--line-300);
+  background: #fafbfc;
+  min-height: 48px;
+}
+
+.reservations-lab-finder .reservations-search-field input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: var(--ink-900);
+  padding: 0;
+  outline: none;
+}
+
+.reservations-sort-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.reservations-sort-group span {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink-700);
+}
+
+.reservations-sort-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-300);
+  background: #fff;
+  color: var(--ink-700);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.reservations-sort-chip:hover {
+  background: var(--surface-200);
+}
+
+.reservations-sort-chip.is-active {
+  border-color: rgba(6, 77, 144, 0.3);
+  background: rgba(6, 77, 144, 0.1);
+  color: var(--ucb-blue);
+}
+
 @media (max-width: 720px) {
   .reservations-workspace-nav,
   .reservations-task-grid,

@@ -1151,3 +1151,129 @@
   transform: translateY(-2px);
   box-shadow: 0 18px 30px rgba(13, 34, 61, 0.12);
 }
+
+/* Tutorial Toolbar & Filters */
+.tutorials-toolbar {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.tutorials-search-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.tutorials-search-field {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  border-radius: 16px;
+  border: 1px solid rgba(10, 53, 89, 0.12);
+  background: rgba(248, 251, 255, 0.9);
+  overflow: hidden;
+}
+
+.tutorials-search-icon {
+  width: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #0a3559;
+}
+
+.tutorials-search-field input {
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink-900);
+  font: inherit;
+  padding: 0 16px 0 0;
+}
+
+.tutorials-reset-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  min-height: 52px;
+  border-radius: 16px;
+  background: rgba(185, 28, 28, 0.08);
+  color: #991b1b;
+  border: 1px solid rgba(185, 28, 28, 0.14);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.tutorials-reset-button:hover {
+  background: rgba(185, 28, 28, 0.12);
+}
+
+.tutorials-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.tutorials-filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.tutorials-filter-item {
+  display: grid;
+  gap: 6px;
+}
+
+.tutorials-filter-item label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink-700);
+}
+
+.tutorials-filter-item input,
+.tutorials-filter-item select {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(10, 53, 89, 0.12);
+  background: #fff;
+  font: inherit;
+  color: var(--ink-900);
+  min-width: 180px;
+}
+
+.tutorials-status-filters {
+  display: flex;
+  gap: 8px;
+  padding: 4px;
+  background: rgba(10, 53, 89, 0.05);
+  border-radius: 14px;
+}
+
+.tutorials-status-chip {
+  padding: 8px 16px;
+  border-radius: 11px;
+  border: none;
+  background: transparent;
+  color: var(--ink-700);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.tutorials-status-chip.is-active {
+  background: #fff;
+  color: #0a3559;
+  box-shadow: 0 4px 12px rgba(10, 53, 89, 0.08);
+}

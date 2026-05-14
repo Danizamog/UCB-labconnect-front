@@ -6,7 +6,9 @@ import {
   listPublicTutorialSessions,
   subscribeTutorialSessionsRealtime,
 } from '../services/tutorialSessionsService'
+import { getLaboratories } from '../../admin/services/infrastructureService'
 import { FOCUSED_TUTORIAL_KEY, OPEN_TUTORIAL_EVENT } from '../utils/focusTutorialNavigation'
+import { Search, SlidersHorizontal, X } from 'lucide-react'
 import './TutorialPages.css'
 
 const CLOCK_REFRESH_MS = 30 * 1000
@@ -40,6 +42,13 @@ function getEnrollmentState(session, userId, referenceNow = new Date()) {
 function StudentTutorialSessionsPage({ user }) {
   const [sessions, setSessions] = useState([])
   const [mySessions, setMySessions] = useState([])
+  const [laboratories, setLaboratories] = useState([])
+  const [filters, setFilters] = useState({
+    topic_search: '',
+    session_date: '',
+    laboratory_id: '',
+    status: 'all', // 'all', 'active', 'finished'
+  })
   const [focusedSessionId, setFocusedSessionId] = useState('')
   const [enrollingId, setEnrollingId] = useState('')
   const [cancellingId, setCancellingId] = useState('')
@@ -47,13 +56,26 @@ function StudentTutorialSessionsPage({ user }) {
   const [message, setMessage] = useState('')
   const [clockTick, setClockTick] = useState(() => Date.now())
 
-  const loadPublicSessions = useCallback(async () => {
+  const loadPublicSessions = useCallback(async (currentFilters = filters) => {
     try {
-      const publicSessions = await listPublicTutorialSessions()
+      const publicSessions = await listPublicTutorialSessions({
+        topic_search: currentFilters.topic_search,
+        session_date: currentFilters.session_date,
+        laboratory_id: currentFilters.laboratory_id,
+      })
       setSessions(publicSessions)
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudo cargar la cartelera de tutorias.')
+    }
+  }, [filters])
+
+  const loadLaboratories = useCallback(async () => {
+    try {
+      const labs = await getLaboratories()
+      setLaboratories(labs.filter((l) => l.is_active !== false))
+    } catch {
+      // ignore
     }
   }, [])
 
@@ -67,8 +89,8 @@ function StudentTutorialSessionsPage({ user }) {
   }, [])
 
   const loadSessions = useCallback(async () => {
-    await Promise.all([loadPublicSessions(), loadMyEnrollments()])
-  }, [loadMyEnrollments, loadPublicSessions])
+    await Promise.all([loadPublicSessions(), loadMyEnrollments(), loadLaboratories()])
+  }, [loadMyEnrollments, loadPublicSessions, loadLaboratories])
 
   const publicReloadTimerRef = useRef(null)
   const myReloadTimerRef = useRef(null)
@@ -160,17 +182,51 @@ function StudentTutorialSessionsPage({ user }) {
     [allKnownSessions, focusedSessionId],
   )
 
-  const availableSessions = useMemo(
-    () => sessions.filter((session) => session.is_published),
-    [sessions],
-  )
-
   const nowReference = useMemo(() => new Date(clockTick), [clockTick])
+
+  const filteredSessions = useMemo(() => {
+    let result = [...sessions]
+
+    if (filters.status === 'active') {
+      result = result.filter((s) => {
+        const endAt = parseSessionDate(s.end_at)
+        return endAt && endAt.getTime() > nowReference.getTime()
+      })
+    } else if (filters.status === 'finished') {
+      result = result.filter((s) => {
+        const endAt = parseSessionDate(s.end_at)
+        return endAt && endAt.getTime() <= nowReference.getTime()
+      })
+    }
+
+    return result.sort((a, b) => {
+      const dateA = parseSessionDate(a.start_at)
+      const dateB = parseSessionDate(b.start_at)
+      return (dateA?.getTime() || 0) - (dateB?.getTime() || 0)
+    })
+  }, [sessions, filters.status, nowReference])
+
+  const availableSessions = useMemo(
+    () => filteredSessions.filter((session) => session.is_published),
+    [filteredSessions],
+  )
 
   const focusedState = useMemo(
     () => (focusedSession ? getEnrollmentState(focusedSession, user?.user_id, nowReference) : null),
     [focusedSession, nowReference, user?.user_id],
   )
+
+  const handleFilterChange = (key, value) => {
+    const nextFilters = { ...filters, [key]: value }
+    setFilters(nextFilters)
+    loadPublicSessions(nextFilters)
+  }
+
+  const handleResetFilters = () => {
+    const reset = { topic_search: '', session_date: '', laboratory_id: '', status: 'all' }
+    setFilters(reset)
+    loadPublicSessions(reset)
+  }
 
   const handleEnroll = async (session) => {
     setEnrollingId(session.id)
@@ -382,6 +438,79 @@ function StudentTutorialSessionsPage({ user }) {
           <p className="tutorials-panel-subtitle">
             Explora todas las tutorias publicadas y reserva tu cupo solo en sesiones futuras con capacidad disponible.
           </p>
+        </div>
+
+        <div className="tutorials-toolbar">
+          <div className="tutorials-search-row">
+            <label className="tutorials-search-field">
+              <span className="tutorials-search-icon">
+                <Search size={16} />
+              </span>
+              <input
+                type="search"
+                value={filters.topic_search}
+                onChange={(event) => handleFilterChange('topic_search', event.target.value)}
+                placeholder="Buscar por tema o descripción..."
+                aria-label="Buscar tutoria por tema"
+              />
+            </label>
+            <button type="button" className="tutorials-reset-button" onClick={handleResetFilters} title="Limpiar filtros">
+              <X size={16} />
+              <span>Limpiar</span>
+            </button>
+          </div>
+
+          <div className="tutorials-filters-row">
+            <div className="tutorials-filter-group">
+              <div className="tutorials-filter-item">
+                <label htmlFor="filter-date">Fecha</label>
+                <input
+                  id="filter-date"
+                  type="date"
+                  value={filters.session_date}
+                  onChange={(event) => handleFilterChange('session_date', event.target.value)}
+                />
+              </div>
+
+              <div className="tutorials-filter-item">
+                <label htmlFor="filter-lab">Laboratorio</label>
+                <select
+                  id="filter-lab"
+                  value={filters.laboratory_id}
+                  onChange={(event) => handleFilterChange('laboratory_id', event.target.value)}
+                >
+                  <option value="">Todos los laboratorios</option>
+                  {laboratories.map((lab) => (
+                    <option key={lab.id} value={lab.id}>{lab.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="tutorials-status-filters">
+              <button
+                type="button"
+                className={`tutorials-status-chip ${filters.status === 'all' ? 'is-active' : ''}`}
+                onClick={() => handleFilterChange('status', 'all')}
+              >
+                Todas
+              </button>
+              <button
+                type="button"
+                className={`tutorials-status-chip ${filters.status === 'active' ? 'is-active' : ''}`}
+                onClick={() => handleFilterChange('status', 'active')}
+              >
+                Activas
+              </button>
+              <button
+                type="button"
+                className={`tutorials-status-chip ${filters.status === 'finished' ? 'is-active' : ''}`}
+                onClick={() => handleFilterChange('status', 'finished')}
+              >
+                Finalizadas
+              </button>
+            </div>
+          </div>
         </div>
 
         {availableSessions.length === 0 ? (

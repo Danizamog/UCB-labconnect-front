@@ -134,8 +134,15 @@ function mapTutorialSession(record) {
   }
 }
 
-export async function listPublicTutorialSessions() {
-  const data = await request(`${tutorialsBase}/tutorial-sessions`, { cacheTtlMs: 5000 })
+export async function listPublicTutorialSessions(filters = {}) {
+  const params = new URLSearchParams()
+  if (filters.topic_search) params.append('topic_search', filters.topic_search)
+  if (filters.session_date) params.append('session_date', filters.session_date)
+  if (filters.laboratory_id) params.append('laboratory_id', filters.laboratory_id)
+
+  const query = params.toString()
+  const url = `${tutorialsBase}/tutorial-sessions${query ? `?${query}` : ''}`
+  const data = await request(url, { cacheTtlMs: 5000 })
   return Array.isArray(data) ? data.map(mapTutorialSession) : []
 }
 

@@ -261,6 +261,8 @@ function isCreatableSlot(slot) {
 
 function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead }) {
   const [labs, setLabs] = useState([])
+  const [labSearch, setLabSearch] = useState('')
+  const [labSort, setLabSort] = useState('name') // 'name', 'capacity'
   const [reservations, setReservations] = useState([])
   const [penalties, setPenalties] = useState([])
   const [slots, setSlots] = useState([])
@@ -488,6 +490,18 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     () => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])),
     [labs],
   )
+
+  const filteredLabs = useMemo(() => {
+    let result = labs.filter((lab) => lab.name.toLowerCase().includes(labSearch.toLowerCase()))
+
+    if (labSort === 'capacity') {
+      result = [...result].sort((a, b) => (b.capacity || 0) - (a.capacity || 0))
+    } else {
+      result = [...result].sort((a, b) => a.name.localeCompare(b.name))
+    }
+
+    return result
+  }, [labs, labSearch, labSort])
 
   const selectedSlot = useMemo(
     () => slots.find((slot) => getSlotKey(slot) === selectedSlotKey) || null,
@@ -1243,6 +1257,34 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
         <form className="reservations-form" onSubmit={handleSubmit}>
           <div className="reservations-form-section">
             <span className="reservations-form-section-label">1 - Laboratorio</span>
+            <div className="reservations-lab-finder">
+              <label className="reservations-search-field">
+                <Search size={16} />
+                <input
+                  type="search"
+                  placeholder="Buscar laboratorio por nombre..."
+                  value={labSearch}
+                  onChange={(e) => setLabSearch(e.target.value)}
+                />
+              </label>
+              <div className="reservations-sort-group">
+                <span>Ordenar por:</span>
+                <button
+                  type="button"
+                  className={`reservations-sort-chip ${labSort === 'name' ? 'is-active' : ''}`}
+                  onClick={() => setLabSort('name')}
+                >
+                  Nombre
+                </button>
+                <button
+                  type="button"
+                  className={`reservations-sort-chip ${labSort === 'capacity' ? 'is-active' : ''}`}
+                  onClick={() => setLabSort('capacity')}
+                >
+                  Capacidad
+                </button>
+              </div>
+            </div>
             <label>
               <span>Laboratorio</span>
               <select
@@ -1257,8 +1299,10 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                 required
               >
                 <option value="">Selecciona un laboratorio</option>
-                {labs.map((lab) => (
-                  <option key={lab.id} value={lab.id}>{lab.name}</option>
+                {filteredLabs.map((lab) => (
+                  <option key={lab.id} value={lab.id}>
+                    {lab.name} {lab.capacity ? `(${lab.capacity} personas)` : ''}
+                  </option>
                 ))}
               </select>
             </label>
