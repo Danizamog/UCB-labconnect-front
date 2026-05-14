@@ -218,25 +218,13 @@ export async function listUsersWithRoles({ token } = {}) {
 }
 
 export async function assignUserRole(userId, roleId, { token } = {}) {
-  let record
-
-  try {
-    record = await apiRequest(`${USERS_ENDPOINT}/${userId}/role`, {
-      method: 'PATCH',
-      token,
-      body: {
-        roleId,
-      },
-    })
-  } catch {
-    record = await apiRequest(`${USERS_ENDPOINT}/${userId}`, {
-      method: 'PATCH',
-      token,
-      body: {
-        roleId,
-      },
-    })
-  }
+  const record = await apiRequest(`/users/${userId}`, {
+    method: 'PUT',
+    token,
+    body: {
+      role: roleId,
+    },
+  })
   clearRolesCache()
 
   return mapUserRecord(record)
