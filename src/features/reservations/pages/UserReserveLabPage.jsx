@@ -504,6 +504,14 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     return result
   }, [labs, labSearch, labSort])
 
+  const labOptions = useMemo(() => {
+    const selected = labs.find(l => String(l.id) === String(form.laboratory_id));
+    if (selected && !filteredLabs.some(l => String(l.id) === String(selected.id))) {
+      return [selected, ...filteredLabs];
+    }
+    return filteredLabs;
+  }, [filteredLabs, form.laboratory_id, labs]);
+
   const selectedSlot = useMemo(
     () => slots.find((slot) => getSlotKey(slot) === selectedSlotKey) || null,
     [selectedSlotKey, slots],
@@ -1300,18 +1308,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                 required
               >
                 <option value="">Selecciona un laboratorio</option>
-                {useMemo(() => {
-                  const filtered = filteredLabs
-                  const isSelectedFilteredOut = form.laboratory_id && !filtered.some(l => l.id === form.laboratory_id)
-                  
-                  if (isSelectedFilteredOut) {
-                    const selectedLab = labs.find(l => l.id === form.laboratory_id)
-                    if (selectedLab) {
-                      return [selectedLab, ...filtered]
-                    }
-                  }
-                  return filtered
-                }, [filteredLabs, form.laboratory_id, labs]).map((lab) => (
+                {labOptions.map((lab) => (
                   <option key={lab.id} value={lab.id}>
                     {lab.name} {lab.capacity ? `(${lab.capacity} personas)` : ''}
                   </option>
