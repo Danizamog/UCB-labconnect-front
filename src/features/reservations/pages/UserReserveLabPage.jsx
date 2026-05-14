@@ -1300,7 +1300,18 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                 required
               >
                 <option value="">Selecciona un laboratorio</option>
-                {filteredLabs.map((lab) => (
+                {useMemo(() => {
+                  const filtered = filteredLabs
+                  const isSelectedFilteredOut = form.laboratory_id && !filtered.some(l => l.id === form.laboratory_id)
+                  
+                  if (isSelectedFilteredOut) {
+                    const selectedLab = labs.find(l => l.id === form.laboratory_id)
+                    if (selectedLab) {
+                      return [selectedLab, ...filtered]
+                    }
+                  }
+                  return filtered
+                }, [filteredLabs, form.laboratory_id, labs]).map((lab) => (
                   <option key={lab.id} value={lab.id}>
                     {lab.name} {lab.capacity ? `(${lab.capacity} personas)` : ''}
                   </option>
