@@ -1843,13 +1843,15 @@
 
 /* Lab Search & Sort Styles */
 .reservations-lab-finder {
-  display: grid;
-  gap: 12px;
-  margin-bottom: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
 .reservations-lab-finder .reservations-search-field {
-  flex: 1;
+  flex: 2;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1858,6 +1860,7 @@
   border: 1.5px solid var(--line-300);
   background: #fafbfc;
   min-height: 48px;
+  min-width: 300px;
 }
 
 .reservations-lab-finder .reservations-search-field input {
@@ -1875,6 +1878,8 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  flex: 1;
+  justify-content: flex-end;
 }
 
 .reservations-sort-group span {

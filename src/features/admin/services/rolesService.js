@@ -229,24 +229,18 @@ export async function listUsersWithRoles({ token } = {}) {
 }
 
 export async function assignUserRole(userId, roleId, { token } = {}) {
-  const roles = await listRoles({ token })
-  const selectedRole = roles.find((r) => r.id === roleId)
-  const roleName = selectedRole ? selectedRole.nombre : roleId
-  
-  const payload = { role: roleName }
-  console.log('[DEBUG] assignUserRole - userId:', userId, 'payload:', payload)
-  
-  const [record, updatedRoles] = await Promise.all([
+  const [record, roles] = await Promise.all([
     apiRequest(`/roles/users/${userId}`, {
       method: 'PATCH',
       token,
-      body: payload,
+      body: {
+        roleId: roleId,
+      },
     }),
     listRoles({ token }),
   ])
   
-  console.log('[DEBUG] assignUserRole - API response:', record)
   clearRolesCache()
 
-  return mapUserRecord(record, updatedRoles)
+  return mapUserRecord(record, roles)
 }
