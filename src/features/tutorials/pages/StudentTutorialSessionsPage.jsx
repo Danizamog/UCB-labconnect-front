@@ -6,7 +6,7 @@ import {
   listPublicTutorialSessions,
   subscribeTutorialSessionsRealtime,
 } from '../services/tutorialSessionsService'
-import { getLaboratories } from '../../admin/services/infrastructureService'
+import { listAdminLabs as getLaboratories } from '../../admin/services/infrastructureService'
 import { FOCUSED_TUTORIAL_KEY, OPEN_TUTORIAL_EVENT } from '../utils/focusTutorialNavigation'
 import { Search, SlidersHorizontal, X } from 'lucide-react'
 import './TutorialPages.css'
