@@ -456,16 +456,13 @@ function AdminLabAnalyticsPage() {
   }, [rankedLabs])
 
   const peakHoursData = useMemo(() => {
-    console.log('[DEBUG] Analytics state:', analytics)
     const data = Array.isArray(analytics?.hourly_usage) ? analytics.hourly_usage : []
-    console.log('[DEBUG] Hourly usage data:', data)
     const maxCount = Math.max(...data.map((h) => h.count), 1)
     const processed = data.map((h) => ({
       ...h,
       percentage: (h.count / maxCount) * 100,
       label: `${String(h.hour).padStart(2, '0')}:00`,
     }))
-    console.log('[DEBUG] Processed peakHoursData:', processed)
     return processed
   }, [analytics])
 
