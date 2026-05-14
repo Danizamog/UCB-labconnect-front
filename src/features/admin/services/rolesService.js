@@ -1,8 +1,9 @@
 import { getAuthToken } from '../../../shared/utils/storage'
 
 const API_BASE_URL = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
-const ROLES_ENDPOINT = import.meta.env.VITE_ROLES_ENDPOINT || '/roles'
-const USERS_ENDPOINT = import.meta.env.VITE_ROLE_USERS_ENDPOINT || '/roles/users'
+const ROLE_SERVICE_URL = (import.meta.env.VITE_ROLE_SERVICE_URL || 'http://localhost:8004/v1/roles').replace(/\/$/, '')
+const ROLES_ENDPOINT = ROLE_SERVICE_URL
+const USERS_ENDPOINT = `${ROLE_SERVICE_URL}/users`
 const requestCache = new Map()
 const inFlightRequests = new Map()
 
@@ -39,7 +40,7 @@ function clearRolesCache() {
 async function apiRequest(path, { method = 'GET', token, body, cacheTtlMs = 0, skipCache = false } = {}) {
   const resolvedMethod = String(method || 'GET').toUpperCase()
   const resolvedToken = token || getAuthToken() || ''
-  const url = `${API_BASE_URL}${path}`
+  const url = path.startsWith('http') ? path : `${API_BASE_URL}${path}`
   const canCache = resolvedMethod === 'GET' && cacheTtlMs > 0 && !skipCache
   const cacheKey = buildRequestCacheKey(url, resolvedMethod, resolvedToken)
 
