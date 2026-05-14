@@ -119,29 +119,37 @@ function mapRoleRecord(record) {
   }
 }
 
-function mapUserRecord(record) {
+function mapUserRecord(record, allRoles = []) {
   const expandedRole = record.expand?.role
+
+  let roleObj = null
+  if (expandedRole) {
+    roleObj = {
+      id: expandedRole.id,
+      nombre: expandedRole.nombre ?? expandedRole.name ?? '',
+      descripcion: expandedRole.descripcion ?? expandedRole.description ?? '',
+      permisos: expandedRole.permisos ?? expandedRole.permissions ?? [],
+    }
+  } else if (record.role && typeof record.role === 'object') {
+    roleObj = {
+      id: record.role.id,
+      nombre: record.role.nombre ?? record.role.name ?? '',
+      descripcion: record.role.descripcion ?? record.role.description ?? '',
+      permisos: record.role.permisos ?? record.role.permissions ?? [],
+    }
+  } else if (typeof record.role === 'string') {
+    const foundRole = allRoles.find((r) => r.nombre === record.role)
+    if (foundRole) {
+      roleObj = foundRole
+    }
+  }
 
   return {
     id: record.id,
     name: record.name ?? '',
     email: record.email ?? '',
-    roleId: record.roleId ?? (typeof record.role === 'string' ? record.role : record.role?.id) ?? null,
-    role: expandedRole
-      ? {
-          id: expandedRole.id,
-          nombre: expandedRole.nombre ?? expandedRole.name ?? '',
-          descripcion: expandedRole.descripcion ?? expandedRole.description ?? '',
-          permisos: expandedRole.permisos ?? expandedRole.permissions ?? [],
-        }
-      : record.role && typeof record.role === 'object'
-        ? {
-            id: record.role.id,
-            nombre: record.role.nombre ?? record.role.name ?? '',
-            descripcion: record.role.descripcion ?? record.role.description ?? '',
-            permisos: record.role.permisos ?? record.role.permissions ?? [],
-          }
-        : null,
+    roleId: roleObj?.id || null,
+    role: roleObj,
     created: record.created,
     updated: record.updated,
   }
@@ -211,21 +219,27 @@ export async function deleteRole(roleId, { token } = {}) {
 }
 
 export async function listUsersWithRoles({ token } = {}) {
-  const data = await apiRequest(`${USERS_ENDPOINT}?expand=role`, { token, cacheTtlMs: 15000 })
+  const [data, roles] = await Promise.all([
+    apiRequest(`${USERS_ENDPOINT}?expand=role`, { token, cacheTtlMs: 15000 }),
+    listRoles({ token }),
+  ])
   const records = normalizeArrayResponse(data)
 
-  return records.map(mapUserRecord)
+  return records.map((record) => mapUserRecord(record, roles))
 }
 
 export async function assignUserRole(userId, roleId, { token } = {}) {
-  const record = await apiRequest(`/users/${userId}`, {
-    method: 'PUT',
-    token,
-    body: {
-      role: roleId,
-    },
-  })
+  const [record, roles] = await Promise.all([
+    apiRequest(`/users/${userId}`, {
+      method: 'PUT',
+      token,
+      body: {
+        role: roleId,
+      },
+    }),
+    listRoles({ token }),
+  ])
   clearRolesCache()
 
-  return mapUserRecord(record)
+  return mapUserRecord(record, roles)
 }
