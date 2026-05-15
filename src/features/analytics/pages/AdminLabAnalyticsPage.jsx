@@ -321,6 +321,7 @@ function LoadingState() {
 
 function AdminLabAnalyticsPage() {
   const [period, setPeriod] = useState('daily')
+  const [customRange, setCustomRange] = useState({ start: '', end: '' })
   const [occupancyFilter, setOccupancyFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const deferredSearchTerm = useDeferredValue(searchTerm)
@@ -338,7 +339,11 @@ function AdminLabAnalyticsPage() {
       setError('')
 
       try {
-        const response = await getLaboratoryUsageAnalytics(period)
+        const response = await getLaboratoryUsageAnalytics(
+          period === 'custom' ? 'daily' : period,
+          period === 'custom' ? customRange.start : null,
+          period === 'custom' ? customRange.end : null
+        )
         if (!isMounted) {
           return
         }
@@ -348,7 +353,7 @@ function AdminLabAnalyticsPage() {
           return
         }
         setAnalytics(emptyAnalytics)
-        setError(err.message || 'No se pudieron cargar las estadisticas de uso por laboratorio.')
+        setError(err.message || 'No se pudieron cargar las estadisticas.')
       } finally {
         if (isMounted) {
           setIsLoading(false)
@@ -361,7 +366,7 @@ function AdminLabAnalyticsPage() {
     return () => {
       isMounted = false
     }
-  }, [period])
+  }, [period, customRange])
 
   const rankedLabs = useMemo(
     () => (Array.isArray(analytics?.labs) ? analytics.labs : []),
@@ -432,26 +437,50 @@ function AdminLabAnalyticsPage() {
   }
 
   const occupancySummary = useMemo(() => {
-    const highCount = rankedLabs.filter((lab) => getOccupancyBand(lab.occupancy_percentage) === 'high').length
-    const mediumCount = rankedLabs.filter((lab) => getOccupancyBand(lab.occupancy_percentage) === 'medium').length
-    const lowCount = rankedLabs.filter((lab) => getOccupancyBand(lab.occupancy_percentage) === 'low').length
+  const highCount = rankedLabs.filter((lab) => getOccupancyBand(lab.occupancy_percentage) === 'high').length
+  const mediumCount = rankedLabs.filter((lab) => getOccupancyBand(lab.occupancy_percentage) === 'medium').length
+  const lowCount = rankedLabs.filter((lab) => getOccupancyBand(lab.occupancy_percentage) === 'low').length
 
-    return {
-      totalCount: rankedLabs.length,
+  return {
+    totalCount: rankedLabs.length,
+    highCount,
+    mediumCount,
+    lowCount,
+    recommendation: getDecisionCopy({
       highCount,
       mediumCount,
       lowCount,
-      recommendation: getDecisionCopy({
-        highCount,
-        mediumCount,
-        lowCount,
-        totalCount: rankedLabs.length,
-      }),
-    }
+      totalCount: rankedLabs.length,
+    }),
+  }
   }, [rankedLabs])
 
+  const peakHoursData = useMemo(() => {
+    console.log('[DEBUG] Analytics state:', analytics)
+    const data = Array.isArray(analytics?.hourly_usage) ? analytics.hourly_usage : []
+    console.log('[DEBUG] Hourly usage data:', data)
+    const maxCount = Math.max(...data.map((h) => h.count), 1)
+    const processed = data.map((h) => ({
+      ...h,
+      percentage: (h.count / maxCount) * 100,
+      label: `${String(h.hour).padStart(2, '0')}:00`,
+    }))
+    console.log('[DEBUG] Processed peakHoursData:', processed)
+    return processed
+  }, [analytics])
+
+  const weekdayUsageData = useMemo(() => {
+    const data = Array.isArray(analytics?.weekday_usage) ? analytics.weekday_usage : []
+    const maxCount = Math.max(...data.map((d) => d.count), 1)
+    return data.map((d) => ({
+      ...d,
+      percentage: (d.count / maxCount) * 100,
+    }))
+  }, [analytics])
+
   return (
-    <section className="analytics-page" aria-label="Modulo de analisis de laboratorios">
+  <section className="analytics-page" aria-label="Modulo de analisis de laboratorios">
+
       <header className="analytics-header">
         <div className="analytics-header-copy">
           <p className="analytics-kicker">Analisis operativo</p>
@@ -498,8 +527,8 @@ function AdminLabAnalyticsPage() {
         </div>
 
         <div className="analytics-period-grid" role="tablist" aria-label="Filtro de estadisticas por periodo">
-          {PERIOD_OPTIONS.map((option) => {
-            const Icon = option.icon
+          {[...PERIOD_OPTIONS, { id: 'custom', label: 'Rango personalizado', helper: 'Define tus fechas' }].map((option) => {
+            const Icon = option.icon || CalendarRange
             const isActive = period === option.id
 
             return (
@@ -522,6 +551,24 @@ function AdminLabAnalyticsPage() {
             )
           })}
         </div>
+
+        {period === 'custom' && (
+          <div className="analytics-toolbar">
+            <div className="analytics-filter-group" style={{ flexDirection: 'row', gap: '10px', alignItems: 'center' }}>
+              <input
+                type="date"
+                value={customRange.start}
+                onChange={(e) => setCustomRange((prev) => ({ ...prev, start: e.target.value }))}
+              />
+              <span>a</span>
+              <input
+                type="date"
+                value={customRange.end}
+                onChange={(e) => setCustomRange((prev) => ({ ...prev, end: e.target.value }))}
+              />
+            </div>
+          </div>
+        )}
 
         <div className="analytics-toolbar">
           <label className="analytics-search-field">
@@ -677,6 +724,60 @@ function AdminLabAnalyticsPage() {
                 <strong>{analytics.totals.blocked_blocks}</strong>
                 <p>Bloques descontados por cierres operativos o mantenimiento.</p>
               </article>
+            </div>
+          </section>
+
+          <section className="analytics-panel">
+            <div className="analytics-panel-header">
+              <div>
+                <h3>Horarios frecuentes y horas pico</h3>
+                <p className="analytics-panel-subtitle">
+                  Visualiza la distribucion de la demanda a lo largo del dia. Ayuda a identificar cuando se concentra
+                  la mayor cantidad de reservas para optimizar turnos o personal.
+                </p>
+              </div>
+            </div>
+
+            <div className="analytics-peak-chart">
+              {peakHoursData.map((hour) => (
+                <div key={hour.hour} className="analytics-peak-bar-container">
+                  <div 
+                    className="analytics-peak-bar" 
+                    style={{ height: `${hour.percentage}%` }}
+                    title={`${hour.label}: ${hour.count} reservas`}
+                  >
+                    <span className="analytics-peak-count">{hour.count}</span>
+                  </div>
+                  <span className="analytics-peak-label">{hour.label}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="analytics-panel">
+            <div className="analytics-panel-header">
+              <div>
+                <h3>Uso por dia de la semana</h3>
+                <p className="analytics-panel-subtitle">
+                  Identifica que dias tienen mayor volumen de solicitudes. Ideal para planificar el mantenimiento 
+                  en los dias de menor carga.
+                </p>
+              </div>
+            </div>
+
+            <div className="analytics-peak-chart">
+              {weekdayUsageData.map((day) => (
+                <div key={day.weekday} className="analytics-peak-bar-container">
+                  <div 
+                    className="analytics-peak-bar" 
+                    style={{ height: `${day.percentage}%` }}
+                    title={`${day.label}: ${day.count} reservas`}
+                  >
+                    <span className="analytics-peak-count">{day.count}</span>
+                  </div>
+                  <span className="analytics-peak-label">{day.label}</span>
+                </div>
+              ))}
             </div>
           </section>
 

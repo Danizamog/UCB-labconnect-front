@@ -643,17 +643,19 @@ function mapLaboratoryUsageStat(record) {
   }
 }
 
-export async function getLaboratoryUsageAnalytics(period = 'daily') {
-  const normalizedPeriod = ['daily', 'weekly', 'monthly'].includes(String(period || '').trim().toLowerCase())
-    ? String(period).trim().toLowerCase()
-    : 'daily'
+export async function getLaboratoryUsageAnalytics(period = 'daily', startDate = null, endDate = null) {
+  const params = new URLSearchParams()
+  params.set('period', period)
+  if (startDate) params.set('start_date', startDate)
+  if (endDate) params.set('end_date', endDate)
+
   const data = await request(
-    `${reservationsBase}/reservations/analytics/laboratory-usage?period=${encodeURIComponent(normalizedPeriod)}`,
+    `${reservationsBase}/reservations/analytics/laboratory-usage?${params.toString()}`,
     { cacheTtlMs: 1500 },
   )
 
   return {
-    period: data?.period || normalizedPeriod,
+    period: data?.period || period,
     period_label: data?.period_label || '',
     start_date: data?.start_date || '',
     end_date: data?.end_date || '',
@@ -671,6 +673,8 @@ export async function getLaboratoryUsageAnalytics(period = 'daily') {
     },
     highest_usage_laboratory: data?.highest_usage_laboratory ? mapLaboratoryUsageStat(data.highest_usage_laboratory) : null,
     lowest_usage_laboratory: data?.lowest_usage_laboratory ? mapLaboratoryUsageStat(data.lowest_usage_laboratory) : null,
+    hourly_usage: Array.isArray(data?.hourly_usage) ? data.hourly_usage : [],
+    weekday_usage: Array.isArray(data?.weekday_usage) ? data.weekday_usage : [],
   }
 }
 
