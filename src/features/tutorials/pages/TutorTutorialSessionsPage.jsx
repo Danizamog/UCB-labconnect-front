@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsPDF } from 'jspdf'
 import ucbEscudoLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
-import { listAdminLabs } from '../../admin/services/infrastructureService'
-import { getLabAvailability } from '../../reservations/services/reservationsService'
+import { listAdminLabs, listMaterials } from '../../admin/services/infrastructureService'
+import {
+  createSupplyReservation,
+  getLabAvailability,
+} from '../../reservations/services/reservationsService'
 import {
   createTutorialSession,
   deleteTutorialSession,
@@ -111,6 +114,7 @@ function createDefaultForm(overrides = {}) {
     start_time: '',
     end_time: '',
     max_students: 8,
+    requested_materials: [],
     ...overrides,
   }
 }
@@ -236,6 +240,8 @@ function TutorTutorialSessionsPage() {
   const [clockTick, setClockTick] = useState(Date.now())
   const [focusedSession, setFocusedSession] = useState(null)
   const [isLoadingFocusedSession, setIsLoadingFocusedSession] = useState(false)
+  const [materialsCatalog, setMaterialsCatalog] = useState([])
+  const [isLoadingMaterials, setIsLoadingMaterials] = useState(false)
   const todayIso = todayLocalDateString()
   const maxReservationIso = maxReservableDateString()
   const nowReference = useMemo(() => new Date(clockTick), [clockTick])
@@ -249,6 +255,52 @@ function TutorTutorialSessionsPage() {
       window.clearInterval(timer)
     }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const labId = String(form.laboratory_id || '').trim()
+
+    if (!labId) {
+      setMaterialsCatalog([])
+      setForm((previous) => (
+        previous.requested_materials.length === 0
+          ? previous
+          : { ...previous, requested_materials: [] }
+      ))
+      return () => {
+        cancelled = true
+      }
+    }
+
+    setIsLoadingMaterials(true)
+    listMaterials(labId)
+      .then((data) => {
+        if (cancelled) return
+        const items = Array.isArray(data) ? data : []
+        setMaterialsCatalog(items)
+        setForm((previous) => {
+          const allowedIds = new Set(items.map((item) => String(item.id)))
+          const filtered = previous.requested_materials.filter((entry) => allowedIds.has(String(entry.stock_item_id)))
+          if (filtered.length === previous.requested_materials.length) {
+            return previous
+          }
+          return { ...previous, requested_materials: filtered }
+        })
+      })
+      .catch(() => {
+        if (cancelled) return
+        setMaterialsCatalog([])
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingMaterials(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [form.laboratory_id])
 
   const loadSessions = async () => {
     try {
@@ -569,9 +621,15 @@ function TutorTutorialSessionsPage() {
 
     setIsSubmitting(true)
     try {
+      const labId = String(selectedLab?.id || '')
+      const requestedMaterials = (form.requested_materials || []).filter((entry) => (
+        entry?.stock_item_id && Number(entry.quantity) > 0
+      ))
+
+      const { requested_materials: _omitMaterials, ...formForBackend } = form
       const payload = {
-        ...form,
-        laboratory_id: String(selectedLab?.id || ''),
+        ...formForBackend,
+        laboratory_id: labId,
         location: String(selectedLab?.name || ''),
         max_students: Number(form.max_students),
       }
@@ -584,8 +642,31 @@ function TutorTutorialSessionsPage() {
             : 'Tutoria actualizada correctamente.',
         )
       } else {
-        await createTutorialSession(payload)
-        setMessage('Tutoria publicada correctamente. Ya esta visible para los estudiantes.')
+        const createdSession = await createTutorialSession(payload)
+        const sessionId = String(createdSession?.id || '')
+
+        if (sessionId && requestedMaterials.length > 0) {
+          const results = await Promise.allSettled(requestedMaterials.map((entry) => (
+            createSupplyReservation({
+              stock_item_id: entry.stock_item_id,
+              quantity: Number(entry.quantity),
+              requested_for: `Tutoria: ${form.topic}`,
+              notes: form.description || '',
+              laboratory_id: labId,
+              tutorial_session_id: sessionId,
+            })
+          )))
+
+          const failed = results.filter((result) => result.status === 'rejected')
+          if (failed.length > 0) {
+            const detail = failed.map((result) => result.reason?.message || 'Error desconocido').join('; ')
+            setMessage(`Tutoria publicada, pero ${failed.length} material(es) no se pudieron reservar: ${detail}`)
+          } else {
+            setMessage('Tutoria publicada con sus materiales solicitados. Quedan pendientes de aprobacion del encargado.')
+          }
+        } else {
+          setMessage('Tutoria publicada correctamente. Ya esta visible para los estudiantes.')
+        }
       }
 
       setEditingSessionId('')
@@ -956,6 +1037,109 @@ function TutorTutorialSessionsPage() {
             <span>Ubicacion asignada: {selectedLab?.name || 'Selecciona un laboratorio'}</span>
             <span>Solo se permiten bloques futuros y hasta un mes de anticipacion.</span>
           </div>
+
+          {selectedLab && !editingSessionId ? (
+            <div className="tutorial-materials">
+              <div className="tutorial-materials-header">
+                <strong>Materiales requeridos (opcional)</strong>
+                <p>Reserva insumos del mismo laboratorio. Quedan en pendiente y el encargado los aprueba antes de descontar stock.</p>
+              </div>
+
+              {isLoadingMaterials ? (
+                <p className="tutorials-empty">Cargando catalogo de materiales...</p>
+              ) : materialsCatalog.length === 0 ? (
+                <p className="tutorials-empty">El laboratorio no tiene materiales registrados.</p>
+              ) : (
+                <>
+                  {form.requested_materials.length === 0 ? (
+                    <p className="tutorials-empty">Aun no agregaste materiales a la tutoria.</p>
+                  ) : (
+                    <ul className="tutorial-materials-list">
+                      {form.requested_materials.map((entry, index) => {
+                        const material = materialsCatalog.find((item) => String(item.id) === String(entry.stock_item_id))
+                        const stock = Number(material?.quantity_available || 0)
+                        const isOutOfStock = stock <= 0
+                        return (
+                          <li key={`${entry.stock_item_id}-${index}`} className={`tutorial-material-row${isOutOfStock ? ' out-of-stock' : ''}`}>
+                            <div className="tutorial-material-row-info">
+                              <strong>{material?.name || entry.stock_item_id}</strong>
+                              <span>
+                                {isOutOfStock
+                                  ? <span className="material-badge agotado">Agotado</span>
+                                  : `${stock} ${material?.unit || ''} disponibles`}
+                              </span>
+                            </div>
+                            <input
+                              type="number"
+                              min="1"
+                              max={Math.max(stock, 1)}
+                              value={entry.quantity}
+                              disabled={isOutOfStock}
+                              onChange={(event) => {
+                                const value = Math.max(1, Number(event.target.value) || 1)
+                                setForm((previous) => {
+                                  const next = previous.requested_materials.slice()
+                                  next[index] = { ...next[index], quantity: value }
+                                  return { ...previous, requested_materials: next }
+                                })
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="tutorials-secondary"
+                              onClick={() => {
+                                setForm((previous) => ({
+                                  ...previous,
+                                  requested_materials: previous.requested_materials.filter((_, i) => i !== index),
+                                }))
+                              }}
+                            >
+                              Quitar
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+
+                  <div className="tutorial-materials-add">
+                    <select
+                      value=""
+                      onChange={(event) => {
+                        const stockItemId = event.target.value
+                        if (!stockItemId) return
+                        setForm((previous) => {
+                          if (previous.requested_materials.some((entry) => String(entry.stock_item_id) === String(stockItemId))) {
+                            return previous
+                          }
+                          return {
+                            ...previous,
+                            requested_materials: [
+                              ...previous.requested_materials,
+                              { stock_item_id: String(stockItemId), quantity: 1 },
+                            ],
+                          }
+                        })
+                      }}
+                    >
+                      <option value="">Agregar material...</option>
+                      {materialsCatalog
+                        .filter((material) => !form.requested_materials.some((entry) => String(entry.stock_item_id) === String(material.id)))
+                        .map((material) => {
+                          const stock = Number(material.quantity_available || 0)
+                          const out = stock <= 0
+                          return (
+                            <option key={material.id} value={material.id} disabled={out}>
+                              {material.name}{out ? ' (Agotado)' : ` - ${stock} ${material.unit || ''}`}
+                            </option>
+                          )
+                        })}
+                    </select>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : null}
 
           {validationMessage ? <p className="tutorials-inline-hint">{validationMessage}</p> : null}
 

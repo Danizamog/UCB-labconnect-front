@@ -11,10 +11,22 @@ import {
   updateMaterial,
 } from '../services/infrastructureService'
 import { listUserProfiles } from '../services/profileService'
+import {
+  createSupplyReservation,
+  listSupplyReservations,
+  updateSupplyReservationStatus,
+} from '../../reservations/services/reservationsService'
 import { hasAnyPermission, isAdminUser } from '../../../shared/lib/permissions'
 import { formatDateTime, movementTypeLabel } from '../../../shared/utils/formatters'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import './AdminAssetsPage.css'
+
+const SUPPLY_STATUS_LABELS = {
+  pending: 'Pendiente',
+  approved: 'Aprobada',
+  delivered: 'Entregada',
+  cancelled: 'Cancelada',
+}
 
 const defaultMaterialForm = { name: '', category: '', unit: 'unidad', quantity_available: 0, minimum_stock: 0, laboratory_id: '', description: '' }
 const defaultMovementForm = { stock_item_id: '', movement_type: 'entry', quantity: 1, notes: '' }
@@ -53,6 +65,19 @@ function AdminMaterialesPage({ user }) {
   const [movementForm, setMovementForm] = useState(defaultMovementForm)
   const [activeModal, setActiveModal] = useState(null)
   const [activeTab, setActiveTab] = useState('catalog')
+  const [supplyReservations, setSupplyReservations] = useState([])
+  const [supplyLoading, setSupplyLoading] = useState(false)
+  const [supplyActionId, setSupplyActionId] = useState('')
+  const [supplyStatusFilter, setSupplyStatusFilter] = useState('pending')
+  const [supplyCreateForm, setSupplyCreateForm] = useState({
+    laboratory_id: '',
+    stock_item_id: '',
+    quantity: 1,
+    requested_for: '',
+    notes: '',
+  })
+  const [isCreatingSupply, setIsCreatingSupply] = useState(false)
+  const [showSupplyCreateForm, setShowSupplyCreateForm] = useState(false)
 
   const [confirmModal, setConfirmModal] = useState(null)
 
@@ -122,6 +147,98 @@ function AdminMaterialesPage({ user }) {
       setMaterialMovements(movementsData)
     } catch {
       // historial de movimientos no critico
+    }
+
+    await fetchSupplyReservations(supplyStatusFilter)
+  }
+
+  const fetchSupplyReservations = async (statusFilter = supplyStatusFilter) => {
+    setSupplyLoading(true)
+    try {
+      const data = await listSupplyReservations({
+        status: statusFilter || undefined,
+        skipCache: true,
+      })
+      setSupplyReservations(Array.isArray(data) ? data : [])
+    } catch (err) {
+      setMessage('')
+      setError(err.message || 'No se pudieron cargar las solicitudes de reactivos.')
+    } finally {
+      setSupplyLoading(false)
+    }
+  }
+
+  const handleCreateSupplyReservation = async (event) => {
+    event.preventDefault()
+    setMessage('')
+    setError('')
+
+    if (!supplyCreateForm.laboratory_id || !supplyCreateForm.stock_item_id) {
+      setError('Selecciona laboratorio y material para crear la solicitud.')
+      return
+    }
+
+    const quantity = Number(supplyCreateForm.quantity || 0)
+    if (quantity <= 0) {
+      setError('La cantidad debe ser mayor a cero.')
+      return
+    }
+
+    setIsCreatingSupply(true)
+    try {
+      await createSupplyReservation({
+        stock_item_id: supplyCreateForm.stock_item_id,
+        quantity,
+        requested_for: supplyCreateForm.requested_for || 'Solicitud creada por administrador',
+        notes: supplyCreateForm.notes || '',
+        laboratory_id: supplyCreateForm.laboratory_id,
+      })
+      setMessage('Solicitud manual creada. Queda pendiente y puedes aprobarla desde la tabla.')
+      setSupplyCreateForm({
+        laboratory_id: '',
+        stock_item_id: '',
+        quantity: 1,
+        requested_for: '',
+        notes: '',
+      })
+      setShowSupplyCreateForm(false)
+      await fetchSupplyReservations(supplyStatusFilter)
+    } catch (err) {
+      setError(err.message || 'No se pudo crear la solicitud manual.')
+    } finally {
+      setIsCreatingSupply(false)
+    }
+  }
+
+  const supplyCreateAvailableMaterials = useMemo(() => {
+    const labId = String(supplyCreateForm.laboratory_id || '')
+    if (!labId) return []
+    return materials.filter((material) => String(material.laboratory_id || '') === labId)
+  }, [materials, supplyCreateForm.laboratory_id])
+
+  const handleUpdateSupplyStatus = async (reservationId, nextStatus) => {
+    setSupplyActionId(reservationId)
+    setMessage('')
+    setError('')
+    try {
+      await updateSupplyReservationStatus(reservationId, nextStatus)
+      setMessage(
+        nextStatus === 'approved'
+          ? 'Reserva aprobada y stock descontado.'
+          : nextStatus === 'cancelled'
+          ? 'Reserva rechazada.'
+          : 'Reserva actualizada.',
+      )
+      await Promise.all([
+        fetchSupplyReservations(supplyStatusFilter),
+        fetchReportData(),
+      ])
+      const refreshed = await listMaterials()
+      setMaterials(refreshed)
+    } catch (err) {
+      setError(err.message || 'No se pudo actualizar la reserva de reactivo.')
+    } finally {
+      setSupplyActionId('')
     }
   }
 
@@ -681,6 +798,21 @@ function AdminMaterialesPage({ user }) {
           <span>Reportes</span>
           <span className="infra-tab-count">{stockAlertsCount}</span>
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'requests'}
+          className={`infra-tab-button ${activeTab === 'requests' ? 'is-active' : ''}`}
+          onClick={() => {
+            setActiveTab('requests')
+            fetchSupplyReservations(supplyStatusFilter)
+          }}
+        >
+          <span>Solicitudes</span>
+          <span className="infra-tab-count">
+            {supplyReservations.filter((reservation) => reservation.status === 'pending').length}
+          </span>
+        </button>
       </nav>
 
       {message ? <p className="infra-alert infra-success">{message}</p> : null}
@@ -1201,6 +1333,233 @@ function AdminMaterialesPage({ user }) {
           </section>
 
           </>
+          ) : null}
+
+          {activeTab === 'requests' ? (
+          <section className="infra-card infra-card-full">
+            <div className="infra-section-head">
+              <div>
+                <h3>Solicitudes de reactivos</h3>
+                <p>
+                  Aprueba o rechaza pedidos de materiales. Al aprobar, el sistema descuenta el stock y genera un movimiento.
+                  Si rechazas una reserva ya aprobada, el stock se repone automaticamente.
+                </p>
+              </div>
+              <div className="infra-actions">
+                <select
+                  value={supplyStatusFilter}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    setSupplyStatusFilter(value)
+                    fetchSupplyReservations(value)
+                  }}
+                >
+                  <option value="pending">Pendientes</option>
+                  <option value="approved">Aprobadas</option>
+                  <option value="delivered">Entregadas</option>
+                  <option value="cancelled">Canceladas</option>
+                  <option value="">Todas</option>
+                </select>
+                <button
+                  type="button"
+                  className="infra-secondary"
+                  onClick={() => fetchSupplyReservations(supplyStatusFilter)}
+                  disabled={supplyLoading}
+                >
+                  {supplyLoading ? 'Cargando...' : 'Refrescar'}
+                </button>
+                <button
+                  type="button"
+                  className="infra-primary"
+                  onClick={() => setShowSupplyCreateForm((prev) => !prev)}
+                >
+                  {showSupplyCreateForm ? 'Cancelar' : 'Crear solicitud manual'}
+                </button>
+              </div>
+            </div>
+
+            {showSupplyCreateForm ? (
+              <form className="infra-form" onSubmit={handleCreateSupplyReservation} style={{ marginBottom: 16, padding: 16, background: '#f8fafc', borderRadius: 12 }}>
+                <div className="infra-form-grid">
+                  <label>
+                    <span>Laboratorio</span>
+                    <select
+                      value={supplyCreateForm.laboratory_id}
+                      onChange={(event) => setSupplyCreateForm((prev) => ({
+                        ...prev,
+                        laboratory_id: event.target.value,
+                        stock_item_id: '',
+                      }))}
+                      required
+                    >
+                      <option value="">Selecciona...</option>
+                      {visibleLabs.map((lab) => (
+                        <option key={lab.id} value={lab.id}>{lab.name}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    <span>Material</span>
+                    <select
+                      value={supplyCreateForm.stock_item_id}
+                      onChange={(event) => setSupplyCreateForm((prev) => ({ ...prev, stock_item_id: event.target.value }))}
+                      disabled={!supplyCreateForm.laboratory_id}
+                      required
+                    >
+                      <option value="">Selecciona...</option>
+                      {supplyCreateAvailableMaterials.map((material) => {
+                        const stock = Number(material.quantity_available || 0)
+                        const out = stock <= 0
+                        return (
+                          <option key={material.id} value={material.id} disabled={out}>
+                            {material.name}{out ? ' (Agotado)' : ` - ${stock} ${material.unit || ''}`}
+                          </option>
+                        )
+                      })}
+                    </select>
+                  </label>
+
+                  <label>
+                    <span>Cantidad</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={supplyCreateForm.quantity}
+                      onChange={(event) => setSupplyCreateForm((prev) => ({ ...prev, quantity: event.target.value }))}
+                      required
+                    />
+                  </label>
+
+                  <label>
+                    <span>Solicitante / Proposito</span>
+                    <input
+                      value={supplyCreateForm.requested_for}
+                      onChange={(event) => setSupplyCreateForm((prev) => ({ ...prev, requested_for: event.target.value }))}
+                      placeholder="Ej: Walk-in estudiante Juan Perez"
+                    />
+                  </label>
+                </div>
+
+                <label>
+                  <span>Notas</span>
+                  <textarea
+                    rows="2"
+                    value={supplyCreateForm.notes}
+                    onChange={(event) => setSupplyCreateForm((prev) => ({ ...prev, notes: event.target.value }))}
+                  />
+                </label>
+
+                <div className="infra-actions">
+                  <button type="submit" className="infra-primary" disabled={isCreatingSupply}>
+                    {isCreatingSupply ? 'Creando...' : 'Crear solicitud'}
+                  </button>
+                </div>
+              </form>
+            ) : null}
+
+            <div className="infra-table-wrap">
+              <table className="infra-table">
+                <thead>
+                  <tr>
+                    <th>Material</th>
+                    <th>Laboratorio</th>
+                    <th>Cantidad</th>
+                    <th>Stock actual</th>
+                    <th>Solicitante</th>
+                    <th>Origen</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {supplyReservations.length === 0 ? (
+                    <tr>
+                      <td colSpan="8">
+                        {supplyLoading ? 'Cargando solicitudes...' : 'No hay solicitudes con ese filtro.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    supplyReservations.map((reservation) => {
+                      const insufficient = reservation.status === 'pending'
+                        && Number(reservation.quantity_available || 0) < Number(reservation.quantity || 0)
+                      const isProcessing = supplyActionId === reservation.id
+                      return (
+                        <tr key={reservation.id}>
+                          <td>
+                            <strong>{reservation.stock_item_name || reservation.stock_item_id}</strong>
+                            {reservation.notes ? <small>{reservation.notes}</small> : null}
+                          </td>
+                          <td>{reservation.laboratory_name || reservation.laboratory_id || '-'}</td>
+                          <td>{reservation.quantity}</td>
+                          <td>
+                            {reservation.quantity_available}
+                            {insufficient ? (
+                              <small className="infra-alert infra-error" style={{ marginTop: 4 }}>Stock insuficiente</small>
+                            ) : null}
+                          </td>
+                          <td>
+                            {reservation.requested_by || '-'}
+                            {reservation.requested_for ? <small>{reservation.requested_for}</small> : null}
+                          </td>
+                          <td>{reservation.tutorial_session_id ? 'Tutoria' : 'Reserva directa'}</td>
+                          <td>
+                            <span className={`reservations-status ${reservation.status}`}>
+                              {SUPPLY_STATUS_LABELS[reservation.status] || reservation.status}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="infra-actions compact">
+                              {reservation.status === 'pending' ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="infra-secondary"
+                                    disabled={isProcessing || insufficient}
+                                    title={insufficient ? 'No hay stock suficiente para aprobar' : ''}
+                                    onClick={() => handleUpdateSupplyStatus(reservation.id, 'approved')}
+                                  >
+                                    {isProcessing ? 'Aprobando...' : 'Aprobar'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="infra-danger"
+                                    disabled={isProcessing}
+                                    onClick={() => handleUpdateSupplyStatus(reservation.id, 'cancelled')}
+                                  >
+                                    Rechazar
+                                  </button>
+                                </>
+                              ) : reservation.status === 'approved' ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="infra-secondary"
+                                    disabled={isProcessing}
+                                    onClick={() => handleUpdateSupplyStatus(reservation.id, 'delivered')}
+                                  >
+                                    Marcar entregada
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="infra-danger"
+                                    disabled={isProcessing}
+                                    onClick={() => handleUpdateSupplyStatus(reservation.id, 'cancelled')}
+                                  >
+                                    Cancelar (repone stock)
+                                  </button>
+                                </>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
           ) : null}
 
           {activeTab === 'catalog' ? (

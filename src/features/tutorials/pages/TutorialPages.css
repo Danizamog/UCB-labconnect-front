@@ -1077,3 +1077,91 @@
   transform: translateY(-2px);
   box-shadow: 0 18px 30px rgba(13, 34, 61, 0.12);
 }
+
+.tutorial-materials {
+  border: 1px dashed rgba(13, 34, 61, 0.25);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 8px 0;
+  background: rgba(248, 250, 252, 0.6);
+}
+
+.tutorial-materials-header strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.tutorial-materials-header p {
+  margin: 4px 0 12px;
+  font-size: 0.82rem;
+  color: var(--ink-700, #475569);
+}
+
+.tutorial-materials-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tutorial-material-row {
+  display: grid;
+  grid-template-columns: 1fr 90px auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid rgba(13, 34, 61, 0.1);
+  border-radius: 8px;
+}
+
+.tutorial-material-row.out-of-stock {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.tutorial-material-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tutorial-material-row-info strong {
+  font-size: 0.9rem;
+}
+
+.tutorial-material-row-info span {
+  font-size: 0.78rem;
+  color: var(--ink-700, #475569);
+}
+
+.tutorial-material-row input[type='number'] {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid rgba(13, 34, 61, 0.18);
+  border-radius: 6px;
+}
+
+.tutorial-materials-add select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(13, 34, 61, 0.18);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.material-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.material-badge.agotado {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}

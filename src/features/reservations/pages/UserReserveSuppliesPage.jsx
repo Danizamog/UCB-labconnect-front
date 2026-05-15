@@ -23,10 +23,6 @@ const STATUS_LABELS = {
   cancelled: 'Cancelada',
 }
 
-function normalizeLabId(value) {
-  return value === null || value === undefined || value === '' ? '' : String(value)
-}
-
 function formatDateTime(value) {
   if (!value) {
     return '-'
@@ -49,69 +45,70 @@ function UserReserveSuppliesPage({ user }) {
   const [materials, setMaterials] = useState([])
   const [myReservations, setMyReservations] = useState([])
   const [form, setForm] = useState(initialForm)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingLabs, setIsLoadingLabs] = useState(true)
+  const [isLoadingMaterials, setIsLoadingMaterials] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true)
+  const loadLabsAndReservations = useCallback(async () => {
+    setIsLoadingLabs(true)
     try {
-      const [labsData, materialsData, reservationsData] = await Promise.all([
+      const [labsData, reservationsData] = await Promise.all([
         listAvailableLabs(user),
-        listMaterials(),
-        listSupplyReservations({}, user),
+        listSupplyReservations({ skipCache: true }),
       ])
-
       setLabs(Array.isArray(labsData) ? labsData : [])
-      setMaterials(Array.isArray(materialsData) ? materialsData : [])
       setMyReservations(Array.isArray(reservationsData) ? reservationsData : [])
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudo cargar la informacion de reactivos.')
     } finally {
-      setIsLoading(false)
+      setIsLoadingLabs(false)
     }
   }, [user])
 
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  const availableMaterials = useMemo(() => {
-    return materials.filter((material) => {
-      if (Number(material?.quantity_available || 0) <= 0) {
-        return false
-      }
-
-      const selectedLabId = normalizeLabId(form.laboratory_id)
-      const materialLabId = normalizeLabId(material?.laboratory_id)
-
-      if (!selectedLabId) {
-        return true
-      }
-
-      return materialLabId === '' || materialLabId === selectedLabId
-    })
-  }, [form.laboratory_id, materials])
-
-  useEffect(() => {
-    if (availableMaterials.length === 0) {
-      if (form.stock_item_id) {
-        setForm((previous) => ({ ...previous, stock_item_id: '' }))
-      }
+  const loadMaterials = useCallback(async (laboratoryId) => {
+    if (!laboratoryId) {
+      setMaterials([])
       return
     }
 
-    const hasSelected = availableMaterials.some((material) => String(material.id) === String(form.stock_item_id))
-    if (!hasSelected) {
-      setForm((previous) => ({ ...previous, stock_item_id: String(availableMaterials[0].id) }))
+    setIsLoadingMaterials(true)
+    try {
+      const data = await listMaterials(laboratoryId)
+      setMaterials(Array.isArray(data) ? data : [])
+      setError('')
+    } catch (err) {
+      setError(err.message || 'No se pudo cargar el catalogo de reactivos del laboratorio.')
+      setMaterials([])
+    } finally {
+      setIsLoadingMaterials(false)
     }
-  }, [availableMaterials, form.stock_item_id])
+  }, [])
+
+  useEffect(() => {
+    loadLabsAndReservations()
+  }, [loadLabsAndReservations])
+
+  useEffect(() => {
+    loadMaterials(form.laboratory_id)
+    setForm((previous) => ({ ...previous, stock_item_id: '' }))
+  }, [form.laboratory_id, loadMaterials])
 
   const selectedMaterial = useMemo(
-    () => availableMaterials.find((material) => String(material.id) === String(form.stock_item_id)) || null,
-    [availableMaterials, form.stock_item_id],
+    () => materials.find((material) => String(material.id) === String(form.stock_item_id)) || null,
+    [materials, form.stock_item_id],
+  )
+
+  const inStockMaterials = useMemo(
+    () => materials.filter((material) => Number(material?.quantity_available || 0) > 0),
+    [materials],
+  )
+
+  const totalAvailableUnits = useMemo(
+    () => inStockMaterials.reduce((sum, material) => sum + Number(material.quantity_available || 0), 0),
+    [inStockMaterials],
   )
 
   const pendingCount = useMemo(
@@ -119,23 +116,18 @@ function UserReserveSuppliesPage({ user }) {
     [myReservations],
   )
 
-  const materialById = useMemo(
-    () => Object.fromEntries(materials.map((material) => [String(material.id), material])),
-    [materials],
-  )
-
-  const totalAvailableUnits = useMemo(
-    () => availableMaterials.reduce((sum, material) => sum + Number(material.quantity_available || 0), 0),
-    [availableMaterials],
-  )
-
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
     setMessage('')
 
+    if (!form.laboratory_id) {
+      setError('Selecciona un laboratorio para continuar.')
+      return
+    }
+
     if (!form.stock_item_id) {
-      setError('Selecciona un reactivo para continuar.')
+      setError('Selecciona un reactivo disponible para continuar.')
       return
     }
 
@@ -159,22 +151,89 @@ function UserReserveSuppliesPage({ user }) {
         quantity: requestedQuantity,
         requested_for: form.requested_for,
         notes: form.notes,
+        laboratory_id: form.laboratory_id,
       })
 
-      setMessage('Reserva de reactivo creada correctamente.')
+      setMessage('Solicitud de reserva creada. El stock se descontara cuando el encargado apruebe.')
       setForm((previous) => ({
         ...previous,
+        stock_item_id: '',
         quantity: 1,
         requested_for: '',
         notes: '',
       }))
 
-      await loadData()
+      await Promise.all([
+        loadMaterials(form.laboratory_id),
+        loadLabsAndReservations(),
+      ])
     } catch (err) {
       setError(err.message || 'No se pudo crear la reserva del reactivo.')
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const renderMaterialsArea = () => {
+    if (!form.laboratory_id) {
+      return (
+        <p className="infra-empty">Selecciona un laboratorio para ver los reactivos disponibles.</p>
+      )
+    }
+
+    if (isLoadingMaterials) {
+      return <p className="infra-empty">Cargando reactivos del laboratorio...</p>
+    }
+
+    if (materials.length === 0) {
+      return <p className="infra-empty">Este laboratorio no tiene reactivos registrados.</p>
+    }
+
+    return (
+      <div className="materials-grid" role="radiogroup" aria-label="Reactivos disponibles">
+        {materials.map((material) => {
+          const stock = Number(material.quantity_available || 0)
+          const isOutOfStock = stock <= 0
+          const isSelected = String(form.stock_item_id) === String(material.id)
+          const cardClass = [
+            'material-card',
+            isOutOfStock ? 'out-of-stock' : '',
+            isSelected ? 'selected' : '',
+          ].filter(Boolean).join(' ')
+
+          return (
+            <button
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
+              aria-disabled={isOutOfStock}
+              disabled={isOutOfStock}
+              key={material.id}
+              className={cardClass}
+              onClick={() => {
+                if (isOutOfStock) return
+                setForm((previous) => ({ ...previous, stock_item_id: String(material.id) }))
+              }}
+            >
+              <div className="material-card-header">
+                <strong>{material.name}</strong>
+                {isOutOfStock ? (
+                  <span className="material-badge agotado">Agotado</span>
+                ) : (
+                  <span className="material-badge disponible">{stock} {material.unit}</span>
+                )}
+              </div>
+              {material.category ? (
+                <span className="material-card-category">{material.category}</span>
+              ) : null}
+              {material.description ? (
+                <p className="material-card-description">{material.description}</p>
+              ) : null}
+            </button>
+          )
+        })}
+      </div>
+    )
   }
 
   return (
@@ -183,12 +242,12 @@ function UserReserveSuppliesPage({ user }) {
         <div>
           <p className="reservations-kicker">Laboratorio</p>
           <h2>Reservar reactivos</h2>
-          <p>Solicita los reactivos disponibles y registra el uso esperado para tu practica.</p>
+          <p>Solicita los reactivos disponibles del laboratorio elegido y registra el uso esperado para tu practica.</p>
         </div>
         <div className="reservations-summary">
           <div>
             <span>Reactivos</span>
-            <strong>{availableMaterials.length}</strong>
+            <strong>{materials.length}</strong>
           </div>
           <div>
             <span>Unidades</span>
@@ -207,11 +266,13 @@ function UserReserveSuppliesPage({ user }) {
       <section className="reservations-panel">
         <div className="reservations-panel-header">
           <h3>Nueva solicitud</h3>
-          <p className="reservations-panel-subtitle">El stock se descuenta al crear la solicitud y queda pendiente de validacion.</p>
+          <p className="reservations-panel-subtitle">
+            Los materiales quedan reservados al solicitar y se descuentan del inventario al ser aprobados por el encargado.
+          </p>
         </div>
 
-        {isLoading ? (
-          <p className="infra-empty">Cargando reactivos...</p>
+        {isLoadingLabs ? (
+          <p className="infra-empty">Cargando laboratorios...</p>
         ) : (
           <form className="reservations-form" onSubmit={handleSubmit}>
             <div className="reservations-form-grid">
@@ -223,28 +284,14 @@ function UserReserveSuppliesPage({ user }) {
                     setForm((previous) => ({
                       ...previous,
                       laboratory_id: event.target.value,
+                      stock_item_id: '',
                     }))
                   }}
-                >
-                  <option value="">Todos los laboratorios</option>
-                  {labs.map((lab) => (
-                    <option key={lab.id} value={lab.id}>{lab.name}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                <span>Reactivo</span>
-                <select
-                  value={form.stock_item_id}
-                  onChange={(event) => setForm((previous) => ({ ...previous, stock_item_id: event.target.value }))}
                   required
                 >
-                  {availableMaterials.length === 0 ? <option value="">Sin stock disponible</option> : null}
-                  {availableMaterials.map((material) => (
-                    <option key={material.id} value={material.id}>
-                      {material.name} ({material.quantity_available} {material.unit})
-                    </option>
+                  <option value="">Selecciona un laboratorio</option>
+                  {labs.map((lab) => (
+                    <option key={lab.id} value={lab.id}>{lab.name}</option>
                   ))}
                 </select>
               </label>
@@ -257,6 +304,7 @@ function UserReserveSuppliesPage({ user }) {
                   max={Math.max(Number(selectedMaterial?.quantity_available || 1), 1)}
                   value={form.quantity}
                   onChange={(event) => setForm((previous) => ({ ...previous, quantity: event.target.value }))}
+                  disabled={!selectedMaterial}
                   required
                 />
               </label>
@@ -269,6 +317,11 @@ function UserReserveSuppliesPage({ user }) {
                   placeholder="Ej.: Practica de quimica organica"
                 />
               </label>
+            </div>
+
+            <div className="materials-picker">
+              <span className="materials-picker-label">Reactivos del laboratorio</span>
+              {renderMaterialsArea()}
             </div>
 
             <label>
@@ -285,7 +338,7 @@ function UserReserveSuppliesPage({ user }) {
               <button
                 type="submit"
                 className="reservations-primary"
-                disabled={isSubmitting || availableMaterials.length === 0}
+                disabled={isSubmitting || !form.stock_item_id}
               >
                 {isSubmitting ? 'Reservando...' : 'Reservar reactivo'}
               </button>
@@ -308,6 +361,7 @@ function UserReserveSuppliesPage({ user }) {
               <thead>
                 <tr>
                   <th>Reactivo</th>
+                  <th>Laboratorio</th>
                   <th>Cantidad</th>
                   <th>Estado</th>
                   <th>Solicitado para</th>
@@ -319,12 +373,8 @@ function UserReserveSuppliesPage({ user }) {
                   <tr key={reservation.id}>
                     <td>
                       <strong>{reservation.stock_item_name || reservation.stock_item_id}</strong>
-                      <small>
-                        {materialById[String(reservation.stock_item_id)]
-                          ? `${materialById[String(reservation.stock_item_id)].quantity_available} ${materialById[String(reservation.stock_item_id)].unit} disponibles ahora`
-                          : ''}
-                      </small>
                     </td>
+                    <td>{reservation.laboratory_name || '-'}</td>
                     <td>{reservation.quantity}</td>
                     <td>
                       <span className={`reservations-status ${reservation.status}`}>
@@ -334,9 +384,7 @@ function UserReserveSuppliesPage({ user }) {
                     <td>{reservation.requested_for || '-'}</td>
                     <td>
                       {formatDateTime(reservation.created)}
-                      <small>
-                        {reservation.notes || 'Sin observaciones'}
-                      </small>
+                      <small>{reservation.notes || 'Sin observaciones'}</small>
                     </td>
                   </tr>
                 ))}

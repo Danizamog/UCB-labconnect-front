@@ -15,12 +15,14 @@ import {
   getOccupancyDashboard,
   getReservationStats,
   listReservationsPage,
+  listSupplyReservations,
   markReservationAbsent,
   registerReservationEntry,
   registerReservationExit,
   subscribeReservationsRealtime,
   updateReservation,
   updateReservationStatus,
+  updateSupplyReservationStatus,
   applyRealtimeRecordPatch,
   mapReservationRecord,
 } from '../services/reservationsService'
@@ -169,6 +171,8 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   const [labs, setLabs] = useState([])
   const [profiles, setProfiles] = useState([])
   const [editingReservationId, setEditingReservationId] = useState(null)
+  const [linkedSupplyReservations, setLinkedSupplyReservations] = useState([])
+  const [isLoadingLinkedSupplies, setIsLoadingLinkedSupplies] = useState(false)
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [isProcessingReservationAction, setIsProcessingReservationAction] = useState(false)
   const [isRejectingReservation, setIsRejectingReservation] = useState(false)
@@ -500,6 +504,18 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     })
     setError('')
     setMessage('')
+    setLinkedSupplyReservations([])
+    setIsLoadingLinkedSupplies(true)
+    listSupplyReservations({ lab_reservation_id: reservation.id, skipCache: true })
+      .then((data) => {
+        setLinkedSupplyReservations(Array.isArray(data) ? data : [])
+      })
+      .catch(() => {
+        setLinkedSupplyReservations([])
+      })
+      .finally(() => {
+        setIsLoadingLinkedSupplies(false)
+      })
   }
 
   const handleCancelEdit = () => {
@@ -508,6 +524,8 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     setIsProcessingReservationAction(false)
     setIsRejectingReservation(false)
     setRejectionReason('')
+    setLinkedSupplyReservations([])
+    setIsLoadingLinkedSupplies(false)
     setDraft({
       laboratory_id: '',
       date: '',
@@ -602,15 +620,43 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     setMessage('')
     setIsProcessingReservationAction(true)
 
+    const cascadeSupplies = async (targetStatus) => {
+      const toCascade = linkedSupplyReservations.filter((supply) => {
+        if (targetStatus === 'approved') return supply.status === 'pending'
+        if (targetStatus === 'cancelled') return supply.status !== 'cancelled'
+        return false
+      })
+      if (toCascade.length === 0) return { ok: 0, failed: [] }
+
+      const results = await Promise.allSettled(
+        toCascade.map((supply) => updateSupplyReservationStatus(supply.id, targetStatus)),
+      )
+      const failed = results
+        .map((r, idx) => ({ r, supply: toCascade[idx] }))
+        .filter(({ r }) => r.status === 'rejected')
+        .map(({ r, supply }) => `${supply.stock_item_name || supply.stock_item_id}: ${r.reason?.message || 'error'}`)
+      return { ok: results.length - failed.length, failed }
+    }
+
     try {
       if (action === 'approve') {
         await updateReservationStatus(editingReservation.id, 'approved')
-        setMessage('Reserva aprobada correctamente. El estudiante recibira una notificacion de confirmacion.')
+        const { ok, failed } = await cascadeSupplies('approved')
+        const supplyNote = ok > 0
+          ? ` Tambien se aprobaron ${ok} reserva(s) de reactivos vinculadas y se descuento el stock.`
+          : ''
+        const failureNote = failed.length > 0
+          ? ` No se pudieron aprobar ${failed.length} reactivo(s): ${failed.join(' | ')}`
+          : ''
+        setMessage(`Reserva aprobada correctamente.${supplyNote}${failureNote}`)
       }
 
       if (action === 'cancel') {
         await updateReservationStatus(editingReservation.id, 'cancelled')
-        setMessage('Reserva cancelada correctamente.')
+        const { ok, failed } = await cascadeSupplies('cancelled')
+        const supplyNote = ok > 0 ? ` Se cancelaron ${ok} reactivo(s) vinculado(s).` : ''
+        const failureNote = failed.length > 0 ? ` Errores: ${failed.join(' | ')}` : ''
+        setMessage(`Reserva cancelada correctamente.${supplyNote}${failureNote}`)
       }
 
       if (action === 'reject') {
@@ -618,7 +664,10 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
           throw new Error('Debes escribir el motivo del rechazo antes de continuar.')
         }
         await updateReservationStatus(editingReservation.id, 'rejected', { cancel_reason: rejectionReason.trim() })
-        setMessage('Reserva rechazada correctamente. El estudiante recibira una notificacion con el motivo ingresado.')
+        const { ok, failed } = await cascadeSupplies('cancelled')
+        const supplyNote = ok > 0 ? ` Se cancelaron ${ok} reactivo(s) vinculado(s).` : ''
+        const failureNote = failed.length > 0 ? ` Errores: ${failed.join(' | ')}` : ''
+        setMessage(`Reserva rechazada correctamente.${supplyNote}${failureNote}`)
       }
 
       if (action === 'entry') {
@@ -1467,6 +1516,48 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
         primaryActionLabel="Guardar reserva"
         extraActions={editingReservation ? (
           <>
+            <div className="reservations-panel" style={{ marginBottom: 12 }}>
+              <div className="reservations-panel-header">
+                <h4>Reactivos solicitados</h4>
+                <p className="reservations-panel-subtitle">
+                  Estos materiales se aprobaran o cancelaran en cascada cuando cambies el estado de la reserva.
+                </p>
+              </div>
+              {isLoadingLinkedSupplies ? (
+                <p className="reservations-empty">Cargando reactivos vinculados...</p>
+              ) : linkedSupplyReservations.length === 0 ? (
+                <p className="reservations-empty">Esta reserva no incluye reactivos.</p>
+              ) : (
+                <table className="supplies-table">
+                  <thead>
+                    <tr>
+                      <th>Reactivo</th>
+                      <th>Cantidad</th>
+                      <th>Disponible</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {linkedSupplyReservations.map((supply) => (
+                      <tr key={supply.id}>
+                        <td><strong>{supply.stock_item_name || supply.stock_item_id}</strong></td>
+                        <td>{supply.quantity}</td>
+                        <td>{supply.quantity_available}</td>
+                        <td>
+                          <span className={`reservations-status ${supply.status}`}>
+                            {supply.status === 'pending' ? 'Pendiente'
+                              : supply.status === 'approved' ? 'Aprobada'
+                              : supply.status === 'delivered' ? 'Entregada'
+                              : supply.status === 'cancelled' ? 'Cancelada'
+                              : supply.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
             {(canApproveFromModal || canRejectFromModal || canCancelFromModal || canRegisterEntryFromModal || canRegisterExitFromModal || canMarkAbsentFromModal) ? (
               <div className="reservations-actions">
                 {canApproveFromModal ? (
