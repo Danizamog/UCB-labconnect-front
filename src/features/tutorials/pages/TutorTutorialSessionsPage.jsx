@@ -692,10 +692,10 @@ function TutorTutorialSessionsPage() {
             const detail = failed.map((result) => result.reason?.message || 'Error desconocido').join('; ')
             setMessage(`Tutoria publicada, pero ${failed.length} material(es) no se pudieron reservar: ${detail}`)
           } else {
-            setMessage('Tutoria publicada con sus materiales solicitados. Quedan pendientes de aprobacion del encargado.')
+            setMessage('Tutoria solicitada con sus materiales. Queda pendiente de aprobacion del encargado del laboratorio.')
           }
         } else {
-          setMessage('Tutoria publicada correctamente. Ya esta visible para los estudiantes.')
+          setMessage('Tutoria solicitada correctamente. Queda pendiente de aprobacion del encargado del laboratorio antes de que los estudiantes puedan inscribirse.')
         }
       }
 
@@ -1206,13 +1206,27 @@ function TutorTutorialSessionsPage() {
               <article key={session.id} className="tutorial-card tutor-card">
                 <div className="tutorial-card-head">
                   <div>
-                    <span className="tutorial-badge">{hasEnded ? 'Finalizada' : 'Publicada'}</span>
+                    <span className="tutorial-badge">
+                      {hasEnded
+                        ? 'Finalizada'
+                        : session.approval_status === 'pending'
+                          ? 'Pendiente de aprobacion'
+                          : session.approval_status === 'rejected'
+                            ? 'Rechazada'
+                            : 'Aprobada'}
+                    </span>
                     <h4>{session.topic}</h4>
                   </div>
                   <strong className="tutorial-seats">{session.enrolled_count}/{session.max_students}</strong>
                 </div>
 
                 <p className="tutorial-copy">{session.description || 'Sin descripcion adicional.'}</p>
+
+                {session.approval_status === 'rejected' && session.approval_reason ? (
+                  <p className="tutorials-inline-hint">
+                    Motivo del rechazo: {session.approval_reason}
+                  </p>
+                ) : null}
 
                 <div className="tutorial-meta">
                   <span>{session.session_date}</span>

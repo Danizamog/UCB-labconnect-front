@@ -8,6 +8,7 @@ import {
   listAvailableLabs,
   prefetchLabAvailability,
   subscribeReservationsRealtime,
+  updateRealtimeSubscription,
 } from '../services/reservationsService'
 import './ReservationsPages.css'
 
@@ -252,66 +253,104 @@ function UserAvailabilityCalendarPage({ user }) {
   const slotsRefreshTimerRef = useRef(null)
   const reservationsRefreshTimerRef = useRef(null)
   const userIdRef = useRef(String(user?.user_id || ''))
+  const selectedLabRef = useRef(String(selectedLab || ''))
+  const selectedDateRef = useRef(String(selectedDate || ''))
+  const loadMyReservationsRef = useRef(loadMyReservations)
+  const realtimeHandlerRef = useRef(null)
 
   useEffect(() => {
     userIdRef.current = String(user?.user_id || '')
   }, [user?.user_id])
 
   useEffect(() => {
-    if (!selectedLab) return undefined
+    selectedLabRef.current = String(selectedLab || '')
+  }, [selectedLab])
 
-    const unsubscribe = subscribeReservationsRealtime((event) => {
+  useEffect(() => {
+    selectedDateRef.current = String(selectedDate || '')
+  }, [selectedDate])
+
+  useEffect(() => {
+    loadMyReservationsRef.current = loadMyReservations
+  }, [loadMyReservations])
+
+  useEffect(() => {
+    const handler = (event) => {
       if (!event?.topic || (event.topic !== 'lab_reservation' && event.topic !== 'tutorial_session')) {
         return
       }
+
+      const currentLab = selectedLabRef.current
+      const currentDate = selectedDateRef.current
 
       if (event.topic === 'lab_reservation') {
         const requestedBy = String(event?.record?.requested_by || '')
         if (requestedBy && requestedBy === userIdRef.current) {
           window.clearTimeout(reservationsRefreshTimerRef.current)
           reservationsRefreshTimerRef.current = window.setTimeout(() => {
-            loadMyReservations({ skipCache: true })
+            loadMyReservationsRef.current?.({ skipCache: true })
           }, RESERVATIONS_REFRESH_DEBOUNCE_MS)
         }
       }
 
+      if (!currentLab) return
+
       const eventLabId = String(event?.record?.laboratory_id || '')
-      if (eventLabId && eventLabId !== String(selectedLab)) {
+      if (eventLabId && eventLabId !== currentLab) {
         return
       }
 
       const eventDate = String(event?.record?.start_at || event?.record?.session_date || '').slice(0, 10)
-      if (eventDate && selectedDate && eventDate !== selectedDate) {
+      if (eventDate && currentDate && eventDate !== currentDate) {
         return
       }
 
-      if (selectedDate) {
+      if (currentDate) {
         window.clearTimeout(slotsRefreshTimerRef.current)
         slotsRefreshTimerRef.current = window.setTimeout(() => {
-          getLabAvailability(selectedLab, selectedDate, { skipCache: true })
+          const lab = selectedLabRef.current
+          const date = selectedDateRef.current
+          if (!lab || !date) return
+          getLabAvailability(lab, date, { skipCache: true })
             .then((payload) => setSlots(Array.isArray(payload?.slots) ? payload.slots : []))
             .catch(() => {})
         }, 800)
       }
-    }, {
+    }
+    realtimeHandlerRef.current = handler
+
+    const initialLab = selectedLabRef.current
+    const unsubscribe = subscribeReservationsRealtime(handler, {
       topics: ['lab_reservation', 'tutorial_session'],
-      laboratoryIds: [String(selectedLab)],
+      laboratoryIds: initialLab ? [initialLab] : [],
       onResync: () => {
-        if (selectedDate) {
-          getLabAvailability(selectedLab, selectedDate, { skipCache: true })
+        const lab = selectedLabRef.current
+        const date = selectedDateRef.current
+        if (lab && date) {
+          getLabAvailability(lab, date, { skipCache: true })
             .then((payload) => setSlots(Array.isArray(payload?.slots) ? payload.slots : []))
             .catch(() => {})
         }
-        loadMyReservations({ skipCache: true })
+        loadMyReservationsRef.current?.({ skipCache: true })
       },
     })
 
     return () => {
       window.clearTimeout(slotsRefreshTimerRef.current)
       window.clearTimeout(reservationsRefreshTimerRef.current)
+      realtimeHandlerRef.current = null
       unsubscribe?.()
     }
-  }, [loadMyReservations, selectedDate, selectedLab])
+  }, [])
+
+  useEffect(() => {
+    const handler = realtimeHandlerRef.current
+    if (!handler) return
+    updateRealtimeSubscription(handler, {
+      topics: ['lab_reservation', 'tutorial_session'],
+      laboratoryIds: selectedLab ? [String(selectedLab)] : [],
+    })
+  }, [selectedLab])
 
   const mappedSlots = useMemo(
     () => slots.map((slot) => ({

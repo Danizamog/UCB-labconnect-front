@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  listMyReservations,
+  searchMyReservationHistory,
   subscribeReservationsRealtime,
-  applyRealtimeRecordPatch,
-  mapReservationRecord,
 } from '../services/reservationsService'
 import {
   listMyEnrolledTutorialSessions,
@@ -13,12 +11,14 @@ import { formatDateTime, formatStatus } from '../../../shared/utils/formatters'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import './UserHistoryPage.css'
 
-const RESERVATION_HISTORY_STATUSES = new Set(['approved', 'in_progress', 'rejected', 'cancelled', 'completed', 'absent'])
 const FILTER_TYPES = {
   ALL: 'all',
   RESERVATIONS: 'reservations',
   TUTORIALS: 'tutorials',
 }
+const RESERVATION_PAGE_SIZE_OPTIONS = [10, 25, 50]
+const TUTORIAL_VISIBLE_INITIAL = 20
+const TUTORIAL_VISIBLE_STEP = 20
 
 function parseDateTimeValue(value) {
   const parsed = new Date(String(value || '').replace(' ', 'T'))
@@ -36,10 +36,6 @@ function parseDateTime(obj, dateField, timeField, datetimeField) {
   }
 
   return null
-}
-
-function parseReservationStart(reservation) {
-  return parseDateTime(reservation, 'date', 'start_time', 'start_at')
 }
 
 function parseTutorialEnd(session) {
@@ -89,20 +85,41 @@ function formatTutorialExactDate(session) {
 
 function UserHistoryPage({ user }) {
   const [reservations, setReservations] = useState([])
+  const [reservationPage, setReservationPage] = useState(0)
+  const [reservationPageSize, setReservationPageSize] = useState(RESERVATION_PAGE_SIZE_OPTIONS[0])
+  const [reservationTotalElements, setReservationTotalElements] = useState(0)
+  const [reservationTotalPages, setReservationTotalPages] = useState(0)
+  const [isLoadingReservations, setIsLoadingReservations] = useState(false)
   const [tutorials, setTutorials] = useState([])
+  const [tutorialVisibleCount, setTutorialVisibleCount] = useState(TUTORIAL_VISIBLE_INITIAL)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [activeFilter, setActiveFilter] = useState(FILTER_TYPES.ALL)
   const [keyword, setKeyword] = useState('')
 
   const loadReservationsOnly = useCallback(async (options = {}) => {
+    const pageNumber = Number.isInteger(options.pageNumber) ? options.pageNumber : reservationPage
+    const pageSize = options.pageSize || reservationPageSize
+    setIsLoadingReservations(true)
     try {
-      const data = await listMyReservations({ skipCache: options.skipCache })
-      setReservations(Array.isArray(data) ? data : [])
+      const result = await searchMyReservationHistory({
+        pageNumber,
+        pageSize,
+        sortBy: 'start_at',
+        sortType: 'DESC',
+        skipCache: Boolean(options.skipCache),
+      })
+      setReservations(Array.isArray(result?.items) ? result.items : [])
+      setReservationTotalElements(Number(result?.totalElements || 0))
+      setReservationTotalPages(Number(result?.totalPages || 0))
     } catch {
       setReservations([])
+      setReservationTotalElements(0)
+      setReservationTotalPages(0)
+    } finally {
+      setIsLoadingReservations(false)
     }
-  }, [])
+  }, [reservationPage, reservationPageSize])
 
   const canManageTutorials = hasAnyPermission(user, ['gestionar_tutorias'])
 
@@ -145,20 +162,49 @@ function UserHistoryPage({ user }) {
   }, [loadReservationsOnly, loadTutorialsOnly])
 
   const tutorialReloadTimerRef = useRef(null)
+  const reservationsReloadTimerRef = useRef(null)
   const userIdRef = useRef(String(user?.user_id || ''))
+  const loadReservationsOnlyRef = useRef(loadReservationsOnly)
+  const loadTutorialsOnlyRef = useRef(loadTutorialsOnly)
+  const loadHistoryRef = useRef(loadHistory)
 
   useEffect(() => {
     userIdRef.current = String(user?.user_id || '')
   }, [user?.user_id])
 
   useEffect(() => {
-    loadHistory()
+    loadReservationsOnlyRef.current = loadReservationsOnly
+  }, [loadReservationsOnly])
 
+  useEffect(() => {
+    loadTutorialsOnlyRef.current = loadTutorialsOnly
+  }, [loadTutorialsOnly])
+
+  useEffect(() => {
+    loadHistoryRef.current = loadHistory
+  }, [loadHistory])
+
+  useEffect(() => {
+    loadReservationsOnly()
+  }, [loadReservationsOnly])
+
+  useEffect(() => {
+    loadTutorialsOnly()
+  }, [loadTutorialsOnly])
+
+  useEffect(() => {
     const scheduleTutorialReload = () => {
       window.clearTimeout(tutorialReloadTimerRef.current)
       tutorialReloadTimerRef.current = window.setTimeout(() => {
-        loadTutorialsOnly()
+        loadTutorialsOnlyRef.current?.()
       }, 1500)
+    }
+
+    const scheduleReservationsReload = () => {
+      window.clearTimeout(reservationsReloadTimerRef.current)
+      reservationsReloadTimerRef.current = window.setTimeout(() => {
+        loadReservationsOnlyRef.current?.({ skipCache: true })
+      }, 800)
     }
 
     const tutorialEventConcernsUser = (event) => {
@@ -181,7 +227,7 @@ function UserHistoryPage({ user }) {
       if (event?.topic === 'lab_reservation') {
         const requestedBy = String(event?.record?.requested_by || '')
         if (requestedBy && requestedBy === userIdRef.current) {
-          setReservations((prev) => applyRealtimeRecordPatch(prev, event, { mapper: mapReservationRecord }))
+          scheduleReservationsReload()
         }
         return
       }
@@ -196,35 +242,17 @@ function UserHistoryPage({ user }) {
       }
     }, {
       topics: ['lab_reservation', 'tutorial_session', 'user_notification'],
-      onResync: () => loadHistory({ skipCache: true }),
+      onResync: () => loadHistoryRef.current?.({ skipCache: true }),
     })
 
     return () => {
       window.clearTimeout(tutorialReloadTimerRef.current)
+      window.clearTimeout(reservationsReloadTimerRef.current)
       unsubscribe?.()
     }
-  }, [loadHistory, loadTutorialsOnly])
+  }, [])
 
-  const reservationHistory = useMemo(() => {
-    const currentUserId = String(user?.user_id || '')
-    const now = Date.now()
-
-    return reservations
-      .filter((reservation) => reservation?.requested_by === currentUserId)
-      .filter((reservation) => {
-        if (RESERVATION_HISTORY_STATUSES.has(String(reservation?.status || ''))) {
-          return true
-        }
-
-        const startAt = parseReservationStart(reservation)
-        return Boolean(startAt) && startAt.getTime() <= now
-      })
-      .sort((left, right) => {
-        const leftTime = parseReservationStart(left)?.getTime() || 0
-        const rightTime = parseReservationStart(right)?.getTime() || 0
-        return rightTime - leftTime
-      })
-  }, [reservations, user?.user_id])
+  const reservationHistory = reservations
 
   const tutorialHistory = useMemo(() => {
     const now = Date.now()
@@ -273,6 +301,15 @@ function UserHistoryPage({ user }) {
     ])
   }, [normalizedKeyword, tutorialHistory])
 
+  const visibleTutorialHistory = useMemo(
+    () => filteredTutorialHistory.slice(0, tutorialVisibleCount),
+    [filteredTutorialHistory, tutorialVisibleCount],
+  )
+
+  useEffect(() => {
+    setTutorialVisibleCount(TUTORIAL_VISIBLE_INITIAL)
+  }, [normalizedKeyword])
+
   const shouldShowReservations = activeFilter === FILTER_TYPES.ALL || activeFilter === FILTER_TYPES.RESERVATIONS
   const shouldShowTutorials = activeFilter === FILTER_TYPES.ALL || activeFilter === FILTER_TYPES.TUTORIALS
 
@@ -294,11 +331,11 @@ function UserHistoryPage({ user }) {
       <div className="history-summary">
         <article>
           <span>Reservas en historial</span>
-          <strong>{filteredReservationHistory.length}</strong>
+          <strong>{reservationTotalElements}</strong>
         </article>
         <article>
           <span>Tutorias finalizadas</span>
-          <strong>{filteredTutorialHistory.length}</strong>
+          <strong>{tutorialHistory.length}</strong>
         </article>
       </div>
 
@@ -348,13 +385,20 @@ function UserHistoryPage({ user }) {
       <section className="history-panel" aria-label="Historial de reservas">
         <div className="history-panel-head">
           <h3>Reservas</h3>
-          <p>Incluye tus reservas aprobadas, en curso, completadas, canceladas o rechazadas.</p>
+          <p>
+            Incluye tus reservas aprobadas, en curso, completadas, canceladas o rechazadas.
+            {normalizedKeyword ? ' La búsqueda filtra solo la página actual.' : ''}
+          </p>
         </div>
 
-        {isLoading && filteredReservationHistory.length === 0 ? (
+        {isLoadingReservations && filteredReservationHistory.length === 0 ? (
           <p className="history-empty">Cargando historial de reservas...</p>
         ) : filteredReservationHistory.length === 0 ? (
-          <p className="history-empty">Aun no tienes reservas en historial.</p>
+          <p className="history-empty">
+            {normalizedKeyword
+              ? 'Ninguna reserva de esta página coincide con la búsqueda. Cambia de página o limpia el filtro.'
+              : 'Aun no tienes reservas en historial.'}
+          </p>
         ) : (
           <div className="history-list">
             {filteredReservationHistory.map((reservation) => (
@@ -376,6 +420,47 @@ function UserHistoryPage({ user }) {
             ))}
           </div>
         )}
+
+        {reservationTotalElements > 0 ? (
+          <div className="history-pagination">
+            <span className="history-pagination-info">
+              Página {Math.min(reservationPage + 1, Math.max(reservationTotalPages, 1))} de {Math.max(reservationTotalPages, 1)}
+              {' '}— {reservationTotalElements} reserva{reservationTotalElements === 1 ? '' : 's'} en total
+            </span>
+            <div className="history-pagination-controls">
+              <label>
+                <span className="visually-hidden">Reservas por página</span>
+                <select
+                  value={reservationPageSize}
+                  onChange={(event) => {
+                    const nextSize = Number(event.target.value) || RESERVATION_PAGE_SIZE_OPTIONS[0]
+                    setReservationPageSize(nextSize)
+                    setReservationPage(0)
+                  }}
+                  aria-label="Reservas por página"
+                >
+                  {RESERVATION_PAGE_SIZE_OPTIONS.map((size) => (
+                    <option key={size} value={size}>{size} por página</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => setReservationPage((prev) => Math.max(prev - 1, 0))}
+                disabled={reservationPage <= 0 || isLoadingReservations}
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                onClick={() => setReservationPage((prev) => prev + 1)}
+                disabled={reservationPage + 1 >= reservationTotalPages || isLoadingReservations}
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
       ) : null}
 
@@ -391,8 +476,9 @@ function UserHistoryPage({ user }) {
         ) : filteredTutorialHistory.length === 0 ? (
           <p className="history-empty">Aun no tienes tutorias finalizadas en historial.</p>
         ) : (
+          <>
           <div className="history-list">
-            {filteredTutorialHistory.map((session) => (
+            {visibleTutorialHistory.map((session) => (
               <article key={session.id} className="history-card">
                 <div className="history-card-top">
                   <span className="history-chip">{session.audience}</span>
@@ -409,6 +495,22 @@ function UserHistoryPage({ user }) {
               </article>
             ))}
           </div>
+          {filteredTutorialHistory.length > visibleTutorialHistory.length ? (
+            <div className="history-pagination">
+              <span className="history-pagination-info">
+                Mostrando {visibleTutorialHistory.length} de {filteredTutorialHistory.length}
+              </span>
+              <div className="history-pagination-controls">
+                <button
+                  type="button"
+                  onClick={() => setTutorialVisibleCount((prev) => prev + TUTORIAL_VISIBLE_STEP)}
+                >
+                  Ver mas
+                </button>
+              </div>
+            </div>
+          ) : null}
+          </>
         )}
       </section>
       ) : null}

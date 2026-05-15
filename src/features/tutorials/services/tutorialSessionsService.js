@@ -120,6 +120,8 @@ function mapTutorialSession(record) {
     end_at: record?.end_at || '',
     max_students: Number(record?.max_students || 0),
     is_published: record?.is_published !== false,
+    approval_status: String(record?.approval_status || 'pending'),
+    approval_reason: String(record?.approval_reason || ''),
     tutor_observation: record?.tutor_observation || '',
     enrolled_students: enrolledStudents.map((student) => ({
       student_id: student?.student_id || '',
@@ -149,6 +151,27 @@ export async function listPublicTutorialSessions(filters = {}) {
 export async function listMyTutorialSessions() {
   const data = await request(`${tutorialsBase}/tutorial-sessions/mine`, { cacheTtlMs: 5000 })
   return Array.isArray(data) ? data.map(mapTutorialSession) : []
+}
+
+export async function listPendingTutorialSessions() {
+  const data = await request(`${tutorialsBase}/tutorial-sessions/pending`, { cacheTtlMs: 1500, skipCache: true })
+  return Array.isArray(data) ? data.map(mapTutorialSession) : []
+}
+
+export async function updateTutorialSessionApproval(sessionId, statusValue, reason = '') {
+  if (!sessionId) {
+    throw new Error('No se pudo identificar la tutoria para aprobar o rechazar.')
+  }
+
+  const record = await request(`${tutorialsBase}/tutorial-sessions/${sessionId}/approval`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      status: String(statusValue || ''),
+      reason: String(reason || ''),
+    }),
+  })
+  clearTutorialSessionsCache()
+  return mapTutorialSession(record)
 }
 
 export async function listMyEnrolledTutorialSessions() {

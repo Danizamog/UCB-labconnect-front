@@ -2,6 +2,7 @@
 import {
   Activity,
   AlertCircle,
+  BookOpen,
   ClipboardList,
   DoorOpen,
   LayoutDashboard,
@@ -10,6 +11,10 @@ import {
 } from 'lucide-react'
 import { listAdminLabs } from '../../admin/services/infrastructureService'
 import { listUserProfiles } from '../../admin/services/profileService'
+import {
+  listPendingTutorialSessions,
+  updateTutorialSessionApproval,
+} from '../../tutorials/services/tutorialSessionsService'
 import {
   createWalkInReservation,
   getOccupancyDashboard,
@@ -91,6 +96,12 @@ const ADMIN_RESERVATION_SECTIONS = [
     helper: 'Busca, filtra y edita reservas sin distracciones.',
     tone: 'requests',
   },
+  {
+    id: 'tutorias-pendientes',
+    label: 'Tutorias pendientes',
+    helper: 'Aprueba o rechaza tutorias y elige sus materiales solicitados.',
+    tone: 'requests',
+  },
 ]
 
 const SECTION_ICON_MAP = {
@@ -99,10 +110,11 @@ const SECTION_ICON_MAP = {
   'ingreso-rapido': DoorOpen,
   'control-entradas-salidas': ClipboardList,
   'solicitudes-reserva': SearchCheck,
+  'tutorias-pendientes': BookOpen,
 }
 
 const defaultTableFilters = {
-  status: 'all',
+  status: 'pending',
   laboratory_id: '',
   date: '',
   where: '',
@@ -201,6 +213,12 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   const [userSearchTerm, setUserSearchTerm] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [pendingTutorials, setPendingTutorials] = useState([])
+  const [isLoadingPendingTutorials, setIsLoadingPendingTutorials] = useState(false)
+  const [tutorialSupplyMap, setTutorialSupplyMap] = useState({})
+  const [tutorialSupplySelection, setTutorialSupplySelection] = useState({})
+  const [tutorialRejectionDrafts, setTutorialRejectionDrafts] = useState({})
+  const [tutorialActionId, setTutorialActionId] = useState('')
   const tableQueryRef = useRef({ ...defaultTableFilters, pageNumber: 0 })
   const realtimeRefreshTimeoutRef = useRef(null)
 
@@ -286,6 +304,48 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     }
   }, [])
 
+  const loadPendingTutorialsData = useCallback(async () => {
+    setIsLoadingPendingTutorials(true)
+    try {
+      const sessions = await listPendingTutorialSessions()
+      setPendingTutorials(sessions)
+
+      const supplyResults = await Promise.all(
+        sessions.map(async (session) => {
+          try {
+            const supplies = await listSupplyReservations({
+              tutorial_session_id: session.id,
+              skipCache: true,
+            })
+            return [session.id, supplies]
+          } catch {
+            return [session.id, []]
+          }
+        }),
+      )
+
+      const supplyMap = Object.fromEntries(supplyResults)
+      setTutorialSupplyMap(supplyMap)
+      setTutorialSupplySelection((previous) => {
+        const next = { ...previous }
+        for (const [sessionId, supplies] of supplyResults) {
+          if (!next[sessionId]) {
+            next[sessionId] = Object.fromEntries(
+              supplies
+                .filter((supply) => supply.status === 'pending')
+                .map((supply) => [supply.id, true]),
+            )
+          }
+        }
+        return next
+      })
+    } catch (err) {
+      setError(err.message || 'No se pudieron cargar las tutorias pendientes.')
+    } finally {
+      setIsLoadingPendingTutorials(false)
+    }
+  }, [])
+
   const reloadAll = useCallback(async () => {
     await Promise.all([loadOperationalData(), loadTableData(tableQueryRef.current)])
   }, [loadOperationalData, loadTableData])
@@ -348,6 +408,12 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   useEffect(() => {
     setActiveWorkspace(getReservationSectionFromHash(currentHash))
   }, [currentHash])
+
+  useEffect(() => {
+    if (activeWorkspace === 'tutorias-pendientes') {
+      loadPendingTutorialsData()
+    }
+  }, [activeWorkspace, loadPendingTutorialsData])
 
   const labNameById = useMemo(
     () => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])),
@@ -750,6 +816,101 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
       setError(err.message || 'No se pudo registrar el walk-in.')
     } finally {
       setIsSavingWalkIn(false)
+    }
+  }
+
+  const toggleTutorialSupply = (sessionId, supplyId) => {
+    setTutorialSupplySelection((previous) => {
+      const current = previous[sessionId] || {}
+      return {
+        ...previous,
+        [sessionId]: {
+          ...current,
+          [supplyId]: !current[supplyId],
+        },
+      }
+    })
+  }
+
+  const handleApproveTutorial = async (session) => {
+    if (!session?.id) return
+    setError('')
+    setMessage('')
+    setTutorialActionId(session.id)
+
+    try {
+      const supplies = tutorialSupplyMap[session.id] || []
+      const selection = tutorialSupplySelection[session.id] || {}
+      const toApprove = supplies.filter((supply) => supply.status === 'pending' && selection[supply.id])
+      const toCancel = supplies.filter((supply) => supply.status === 'pending' && !selection[supply.id])
+
+      await updateTutorialSessionApproval(session.id, 'approved')
+
+      const approveResults = await Promise.allSettled(
+        toApprove.map((supply) => updateSupplyReservationStatus(supply.id, 'approved')),
+      )
+      const cancelResults = await Promise.allSettled(
+        toCancel.map((supply) => updateSupplyReservationStatus(supply.id, 'cancelled')),
+      )
+
+      const approvedOk = approveResults.filter((result) => result.status === 'fulfilled').length
+      const approvedFailed = approveResults
+        .map((result, idx) => ({ result, supply: toApprove[idx] }))
+        .filter(({ result }) => result.status === 'rejected')
+        .map(({ result, supply }) => `${supply.stock_item_name || supply.stock_item_id}: ${result.reason?.message || 'error'}`)
+      const cancelledOk = cancelResults.filter((result) => result.status === 'fulfilled').length
+
+      let notice = `Tutoria '${session.topic}' aprobada.`
+      if (approvedOk > 0) notice += ` Se aprobaron ${approvedOk} insumo(s) y se descuento el stock.`
+      if (cancelledOk > 0) notice += ` Se cancelaron ${cancelledOk} insumo(s) no seleccionado(s).`
+      if (approvedFailed.length > 0) notice += ` Errores en insumos: ${approvedFailed.join(' | ')}`
+      setMessage(notice)
+
+      await loadPendingTutorialsData()
+    } catch (err) {
+      setError(err.message || 'No se pudo aprobar la tutoria.')
+    } finally {
+      setTutorialActionId('')
+    }
+  }
+
+  const handleRejectTutorial = async (session) => {
+    if (!session?.id) return
+    const reason = String(tutorialRejectionDrafts[session.id] || '').trim()
+    if (!reason) {
+      setError('Debes escribir el motivo del rechazo antes de continuar.')
+      return
+    }
+
+    setError('')
+    setMessage('')
+    setTutorialActionId(session.id)
+
+    try {
+      const supplies = tutorialSupplyMap[session.id] || []
+      const pendingSupplies = supplies.filter((supply) => supply.status === 'pending')
+
+      await updateTutorialSessionApproval(session.id, 'rejected', reason)
+
+      const cancelResults = await Promise.allSettled(
+        pendingSupplies.map((supply) => updateSupplyReservationStatus(supply.id, 'cancelled')),
+      )
+      const cancelledOk = cancelResults.filter((result) => result.status === 'fulfilled').length
+
+      let notice = `Tutoria '${session.topic}' rechazada.`
+      if (cancelledOk > 0) notice += ` Se cancelaron ${cancelledOk} insumo(s) vinculado(s).`
+      setMessage(notice)
+
+      setTutorialRejectionDrafts((previous) => {
+        const next = { ...previous }
+        delete next[session.id]
+        return next
+      })
+      await loadPendingTutorialsData()
+    } catch (err) {
+      setError(err.message || 'No se pudo rechazar la tutoria.')
+    } finally {
+      setTutorialActionId('')
     }
   }
 
@@ -1488,6 +1649,161 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
               Siguiente
             </button>
           </div>
+        </section>
+      ) : null}
+
+      {activeWorkspace === 'tutorias-pendientes' ? (
+        <section className="reservations-panel reservations-panel-priority">
+          <div className="reservations-panel-header">
+            <h3>Tutorias pendientes de aprobacion</h3>
+            <p className="reservations-panel-subtitle">
+              Cuando un tutor publica una tutoria, el horario queda bloqueado hasta que tu la apruebes o rechaces.
+              Si pidio materiales, decide cuales aceptas en la misma vista.
+            </p>
+          </div>
+
+          {isLoadingPendingTutorials ? (
+            <p className="reservations-empty">Cargando tutorias pendientes...</p>
+          ) : pendingTutorials.length === 0 ? (
+            <p className="reservations-empty">No hay tutorias pendientes de aprobacion.</p>
+          ) : (
+            <div className="reservations-table-wrap">
+              {pendingTutorials.map((session) => {
+                const supplies = tutorialSupplyMap[session.id] || []
+                const selection = tutorialSupplySelection[session.id] || {}
+                const isActioning = tutorialActionId === session.id
+                const rejectionDraft = tutorialRejectionDrafts[session.id] || ''
+                const labName = labNameById[String(session.laboratory_id)] || session.location || '-'
+
+                return (
+                  <article
+                    key={session.id}
+                    className="reservations-panel"
+                    style={{ marginBottom: 16 }}
+                  >
+                    <div className="reservations-panel-header">
+                      <h4>{session.topic}</h4>
+                      <p className="reservations-panel-subtitle">
+                        Tutor: <strong>{session.tutor_name || 'Sin asignar'}</strong>
+                        {session.tutor_email ? ` (${session.tutor_email})` : ''}
+                      </p>
+                    </div>
+
+                    <div className="reservations-controls">
+                      <div>
+                        <span style={{ display: 'block', fontSize: 12, opacity: 0.7 }}>Laboratorio</span>
+                        <strong>{labName}</strong>
+                      </div>
+                      <div>
+                        <span style={{ display: 'block', fontSize: 12, opacity: 0.7 }}>Fecha</span>
+                        <strong>{formatDate(session.session_date)}</strong>
+                      </div>
+                      <div>
+                        <span style={{ display: 'block', fontSize: 12, opacity: 0.7 }}>Horario</span>
+                        <strong>{session.start_time} - {session.end_time}</strong>
+                      </div>
+                      <div>
+                        <span style={{ display: 'block', fontSize: 12, opacity: 0.7 }}>Cupos</span>
+                        <strong>{session.max_students}</strong>
+                      </div>
+                    </div>
+
+                    {session.description ? (
+                      <p style={{ marginTop: 12 }}>{session.description}</p>
+                    ) : null}
+
+                    <div className="reservations-panel" style={{ marginTop: 12 }}>
+                      <div className="reservations-panel-header">
+                        <h5>Materiales solicitados</h5>
+                        <p className="reservations-panel-subtitle">
+                          Marca cuales aceptas. Los desmarcados se cancelaran cuando apruebes la tutoria.
+                        </p>
+                      </div>
+                      {supplies.length === 0 ? (
+                        <p className="reservations-empty">Esta tutoria no incluye materiales.</p>
+                      ) : (
+                        <table className="supplies-table">
+                          <thead>
+                            <tr>
+                              <th>Aceptar</th>
+                              <th>Reactivo</th>
+                              <th>Cantidad</th>
+                              <th>Disponible</th>
+                              <th>Estado</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {supplies.map((supply) => {
+                              const isPending = supply.status === 'pending'
+                              const isChecked = isPending ? Boolean(selection[supply.id]) : false
+                              return (
+                                <tr key={supply.id}>
+                                  <td>
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      disabled={!isPending || isActioning}
+                                      onChange={() => toggleTutorialSupply(session.id, supply.id)}
+                                    />
+                                  </td>
+                                  <td><strong>{supply.stock_item_name || supply.stock_item_id}</strong></td>
+                                  <td>{supply.quantity}</td>
+                                  <td>{supply.quantity_available}</td>
+                                  <td>
+                                    <span className={`reservations-status ${supply.status}`}>
+                                      {supply.status === 'pending' ? 'Pendiente'
+                                        : supply.status === 'approved' ? 'Aprobada'
+                                        : supply.status === 'delivered' ? 'Entregada'
+                                        : supply.status === 'cancelled' ? 'Cancelada'
+                                        : supply.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+
+                    <div className="reservations-actions">
+                      <button
+                        type="button"
+                        className="reservations-primary"
+                        disabled={isActioning || !canManage}
+                        onClick={() => handleApproveTutorial(session)}
+                      >
+                        {isActioning ? 'Procesando...' : 'Aprobar tutoria'}
+                      </button>
+                    </div>
+
+                    <label style={{ marginTop: 12, display: 'block' }}>
+                      <span>Motivo de rechazo</span>
+                      <textarea
+                        rows="2"
+                        value={rejectionDraft}
+                        onChange={(event) => setTutorialRejectionDrafts((previous) => ({
+                          ...previous,
+                          [session.id]: event.target.value,
+                        }))}
+                        placeholder="Explica por que no puedes aprobar esta tutoria."
+                      />
+                    </label>
+                    <div className="reservations-actions">
+                      <button
+                        type="button"
+                        className="reservations-danger"
+                        disabled={isActioning || !canManage || !rejectionDraft.trim()}
+                        onClick={() => handleRejectTutorial(session)}
+                      >
+                        Rechazar tutoria
+                      </button>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
         </section>
       ) : null}
 

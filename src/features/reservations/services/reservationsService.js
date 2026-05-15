@@ -457,6 +457,24 @@ export async function getReservationById(reservationId) {
   return mapReservation(data || {})
 }
 
+export async function searchMyReservationHistory(filters = {}) {
+  const search = new URLSearchParams()
+  search.set('pageNumber', String(Math.max(Number(filters.pageNumber || 0), 0)))
+  search.set('pageSize', String(Math.max(Number(filters.pageSize || 10), 1)))
+  search.set('sortBy', String(filters.sortBy || 'start_at'))
+  search.set('sortType', String(filters.sortType || 'DESC').toUpperCase())
+
+  const skipCache = Boolean(filters.skipCache)
+  const data = await request(
+    `${reservationsBase}/reservations/mine/history/search?${search.toString()}`,
+    {
+      cacheTtlMs: skipCache ? 0 : 2000,
+      skipCache,
+    },
+  )
+  return mapReservationPage(data || {})
+}
+
 export async function listReservationsPage(filters = {}) {
   const search = new URLSearchParams()
   search.set('pageNumber', String(Math.max(Number(filters.pageNumber || 0), 0)))
