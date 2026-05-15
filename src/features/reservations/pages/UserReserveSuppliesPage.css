@@ -38,3 +38,109 @@
   margin-top: 4px;
   color: var(--ink-700);
 }
+
+.materials-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+.materials-picker-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-700);
+  font-weight: 700;
+}
+
+.materials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.material-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--line-300);
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+  font: inherit;
+  color: inherit;
+}
+
+.material-card:hover:not(:disabled) {
+  border-color: #2563eb;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.12);
+}
+
+.material-card.selected {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+}
+
+.material-card.out-of-stock {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+  filter: grayscale(0.4);
+  opacity: 0.75;
+}
+
+.material-card.out-of-stock:hover {
+  border-color: var(--line-300);
+  box-shadow: none;
+}
+
+.material-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.material-card-header strong {
+  font-size: 0.95rem;
+  color: inherit;
+}
+
+.material-card-category {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-700);
+}
+
+.material-card-description {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: var(--ink-700);
+  line-height: 1.35;
+}
+
+.material-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.material-badge.disponible {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+}
+
+.material-badge.agotado {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}

@@ -276,8 +276,10 @@ export function deleteAsset(assetId) {
   })
 }
 
-export function listMaterials() {
-  return request(`${inventoryBase}/stock-items`, { cacheTtlMs: 5000 })
+export function listMaterials(laboratoryId = '') {
+  const normalized = String(laboratoryId || '').trim()
+  const query = normalized ? `?laboratory_id=${encodeURIComponent(normalized)}` : ''
+  return request(`${inventoryBase}/stock-items${query}`, { cacheTtlMs: 5000 })
 }
 
 export function getStockItemsReport({

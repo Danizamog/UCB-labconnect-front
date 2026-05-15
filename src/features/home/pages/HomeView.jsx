@@ -374,7 +374,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const studentActionCards = [
     {
       title: 'Reservar laboratorio',
-      text: 'Elige fecha, laboratorio y horario disponible.',
+      text: 'Elige fecha, laboratorio y horario disponible. Tambien puedes pedir reactivos en el mismo flujo.',
       icon: FlaskConical,
       path: '/app/reservas/nueva',
       primary: true,

@@ -722,6 +722,76 @@ export async function markAllReservationNotificationsAsRead() {
   return data
 }
 
+function mapSupplyReservation(record) {
+  return {
+    id: String(record?.id || ''),
+    stock_item_id: String(record?.stock_item_id || ''),
+    stock_item_name: record?.stock_item_name || '',
+    laboratory_id: String(record?.laboratory_id || ''),
+    laboratory_name: record?.laboratory_name || '',
+    quantity: Number(record?.quantity || 0),
+    quantity_available: Number(record?.quantity_available || 0),
+    status: String(record?.status || 'pending'),
+    requested_by: String(record?.requested_by || ''),
+    requested_for: String(record?.requested_for || ''),
+    notes: String(record?.notes || ''),
+    tutorial_session_id: String(record?.tutorial_session_id || ''),
+    lab_reservation_id: String(record?.lab_reservation_id || ''),
+    created: String(record?.created || ''),
+    updated: String(record?.updated || ''),
+  }
+}
+
+export async function listSupplyReservations(filters = {}) {
+  const search = new URLSearchParams()
+  if (filters.status) search.set('status', filters.status)
+  if (filters.tutorial_session_id) search.set('tutorial_session_id', filters.tutorial_session_id)
+  if (filters.stock_item_id) search.set('stock_item_id', filters.stock_item_id)
+  if (filters.lab_reservation_id) search.set('lab_reservation_id', filters.lab_reservation_id)
+
+  const query = search.toString() ? `?${search.toString()}` : ''
+  const data = await request(`${reservationsBase}/supply-reservations${query}`, {
+    cacheTtlMs: filters.skipCache ? 0 : 1500,
+    skipCache: Boolean(filters.skipCache),
+  })
+  return Array.isArray(data) ? data.map(mapSupplyReservation) : []
+}
+
+export async function createSupplyReservation(payload) {
+  const body = {
+    stock_item_id: String(payload.stock_item_id || ''),
+    quantity: Number(payload.quantity || 0),
+    requested_for: String(payload.requested_for || ''),
+    notes: String(payload.notes || ''),
+    laboratory_id: String(payload.laboratory_id || ''),
+    tutorial_session_id: String(payload.tutorial_session_id || ''),
+    lab_reservation_id: String(payload.lab_reservation_id || ''),
+  }
+
+  const record = await request(`${reservationsBase}/supply-reservations`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+  clearReservationsCache()
+  return mapSupplyReservation(record)
+}
+
+export async function updateSupplyReservationStatus(reservationId, statusValue, options = {}) {
+  if (!reservationId) {
+    throw new Error('No se pudo identificar la reserva de insumo.')
+  }
+
+  const record = await request(`${reservationsBase}/supply-reservations/${reservationId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      status: String(statusValue || ''),
+      notes: options.notes !== undefined ? String(options.notes) : null,
+    }),
+  })
+  clearReservationsCache()
+  return mapSupplyReservation(record)
+}
+
 export async function listMyPenalties() {
   const data = await request(`${reservationsBase}/penalties/mine`, { cacheTtlMs: 1500 })
   return Array.isArray(data) ? data.map(mapPenalty) : []
