@@ -12,6 +12,7 @@ import {
   getTutorialSessionById,
   listMyTutorialSessions,
   subscribeTutorialSessionsRealtime,
+  updateTutorialEnrollmentAttendance,
   updateTutorialSession,
   updateTutorialSessionObservation,
 } from '../services/tutorialSessionsService'
@@ -20,6 +21,7 @@ import './TutorialPages.css'
 
 const MIN_TOPIC_LENGTH = 5
 const MAX_DESCRIPTION_LENGTH = 400
+const MAX_STUDENT_OBSERVATION_LENGTH = 200
 const MAX_SEATS = 50
 const CLOCK_REFRESH_MS = 30 * 1000
 
@@ -73,6 +75,18 @@ function formatEnrollmentTime(value) {
     second: '2-digit',
     hour12: false,
   }).format(date)
+}
+
+function buildEnrollmentAttendanceDrafts(students) {
+  return Object.fromEntries(
+    (Array.isArray(students) ? students : []).map((student) => {
+      const studentId = String(student?.student_id || '')
+      return [studentId, {
+        attended: student?.attended === true,
+        performance_observation: String(student?.performance_observation || '').slice(0, MAX_STUDENT_OBSERVATION_LENGTH),
+      }]
+    }),
+  )
 }
 
 async function loadImageAsDataUrl(src) {
@@ -242,7 +256,8 @@ function TutorTutorialSessionsPage() {
   const [focusedSession, setFocusedSession] = useState(null)
   const [isLoadingFocusedSession, setIsLoadingFocusedSession] = useState(false)
   const [observationDraft, setObservationDraft] = useState('')
-  const [isSavingObservation, setIsSavingObservation] = useState(false)
+  const [isSavingAttendanceList, setIsSavingAttendanceList] = useState(false)
+  const [attendanceDrafts, setAttendanceDrafts] = useState({})
   const [materialsCatalog, setMaterialsCatalog] = useState([])
   const [isLoadingMaterials, setIsLoadingMaterials] = useState(false)
   const todayIso = todayLocalDateString()
@@ -617,25 +632,82 @@ function TutorTutorialSessionsPage() {
 
   useEffect(() => {
     setObservationDraft(String(focusedSession?.tutor_observation || ''))
+    setAttendanceDrafts(buildEnrollmentAttendanceDrafts(focusedSession?.enrolled_students))
   }, [focusedSession])
 
-  const handleSaveObservation = async () => {
+  const handleAttendanceDraftChange = (studentId, field, value) => {
+    const normalizedStudentId = String(studentId || '')
+    if (!normalizedStudentId) {
+      return
+    }
+
+    setAttendanceDrafts((previous) => ({
+      ...previous,
+      [normalizedStudentId]: {
+        attended: previous[normalizedStudentId]?.attended === true,
+        performance_observation: previous[normalizedStudentId]?.performance_observation || '',
+        ...(field === 'attended'
+          ? { attended: value === true }
+          : { performance_observation: String(value || '').slice(0, MAX_STUDENT_OBSERVATION_LENGTH) }),
+      },
+    }))
+  }
+
+  const handleSaveAttendanceList = async () => {
     if (!focusedSession?.id) {
+      return
+    }
+
+    const enrolledStudents = Array.isArray(focusedSession.enrolled_students) ? focusedSession.enrolled_students : []
+    const changedAttendance = enrolledStudents.filter((student) => {
+      const studentId = String(student?.student_id || '')
+      const draft = attendanceDrafts[studentId] || {
+        attended: student?.attended === true,
+        performance_observation: String(student?.performance_observation || ''),
+      }
+
+      return (
+        draft.attended !== (student?.attended === true)
+        || String(draft.performance_observation || '') !== String(student?.performance_observation || '')
+      )
+    })
+
+    const normalizedObservationDraft = String(observationDraft || '').trim()
+    const observationChanged = normalizedObservationDraft !== String(focusedSession.tutor_observation || '')
+
+    if (!observationChanged && changedAttendance.length === 0) {
+      setMessage('No hay cambios pendientes por guardar en la lista.')
+      setError('')
       return
     }
 
     setError('')
     setMessage('')
-    setIsSavingObservation(true)
+    setIsSavingAttendanceList(true)
+
     try {
-      const updated = await updateTutorialSessionObservation(focusedSession.id, observationDraft)
-      setFocusedSession(updated)
-      setSessions((previous) => previous.map((session) => (session.id === updated.id ? updated : session)))
-      setMessage('Observacion de la tutoria guardada correctamente.')
+      let updatedSession = focusedSession
+
+      if (observationChanged) {
+        updatedSession = await updateTutorialSessionObservation(focusedSession.id, normalizedObservationDraft)
+      }
+
+      for (const student of changedAttendance) {
+        const studentId = String(student?.student_id || '')
+        const draft = attendanceDrafts[studentId] || {
+          attended: false,
+          performance_observation: '',
+        }
+        updatedSession = await updateTutorialEnrollmentAttendance(updatedSession.id, studentId, draft)
+      }
+
+      setFocusedSession(updatedSession)
+      setSessions((previous) => previous.map((session) => (session.id === updatedSession.id ? updatedSession : session)))
+      setMessage('La lista de asistencia y las observaciones se guardaron correctamente.')
     } catch (err) {
-      setError(err.message || 'No se pudo guardar la observacion de la tutoria.')
+      setError(err.message || 'No se pudo guardar la lista de asistencia.')
     } finally {
-      setIsSavingObservation(false)
+      setIsSavingAttendanceList(false)
     }
   }
 
@@ -1192,7 +1264,7 @@ function TutorTutorialSessionsPage() {
         <div className="tutorials-panel-header">
           <h3>Mis tutorias publicadas</h3>
           <p className="tutorials-panel-subtitle">
-            Consulta sesiones vigentes y finalizadas. Desde el detalle puedes registrar observaciones breves para el seguimiento academico.
+            Consulta sesiones vigentes y finalizadas. Desde cada tarjeta puedes tomar lista y registrar observaciones de desempeno por estudiante.
           </p>
         </div>
 
@@ -1253,10 +1325,10 @@ function TutorTutorialSessionsPage() {
                 <div className="tutorials-actions">
                   <button
                     type="button"
-                    className="tutorials-secondary"
+                    className="tutorials-primary"
                     onClick={() => handleOpenTutorialDetails(session.id)}
                   >
-                    Ver inscritos
+                    Tomar lista
                   </button>
                   <button
                     type="button"
@@ -1286,13 +1358,17 @@ function TutorTutorialSessionsPage() {
       {focusedSession || isLoadingFocusedSession ? (
         <TutorialSessionDetailModal
           session={focusedSession}
-          title="Bloque de tutoria"
+          title="Tomar lista"
           showEnrollmentDetails
           observationDraft={observationDraft}
           onObservationDraftChange={setObservationDraft}
-          onSaveObservation={handleSaveObservation}
-          isSavingObservation={isSavingObservation}
-          observationHint="Usa este campo para resumir avances, dudas recurrentes o acuerdos de seguimiento de la sesion."
+          onPrimaryAction={handleSaveAttendanceList}
+          primaryActionLabel={isSavingAttendanceList ? 'Guardando lista...' : 'Guardar lista'}
+          primaryActionDisabled={isSavingAttendanceList}
+          observationHint="Desde aqui puedes marcar asistencia y registrar observaciones individuales por cada estudiante inscrito en la tutoria."
+          attendanceDrafts={attendanceDrafts}
+          onAttendanceDraftChange={handleAttendanceDraftChange}
+          isSavingAttendanceList={isSavingAttendanceList}
           enrollmentDownloadActions={{
             onDownloadPdf: () => handleDownloadEnrolledPdf(focusedSession),
             onDownloadCsv: () => handleDownloadEnrolledCsv(focusedSession),

@@ -128,6 +128,8 @@ function mapTutorialSession(record) {
       student_name: student?.student_name || 'Estudiante',
       student_email: student?.student_email || '',
       created_at: student?.created_at || '',
+      attended: student?.attended === true,
+      performance_observation: student?.performance_observation || '',
     })),
     created: record?.created || '',
     updated: record?.updated || '',
@@ -240,6 +242,25 @@ export async function updateTutorialSessionObservation(sessionId, tutorObservati
     method: 'PATCH',
     body: JSON.stringify({
       tutor_observation: String(tutorObservation || '').trim(),
+    }),
+  })
+  clearTutorialSessionsCache()
+  return mapTutorialSession(record)
+}
+
+export async function updateTutorialEnrollmentAttendance(sessionId, studentId, payload) {
+  if (!sessionId) {
+    throw new Error('No se pudo identificar la tutoria para registrar asistencia.')
+  }
+  if (!studentId) {
+    throw new Error('No se pudo identificar al estudiante inscrito.')
+  }
+
+  const record = await request(`${tutorialsBase}/tutorial-sessions/${sessionId}/attendance/${studentId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      attended: payload?.attended === true,
+      performance_observation: String(payload?.performance_observation || '').trim().slice(0, 200),
     }),
   })
   clearTutorialSessionsCache()

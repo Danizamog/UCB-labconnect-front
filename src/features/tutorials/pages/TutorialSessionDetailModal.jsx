@@ -10,9 +10,10 @@ function TutorialSessionDetailModal({
   enrollmentDownloadActions = null,
   observationDraft = '',
   onObservationDraftChange = null,
-  onSaveObservation = null,
-  isSavingObservation = false,
   observationHint = '',
+  attendanceDrafts = {},
+  onAttendanceDraftChange = null,
+  isSavingAttendanceList = false,
 }) {
   if (!session) {
     return null
@@ -73,19 +74,10 @@ function TutorialSessionDetailModal({
                   value={observationDraft}
                   onChange={(event) => onObservationDraftChange(event.target.value)}
                   placeholder="Ej. El estudiante comprendio los ejercicios base, pero aun necesita refuerzo en recursion."
+                  disabled={isSavingAttendanceList}
                 />
                 <div className="tutorial-detail-observation-actions">
                   {observationHint ? <p className="tutorial-detail-hint">{observationHint}</p> : null}
-                  {typeof onSaveObservation === 'function' ? (
-                    <button
-                      type="button"
-                      className="tutorials-primary tutorial-detail-primary"
-                      disabled={isSavingObservation}
-                      onClick={onSaveObservation}
-                    >
-                      {isSavingObservation ? 'Guardando observacion...' : 'Guardar observacion'}
-                    </button>
-                  ) : null}
                 </div>
               </div>
             ) : session.tutor_observation ? (
@@ -142,10 +134,10 @@ function TutorialSessionDetailModal({
 
         {showEnrollmentDetails ? (
           <div className="tutorial-detail-enrolled">
-            <strong>Inscritos</strong>
+            <strong>Lista de asistencia</strong>
 
             {enrolledStudents.length === 0 ? (
-              <p className="tutorial-detail-enrolled-empty">Aun no hay estudiantes inscritos en esta tutoria.</p>
+              <p className="tutorial-detail-enrolled-empty">Aun no hay estudiantes con una inscripcion activa en esta tutoria.</p>
             ) : (
               <div className="tutorial-detail-enrolled-table-wrap">
                 <table className="tutorial-detail-enrolled-table">
@@ -156,18 +148,63 @@ function TutorialSessionDetailModal({
                       <th>Correo</th>
                       <th>Fecha de inscripcion</th>
                       <th>Hora de inscripcion</th>
+                      <th>Asistencia</th>
+                      <th>Observacion</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {enrolledStudents.map((student, index) => (
-                      <tr key={`${session.id}-${student.student_id || index}`}>
-                        <td>{index + 1}</td>
-                        <td>{student.student_name || 'Estudiante'}</td>
-                        <td>{student.student_email || '-'}</td>
-                        <td>{formatDate(student.created_at)}</td>
-                        <td>{formatTime(student.created_at)}</td>
-                      </tr>
-                    ))}
+                    {enrolledStudents.map((student, index) => {
+                      const studentId = String(student.student_id || '')
+                      const draft = attendanceDrafts?.[studentId] || {
+                        attended: student?.attended === true,
+                        performance_observation: String(student?.performance_observation || ''),
+                      }
+                      const charactersUsed = String(draft.performance_observation || '').length
+
+                      return (
+                        <tr key={`${session.id}-${student.student_id || index}`}>
+                          <td>{index + 1}</td>
+                          <td>{student.student_name || 'Estudiante'}</td>
+                          <td>{student.student_email || '-'}</td>
+                          <td>{formatDate(student.created_at)}</td>
+                          <td>{formatTime(student.created_at)}</td>
+                          <td>
+                            {typeof onAttendanceDraftChange === 'function' ? (
+                              <label className="tutorial-attendance-toggle">
+                                <input
+                                  type="checkbox"
+                                  checked={draft.attended === true}
+                                  disabled={isSavingAttendanceList}
+                                  onChange={(event) => onAttendanceDraftChange(studentId, 'attended', event.target.checked)}
+                                />
+                                <span>{draft.attended ? 'Asistio' : 'Pendiente'}</span>
+                              </label>
+                            ) : (
+                              <span className={`tutorial-attendance-pill ${student?.attended ? 'attended' : 'pending'}`}>
+                                {student?.attended ? 'Asistio' : 'Pendiente'}
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            {typeof onAttendanceDraftChange === 'function' ? (
+                              <div className="tutorial-attendance-observation">
+                                <textarea
+                                  rows="3"
+                                  maxLength={200}
+                                  value={draft.performance_observation}
+                                  disabled={isSavingAttendanceList}
+                                  onChange={(event) => onAttendanceDraftChange(studentId, 'performance_observation', event.target.value)}
+                                  placeholder="Describe brevemente el desempeno del estudiante en esta tutoria."
+                                />
+                                <span>{charactersUsed}/200</span>
+                              </div>
+                            ) : (
+                              <p className="tutorial-attendance-readonly">{student?.performance_observation || '-'}</p>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
