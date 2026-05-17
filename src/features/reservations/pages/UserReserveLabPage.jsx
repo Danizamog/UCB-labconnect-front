@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRef } from 'react'
-import { Search } from 'lucide-react'
+import { FlaskConical, Search } from 'lucide-react'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import TutorialSessionDetailModal from '../../tutorials/pages/TutorialSessionDetailModal'
 import { getTutorialSessionById } from '../../tutorials/services/tutorialSessionsService'
@@ -261,6 +261,14 @@ function getSlotLabel(slot) {
 
 function isCreatableSlot(slot) {
   return Boolean(slot) && slot.state === 'available'
+}
+
+function normalizeLabSearchValue(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('es')
+    .trim()
 }
 
 function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead }) {
@@ -573,25 +581,52 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     [labs],
   )
 
+  const normalizedLabSearch = useMemo(() => normalizeLabSearchValue(labSearch), [labSearch])
+
   const filteredLabs = useMemo(() => {
-    let result = labs.filter((lab) => lab.name.toLowerCase().includes(labSearch.toLowerCase()))
+    let result = labs.filter((lab) => {
+      if (!normalizedLabSearch) {
+        return true
+      }
+
+      return normalizeLabSearchValue(lab?.name).includes(normalizedLabSearch)
+    })
 
     if (labSort === 'capacity') {
       result = [...result].sort((a, b) => (b.capacity || 0) - (a.capacity || 0))
     } else {
-      result = [...result].sort((a, b) => a.name.localeCompare(b.name))
+      result = [...result].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'es', { sensitivity: 'base' }))
     }
 
     return result
-  }, [labs, labSearch, labSort])
+  }, [labs, normalizedLabSearch, labSort])
 
-  const labOptions = useMemo(() => {
-    const selected = labs.find(l => String(l.id) === String(form.laboratory_id));
-    if (selected && !filteredLabs.some(l => String(l.id) === String(selected.id))) {
-      return [selected, ...filteredLabs];
+  useEffect(() => {
+    if (labs.length === 0) {
+      return
     }
-    return filteredLabs;
-  }, [filteredLabs, form.laboratory_id, labs]);
+
+    const currentLabId = String(form.laboratory_id || '')
+    const currentLabIsVisible = filteredLabs.some((lab) => String(lab.id) === currentLabId)
+
+    if (currentLabId && currentLabIsVisible) {
+      return
+    }
+
+    const nextLabId = String(filteredLabs[0]?.id || '')
+    if (currentLabId === nextLabId) {
+      return
+    }
+
+    setForm((previous) => ({
+      ...previous,
+      laboratory_id: nextLabId,
+      start_time: '',
+      end_time: '',
+      requested_materials: [],
+    }))
+    setSelectedSlotKey('')
+  }, [filteredLabs, form.laboratory_id, labs.length])
 
   const selectedSlot = useMemo(
     () => slots.find((slot) => getSlotKey(slot) === selectedSlotKey) || null,
@@ -1374,55 +1409,88 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
         <form className="reservations-form" onSubmit={handleSubmit}>
           <div className="reservations-form-section">
             <span className="reservations-form-section-label">1 - Laboratorio</span>
-            <div className="reservations-lab-finder">
-              <label className="reservations-search-field">
-                <Search size={16} />
-                <input
-                  type="search"
-                  placeholder="Buscar laboratorio por nombre..."
-                  value={labSearch}
-                  onChange={(e) => setLabSearch(e.target.value)}
-                />
-              </label>
-              <div className="reservations-sort-group">
-                <span>Ordenar por:</span>
-                <button
-                  type="button"
-                  className={`reservations-sort-chip ${labSort === 'name' ? 'is-active' : ''}`}
-                  onClick={() => setLabSort('name')}
-                >
-                  Nombre
-                </button>
-                <button
-                  type="button"
-                  className={`reservations-sort-chip ${labSort === 'capacity' ? 'is-active' : ''}`}
-                  onClick={() => setLabSort('capacity')}
-                >
-                  Capacidad
-                </button>
+            <div className="reservations-lab-picker">
+              <div className="reservations-lab-picker-head">
+                <div>
+                  <h4>Elige un espacio disponible</h4>
+                  <p>
+                    {normalizedLabSearch
+                      ? `${filteredLabs.length} resultado${filteredLabs.length === 1 ? '' : 's'} para "${labSearch.trim()}"`
+                      : `${filteredLabs.length} laboratorio${filteredLabs.length === 1 ? '' : 's'} disponible${filteredLabs.length === 1 ? '' : 's'}`}
+                  </p>
+                </div>
+                <div className="reservations-sort-group" aria-label="Orden de laboratorios">
+                  <button
+                    type="button"
+                    className={`reservations-sort-chip ${labSort === 'name' ? 'is-active' : ''}`}
+                    onClick={() => setLabSort('name')}
+                  >
+                    Nombre
+                  </button>
+                  <button
+                    type="button"
+                    className={`reservations-sort-chip ${labSort === 'capacity' ? 'is-active' : ''}`}
+                    onClick={() => setLabSort('capacity')}
+                  >
+                    Capacidad
+                  </button>
+                </div>
               </div>
+
+              <div className="reservations-lab-finder">
+                <label className="reservations-search-field">
+                  <Search size={18} aria-hidden="true" />
+                  <input
+                    type="search"
+                    placeholder="Buscar laboratorio por nombre"
+                    aria-label="Buscar laboratorio por nombre"
+                    value={labSearch}
+                    onChange={(e) => setLabSearch(e.target.value)}
+                  />
+                </label>
+              </div>
+
+              <label className="reservations-lab-select-field">
+                <span>Laboratorio seleccionado</span>
+                <div className="reservations-lab-select-control">
+                  <span className="reservations-lab-select-icon" aria-hidden="true">
+                    <FlaskConical size={18} />
+                  </span>
+                  <select
+                    value={form.laboratory_id}
+                    onChange={(event) => setForm((prev) => ({
+                      ...prev,
+                      laboratory_id: event.target.value,
+                      start_time: '',
+                      end_time: '',
+                    }))}
+                    disabled={Boolean(activePenalty) || filteredLabs.length === 0}
+                    required
+                  >
+                    <option value="">Selecciona un laboratorio</option>
+                    {filteredLabs.map((lab) => (
+                      <option key={lab.id} value={lab.id}>
+                        {lab.name} {lab.capacity ? `(${lab.capacity} personas)` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </label>
+
+              {selectedLab ? (
+                <div className="reservations-lab-selected-card">
+                  <strong>{selectedLab.name}</strong>
+                  <span>
+                    {selectedLab.location || selectedLab.area_name || selectedLab.area || 'Ubicacion por definir'}
+                    {selectedLab.capacity ? ` · Capacidad: ${selectedLab.capacity} personas` : ''}
+                  </span>
+                </div>
+              ) : null}
+
+              {normalizedLabSearch && filteredLabs.length === 0 ? (
+                <p className="reservations-empty reservations-lab-empty">No se encontraron laboratorios</p>
+              ) : null}
             </div>
-            <label>
-              <span>Laboratorio</span>
-              <select
-                value={form.laboratory_id}
-                onChange={(event) => setForm((prev) => ({
-                  ...prev,
-                  laboratory_id: event.target.value,
-                  start_time: '',
-                  end_time: '',
-                }))}
-                disabled={Boolean(activePenalty)}
-                required
-              >
-                <option value="">Selecciona un laboratorio</option>
-                {labOptions.map((lab) => (
-                  <option key={lab.id} value={lab.id}>
-                    {lab.name} {lab.capacity ? `(${lab.capacity} personas)` : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
             {!selectedLabIsAccessible && form.laboratory_id ? (
               <p className="reservation-inline-hint">
                 No tienes permisos para reservar este laboratorio. El formulario se deshabilita hasta elegir uno habilitado.
@@ -1941,4 +2009,3 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
 }
 
 export default UserReserveLabPage
-
