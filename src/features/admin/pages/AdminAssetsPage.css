@@ -135,6 +135,36 @@
   font-size: 0.88rem;
 }
 
+.infra-low-stock-report {
+  border-color: rgba(185, 28, 28, 0.12);
+  background:
+    radial-gradient(circle at 96% 0%, rgba(220, 38, 38, 0.08), transparent 28%),
+    #fff;
+}
+
+.infra-low-stock-table-wrap {
+  border-color: rgba(185, 28, 28, 0.1);
+}
+
+.infra-low-stock-table th:nth-child(5),
+.infra-low-stock-table td:nth-child(5) {
+  background: rgba(185, 28, 28, 0.035);
+}
+
+.infra-stock-gap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(185, 28, 28, 0.18);
+  background: rgba(185, 28, 28, 0.09);
+  color: #991b1b;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Form ──────────────────────────────────────────────── */
 .infra-form,
 .infra-list {
