@@ -1841,30 +1841,75 @@
   border-left: 4px solid #dc2626;
 }
 
-/* Lab Search & Sort Styles */
-.reservations-lab-finder {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: center;
-  margin-bottom: 20px;
+.reservations-lab-picker {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(10, 53, 89, 0.1);
+  background:
+    radial-gradient(circle at 96% 0%, rgba(244, 197, 66, 0.14), transparent 30%),
+    linear-gradient(180deg, rgba(248, 251, 255, 0.98), rgba(255, 255, 255, 0.96));
 }
 
-.reservations-lab-finder .reservations-search-field {
-  flex: 2;
+.reservations-lab-picker-head {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.reservations-lab-picker-head h4 {
+  margin: 0;
+  color: var(--ink-900);
+  font-size: 1rem;
+}
+
+.reservations-lab-picker-head p {
+  margin: 4px 0 0;
+  color: var(--ink-700);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.reservations-lab-finder {
+  display: block;
+}
+
+.reservations-lab-finder .reservations-search-field,
+.reservations-lab-select-control {
+  display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
   padding: 0 14px;
   border-radius: 14px;
   border: 1.5px solid var(--line-300);
-  background: #fafbfc;
+  background: #fff;
   min-height: 48px;
-  min-width: 300px;
+  color: var(--ink-700);
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
 
-.reservations-lab-finder .reservations-search-field input {
+.reservations-lab-finder .reservations-search-field:focus-within,
+.reservations-lab-select-control:focus-within {
+  border-color: rgba(6, 77, 144, 0.5);
+  box-shadow: 0 0 0 3px rgba(6, 77, 144, 0.08);
+  background: #fff;
+}
+
+.reservations-lab-finder .reservations-search-field svg {
+  flex: 0 0 auto;
+  color: var(--ucb-blue);
+}
+
+.reservations-lab-finder .reservations-search-field input,
+.reservations-lab-select-control select {
   flex: 1;
+  width: 100%;
+  min-width: 0;
   border: none;
   background: transparent;
   font: inherit;
@@ -1876,20 +1921,14 @@
 .reservations-sort-group {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
-  flex: 1;
   justify-content: flex-end;
 }
 
-.reservations-sort-group span {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--ink-700);
-}
-
 .reservations-sort-chip {
-  padding: 6px 12px;
+  min-height: 34px;
+  padding: 0 12px;
   border-radius: 999px;
   border: 1px solid var(--line-300);
   background: #fff;
@@ -1911,7 +1950,57 @@
   color: var(--ucb-blue);
 }
 
+.reservations-lab-select-field {
+  margin: 0;
+}
+
+.reservations-lab-select-icon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(6, 77, 144, 0.09);
+  color: var(--ucb-blue);
+  flex: 0 0 auto;
+}
+
+.reservations-lab-selected-card {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(6, 77, 144, 0.1);
+  background: rgba(6, 77, 144, 0.045);
+}
+
+.reservations-lab-selected-card strong {
+  color: var(--ink-900);
+  font-size: 0.94rem;
+}
+
+.reservations-lab-selected-card span {
+  color: var(--ink-700);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.reservations-lab-empty {
+  padding: 16px;
+  text-align: left;
+}
+
 @media (max-width: 720px) {
+  .reservations-lab-picker-head,
+  .reservations-sort-group {
+    justify-content: flex-start;
+  }
+
+  .reservations-lab-picker-head {
+    flex-direction: column;
+  }
+
   .reservations-workspace-nav,
   .reservations-task-grid,
   .reservations-insight-grid,

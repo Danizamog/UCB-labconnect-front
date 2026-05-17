@@ -30,7 +30,7 @@ const SUPPLY_STATUS_LABELS = {
 
 const defaultMaterialForm = { name: '', category: '', unit: 'unidad', quantity_available: 0, minimum_stock: 0, laboratory_id: '', description: '' }
 const defaultMovementForm = { stock_item_id: '', movement_type: 'entry', quantity: 1, notes: '' }
-const defaultReportFilters = { laboratory_id: '', status_filter: '', search: '', only_low_or_out: false, include_general: true }
+const defaultReportFilters = { laboratory_id: '', status_filter: '', search: '', only_low_or_out: true, include_general: true }
 const defaultUsageReportFilters = { borrower_id: '', practice: '', date_from: '', date_to: '' }
 
 const reportStatusMeta = {
@@ -89,7 +89,7 @@ function AdminMaterialesPage({ user }) {
   const fetchReportData = async () => {
     setReportLoading(true)
     try {
-      const reportData = await getStockItemsReport()
+      const reportData = await getStockItemsReport({ onlyLowOrOut: true })
       setStockReport(reportData)
       setReportError('')
       return reportData
@@ -316,7 +316,7 @@ function AdminMaterialesPage({ user }) {
     () => visibleMaterials.filter((m) => {
       const qty = Number(m.quantity_available)
       const min = Number(m.minimum_stock || 0)
-      return min > 0 && qty < min
+      return min > 0 && qty <= min
     }),
     [visibleMaterials],
   )
@@ -403,6 +403,11 @@ function AdminMaterialesPage({ user }) {
       lowStock,
     }
   }, [filteredReportItems])
+
+  const lowStockReportItems = useMemo(
+    () => filteredReportItems.filter((item) => item.status === 'out_of_stock' || item.status === 'low_stock'),
+    [filteredReportItems],
+  )
 
   const handleReportFilterChange = (key, value) => {
     const nextValue = key === 'laboratory_id' && value === '__GENERAL__' ? false : reportFilters.include_general
@@ -1070,11 +1075,12 @@ function AdminMaterialesPage({ user }) {
 
           {activeTab === 'reports' ? (
           <>
-          <section className="infra-card">
+          <section className="infra-card infra-low-stock-report">
             <div className="infra-section-head">
               <div>
-                <h3>Reporte de estado y stock</h3>
-                <p>Usa filtros para planificar reposicion por laboratorio, estado o nombre del insumo.</p>
+                <p className="infra-kicker">Compras y reposiciones</p>
+                <h3>Materiales con stock bajo</h3>
+                <p>Solo aparecen materiales cuyo stock actual llego al umbral minimo configurado o esta por debajo.</p>
               </div>
             </div>
 
@@ -1100,10 +1106,9 @@ function AdminMaterialesPage({ user }) {
                     value={reportFilters.status_filter}
                     onChange={(e) => handleReportFilterChange('status_filter', e.target.value)}
                   >
-                    <option value="">Todos</option>
+                    <option value="">Todas las alertas</option>
                     <option value="out_of_stock">Sin stock</option>
                     <option value="low_stock">Stock bajo</option>
-                    <option value="ok">Stock suficiente</option>
                   </select>
                 </label>
 
@@ -1127,15 +1132,6 @@ function AdminMaterialesPage({ user }) {
                   <span>Incluir tambien insumos generales</span>
                 </label>
               ) : null}
-
-              <label className="infra-checkbox">
-                <input
-                  type="checkbox"
-                  checked={reportFilters.only_low_or_out}
-                  onChange={(e) => handleReportFilterChange('only_low_or_out', e.target.checked)}
-                />
-                <span>Mostrar solo insumos con alerta (sin stock o stock bajo)</span>
-              </label>
 
               <div className="infra-actions">
                 <button type="submit" className="infra-primary" disabled={reportLoading}>
@@ -1161,31 +1157,32 @@ function AdminMaterialesPage({ user }) {
               </div>
             </div>
 
-            <div className="infra-table-wrap">
-              <table className="infra-table">
+            <div className="infra-table-wrap infra-low-stock-table-wrap">
+              <table className="infra-table infra-low-stock-table">
                 <thead>
                   <tr>
-                    <th>Material</th>
-                    <th>Categoria</th>
+                    <th>Nombre del material</th>
                     <th>Laboratorio</th>
-                    <th>Disponible</th>
-                    <th>Minimo</th>
+                    <th>Cantidad actual</th>
+                    <th>Umbral minimo</th>
+                    <th>Faltante</th>
                     <th>Estado</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredReportItems.length === 0 ? (
-                    <tr><td colSpan="6">No hay resultados para los filtros aplicados.</td></tr>
+                  {lowStockReportItems.length === 0 ? (
+                    <tr><td colSpan="6">No hay materiales con stock bajo para los filtros aplicados.</td></tr>
                   ) : (
-                    filteredReportItems.map((item) => {
+                    lowStockReportItems.map((item) => {
                       const statusMeta = reportStatusMeta[item.status] || { label: item.status, chipClass: '' }
+                      const stockGap = Number(item.stock_gap ?? Math.max(0, Number(item.minimum_stock || 0) - Number(item.quantity_available || 0)))
                       return (
                         <tr key={item.item_id}>
                           <td>{item.name}</td>
-                          <td>{item.category}</td>
                           <td>{item.laboratory_name || 'General'}</td>
                           <td>{item.quantity_available} {item.unit}</td>
                           <td>{item.minimum_stock}</td>
+                          <td><span className="infra-stock-gap">-{stockGap} {item.unit}</span></td>
                           <td>
                             <span className={`infra-chip ${statusMeta.chipClass}`.trim()}>{statusMeta.label}</span>
                           </td>
