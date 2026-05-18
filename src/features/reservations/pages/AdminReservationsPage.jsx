@@ -2,6 +2,8 @@
 import {
   Activity,
   AlertCircle,
+  ArrowDown,
+  ArrowUp,
   BookOpen,
   ClipboardList,
   DoorOpen,
@@ -945,6 +947,18 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     }))
   }
 
+  const handleToggleDateSort = () => {
+    setTableFilters((previous) => {
+      const isActive = previous.sortBy === 'start_at'
+      const nextSortType = isActive && previous.sortType === 'ASC' ? 'DESC' : 'ASC'
+      return {
+        ...previous,
+        sortBy: 'start_at',
+        sortType: nextSortType,
+      }
+    })
+  }
+
   const visibleTotalElements = restrictToManagedLabs ? visibleTableReservations.length : tableMeta.totalElements
   const visibleRangeStart = restrictToManagedLabs
     ? (visibleTableReservations.length === 0 ? 0 : 1)
@@ -952,6 +966,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   const visibleRangeEnd = restrictToManagedLabs
     ? visibleTableReservations.length
     : Math.min((tableMeta.pageNumber + 1) * tableMeta.pageSize, tableMeta.totalElements)
+  const isDateSortActive = tableFilters.sortBy === 'start_at'
   const activeWorkspaceMeta =
     ADMIN_RESERVATION_SECTIONS.find((section) => section.id === activeWorkspace) || ADMIN_RESERVATION_SECTIONS[0]
   const ActiveWorkspaceIcon = SECTION_ICON_MAP[activeWorkspaceMeta.id] || LayoutDashboard
@@ -1588,7 +1603,15 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                     <th>Laboratorio</th>
                     <th>Solicitante</th>
                     <th>Motivo</th>
-                    <th>Fecha</th>
+                    <th>
+                      <button type="button" className="reservations-table-sort" onClick={handleToggleDateSort}>
+                        <span>Fecha</span>
+                        <span className="reservations-table-sort-icons" aria-hidden="true">
+                          <ArrowUp size={14} strokeWidth={isDateSortActive && tableFilters.sortType === 'ASC' ? 2.5 : 1.5} />
+                          <ArrowDown size={14} strokeWidth={isDateSortActive && tableFilters.sortType === 'DESC' ? 2.5 : 1.5} />
+                        </span>
+                      </button>
+                    </th>
                     <th>Horario</th>
                     <th>Estado</th>
                     <th>Acciones</th>
