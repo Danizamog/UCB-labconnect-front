@@ -198,6 +198,41 @@
   white-space: nowrap;
 }
 
+/* ── Table sort button ────────────────────────────────── */
+.reservations-table-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink-900);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.reservations-table-sort:hover {
+  background: rgba(6, 77, 144, 0.06);
+  border-color: rgba(6, 77, 144, 0.15);
+}
+
+.reservations-table-sort:focus-visible {
+  outline: none;
+  border-color: rgba(6, 77, 144, 0.4);
+  box-shadow: 0 0 0 3px rgba(6, 77, 144, 0.12);
+  background: rgba(6, 77, 144, 0.08);
+}
+
+.reservations-table-sort-icons {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  color: rgba(6, 77, 144, 0.7);
+}
+
 .reservations-primary:active,
 .reservations-secondary:active,
 .reservations-danger:active { transform: scale(0.97); }
