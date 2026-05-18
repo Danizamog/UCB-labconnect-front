@@ -455,6 +455,19 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     () => tableReservations.filter(isReservationVisible),
     [tableReservations, isReservationVisible],
   )
+  const sortedTableReservations = useMemo(() => {
+    if (tableFilters.sortBy !== 'start_at') {
+      return visibleTableReservations
+    }
+
+    const direction = tableFilters.sortType === 'ASC' ? 1 : -1
+    return [...visibleTableReservations].sort((left, right) => {
+      const leftStamp = Date.parse(`${left.date || ''}T${left.start_time || '00:00'}:00`) || 0
+      const rightStamp = Date.parse(`${right.date || ''}T${right.start_time || '00:00'}:00`) || 0
+      if (leftStamp === rightStamp) return 0
+      return (leftStamp - rightStamp) * direction
+    })
+  }, [tableFilters.sortBy, tableFilters.sortType, visibleTableReservations])
   const visibleOccupancy = useMemo(() => {
     if (!restrictToManagedLabs) return occupancy
     const labBreakdown = (occupancy.lab_breakdown || []).filter((entry) =>
@@ -1593,7 +1606,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
 
           {tableLoading ? (
             <p className="reservations-empty">Cargando reservas...</p>
-          ) : visibleTableReservations.length === 0 ? (
+          ) : sortedTableReservations.length === 0 ? (
             <p className="reservations-empty">No hay reservas para este filtro.</p>
           ) : (
             <div className="reservations-table-wrap">
@@ -1618,7 +1631,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleTableReservations.map((item) => (
+                  {sortedTableReservations.map((item) => (
                     <tr key={item.id} className={`reservations-table-row status-${item.status}`}>
                       <td>
                         <strong>{getReservationLabLabel(item)}</strong>
