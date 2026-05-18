@@ -1,16 +1,19 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRef } from 'react'
+﻿import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FlaskConical, Search } from 'lucide-react'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
-import TutorialSessionDetailModal from '../../tutorials/pages/TutorialSessionDetailModal'
 import { getTutorialSessionById } from '../../tutorials/services/tutorialSessionsService'
 import { openTutorialSessionFlow } from '../../tutorials/utils/focusTutorialNavigation'
+
+const TutorialSessionDetailModal = lazy(() => import('../../tutorials/pages/TutorialSessionDetailModal'))
+const ReservationDetailModal = lazy(() => import('./ReservationDetailModal'))
+const ReservationEditModal = lazy(() => import('./ReservationEditModal'))
 import {
   createReservation,
   createSupplyReservation,
   deleteReservation,
   getReservationById,
   getLabAvailability,
+  getMyAgendaSummary,
   isLabAccessibleToUser,
   listAvailableLabs,
   listMyPenalties,
@@ -22,8 +25,6 @@ import {
   mapReservationRecord,
 } from '../services/reservationsService'
 import { listMaterials } from '../../admin/services/infrastructureService'
-import ReservationDetailModal from './ReservationDetailModal'
-import ReservationEditModal from './ReservationEditModal'
 import './ReservationsPages.css'
 
 const MIN_PURPOSE_LENGTH = 5
@@ -292,7 +293,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
   const [reservationToCancel, setReservationToCancel] = useState(null)
   const [selectedSlotKey, setSelectedSlotKey] = useState('')
   const selectedSlotKeyRef = useRef('')
-  const [availabilityRefreshNonce, setAvailabilityRefreshNonce] = useState(0)
+  const availabilityRefreshRef = useRef(null)
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
   const [isSubmittingReservation, setIsSubmittingReservation] = useState(false)
@@ -320,52 +321,42 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     selectedSlotKeyRef.current = selectedSlotKey
   }, [selectedSlotKey])
 
-  useEffect(() => {
-    const labId = String(form.laboratory_id || '').trim()
-    if (!labId) {
-      setMaterialsCatalog([])
-      setForm((prev) => (prev.requested_materials.length === 0 ? prev : { ...prev, requested_materials: [] }))
-      return
-    }
-
-    let cancelled = false
-    setIsLoadingMaterials(true)
-    listMaterials(labId)
-      .then((data) => {
-        if (cancelled) return
-        setMaterialsCatalog(Array.isArray(data) ? data : [])
-      })
-      .catch(() => {
-        if (cancelled) return
-        setMaterialsCatalog([])
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoadingMaterials(false)
-      })
-
-    setForm((prev) => (prev.requested_materials.length === 0 ? prev : { ...prev, requested_materials: [] }))
-
-    return () => {
-      cancelled = true
-    }
-  }, [form.laboratory_id])
-
-  const loadData = useCallback(async () => {
+  const loadLabs = useCallback(async () => {
     try {
-      const [labsData, reservationsData, penaltiesData] = await Promise.all([
-        listAvailableLabs(user),
-        listMyReservations(),
-        listMyPenalties(),
-      ])
+      const labsData = await listAvailableLabs(user)
       setLabs(labsData)
-      setReservations(reservationsData)
-      setPenalties(penaltiesData)
-      setForm((prev) => (prev.laboratory_id || labsData.length === 0 ? prev : { ...prev, laboratory_id: labsData[0].id }))
-      setError(labsData.length === 0 ? 'No tienes permisos para reservar en los laboratorios disponibles actualmente.' : '')
+      setForm((prev) => (
+        prev.laboratory_id || labsData.length === 0
+          ? prev
+          : { ...prev, laboratory_id: labsData[0].id }
+      ))
+      if (labsData.length === 0) {
+        setError('No tienes permisos para reservar en los laboratorios disponibles actualmente.')
+      }
     } catch (err) {
-      setError(err.message || 'No se pudo cargar la informacion para reservar.')
+      setError(err.message || 'No se pudo cargar la informacion de laboratorios.')
     }
   }, [user])
+
+  const loadReservations = useCallback(async () => {
+    try {
+      const reservationsData = await listMyReservations()
+      setReservations(Array.isArray(reservationsData) ? reservationsData : [])
+    } catch {
+      // no critico para el render inicial; el paint rapido viene del summary
+    }
+  }, [])
+
+  const loadUpcomingSummary = useCallback(async () => {
+    try {
+      const summary = await getMyAgendaSummary({ limit: 12 })
+      const upcoming = Array.isArray(summary?.upcoming_reservations) ? summary.upcoming_reservations : []
+      // Solo poblar si todavia no llego la lista completa (evita pisar datos mas frescos).
+      setReservations((prev) => (prev.length > 0 ? prev : upcoming))
+    } catch {
+      // ignorar; loadReservations completara la informacion
+    }
+  }, [])
 
   const loadPenaltiesOnly = useCallback(async () => {
     try {
@@ -376,28 +367,69 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     }
   }, [])
 
-  useEffect(() => {
-    loadData()
+  const refreshAllData = useCallback(async () => {
+    await Promise.all([loadLabs(), loadReservations(), loadPenaltiesOnly()])
+  }, [loadLabs, loadReservations, loadPenaltiesOnly])
 
+  // Carga inicial: cada recurso en su propio efecto para que ninguno bloquee al otro.
+  useEffect(() => {
+    loadLabs()
+  }, [loadLabs])
+
+  useEffect(() => {
+    // Paint rapido del panel "Mis reservas futuras" con payload chico.
+    loadUpcomingSummary()
+  }, [loadUpcomingSummary])
+
+  useEffect(() => {
+    // Lista completa para el historial; corre en paralelo sin bloquear labs.
+    loadReservations()
+  }, [loadReservations])
+
+  useEffect(() => {
+    loadPenaltiesOnly()
+  }, [loadPenaltiesOnly])
+
+  // Refs estables para evitar re-suscribirse al realtime cada vez que cambia
+  // la referencia de los callbacks o de `user`. La suscripcion debe vivir
+  // mientras el componente este montado.
+  const userIdRef = useRef(String(user?.user_id || ''))
+  const refreshAllDataRef = useRef(refreshAllData)
+  const loadPenaltiesOnlyRef = useRef(loadPenaltiesOnly)
+
+  useEffect(() => {
+    userIdRef.current = String(user?.user_id || '')
+  }, [user?.user_id])
+
+  useEffect(() => {
+    refreshAllDataRef.current = refreshAllData
+  }, [refreshAllData])
+
+  useEffect(() => {
+    loadPenaltiesOnlyRef.current = loadPenaltiesOnly
+  }, [loadPenaltiesOnly])
+
+  useEffect(() => {
     const unsubscribe = subscribeReservationsRealtime((event) => {
+      const currentUserId = userIdRef.current
+
       if (event?.topic === 'lab_reservation') {
-        const userId = String(user?.user_id || '')
         const requestedBy = String(event?.record?.requested_by || '')
-        if (userId && requestedBy && requestedBy === userId) {
+        if (currentUserId && requestedBy && requestedBy === currentUserId) {
           setReservations((prev) => applyRealtimeRecordPatch(prev, event, { mapper: mapReservationRecord }))
         }
-        setAvailabilityRefreshNonce((value) => value + 1)
+        availabilityRefreshRef.current?.()
         return
       }
 
       if (event?.topic === 'user_penalty') {
         const recipients = Array.isArray(event?.recipients) ? event.recipients : []
         const isCurrentUserPenalty =
-          event?.record?.user_id === (user?.user_id || '') ||
-          recipients.includes(user?.user_id || '')
+          event?.record?.user_id === currentUserId ||
+          recipients.includes(currentUserId)
 
         if (isCurrentUserPenalty) {
-          loadPenaltiesOnly()
+          loadPenaltiesOnlyRef.current?.()
           setMessage('Tu estado de penalizacion fue actualizado.')
         }
         return
@@ -406,8 +438,8 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       if (event?.topic === 'user_notification') {
         const recipients = Array.isArray(event?.recipients) ? event.recipients : []
         const isCurrentUserNotification =
-          event?.record?.recipient_user_id === (user?.user_id || '') ||
-          recipients.includes(user?.user_id || '')
+          event?.record?.recipient_user_id === currentUserId ||
+          recipients.includes(currentUserId)
 
         if (isCurrentUserNotification) {
           setMessage('Tienes una nueva notificacion relacionada con tus reservas o tutorias.')
@@ -416,13 +448,13 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     }, {
       topics: ['lab_reservation', 'user_penalty', 'user_notification'],
       onResync: () => {
-        loadData()
-        setAvailabilityRefreshNonce((value) => value + 1)
+        refreshAllDataRef.current?.()
+        availabilityRefreshRef.current?.()
       },
     })
 
     return () => unsubscribe?.()
-  }, [loadData, loadPenaltiesOnly, user?.user_id])
+  }, [])
 
   useEffect(() => {
     const applyFocus = (reservationId) => {
@@ -463,7 +495,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
   useEffect(() => {
     let mounted = true
 
-    const loadAvailability = async () => {
+    const loadAvailability = async ({ skipCache = false } = {}) => {
       if (!form.laboratory_id || !form.date || !selectedLabIsAccessible) {
         if (mounted) {
           setSlots([])
@@ -474,9 +506,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
 
       setIsLoadingSlots(true)
       try {
-        const payload = await getLabAvailability(form.laboratory_id, form.date, {
-          skipCache: availabilityRefreshNonce > 0,
-        })
+        const payload = await getLabAvailability(form.laboratory_id, form.date, { skipCache })
         if (!mounted) {
           return
         }
@@ -512,11 +542,17 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       }
     }
 
+    // Exponer un refetch forzado (skipCache) para que el handler realtime
+    // invalide solo cuando llegue un evento, en lugar de hacer skipCache
+    // permanente en todos los cambios de lab/fecha.
+    availabilityRefreshRef.current = () => loadAvailability({ skipCache: true })
+
     loadAvailability()
     return () => {
       mounted = false
+      availabilityRefreshRef.current = null
     }
-  }, [availabilityRefreshNonce, form.date, form.laboratory_id, selectedLabIsAccessible])
+  }, [form.date, form.laboratory_id, selectedLabIsAccessible])
 
   useEffect(() => {
     if (!form.laboratory_id || !form.date || !selectedLabIsAccessible) {
@@ -1009,7 +1045,8 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
         start_time: '',
         end_time: '',
       }))
-      await loadData()
+      availabilityRefreshRef.current?.()
+      await refreshAllData()
     } catch (err) {
       setError(err.message || 'No se pudo crear la reserva.')
     } finally {
@@ -1105,7 +1142,8 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       setFocusedReservationId(updatedReservation.id)
       setFocusedReservationDetails(updatedReservation)
       closeEditModal()
-      await loadData()
+      availabilityRefreshRef.current?.()
+      await refreshAllData()
     } catch (err) {
       setError(err.message || 'No se pudo actualizar la reserva.')
       setIsSavingEdit(false)
@@ -1139,7 +1177,8 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
           ? 'La reserva aprobada fue cancelada. El horario quedo libre nuevamente y el encargado recibira una alerta.'
           : 'La reserva fue cancelada correctamente y el horario quedo disponible.',
       )
-      await loadData()
+      availabilityRefreshRef.current?.()
+      await refreshAllData()
     } catch (err) {
       setError(err.message || 'No se pudo cancelar la reserva.')
     } finally {
@@ -1933,62 +1972,70 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
         )}
       </section>
 
-      <ReservationEditModal
-        reservation={editingReservation}
-        labs={labs}
-        form={editForm}
-        slots={editSlots}
-        selectedSlotKey={editSelectedSlotKey}
-        isLoadingSlots={isLoadingEditSlots}
-        minDate={todayIso}
-        maxDate={maxReservationIso}
-        validationMessage={editValidationMessage}
-        onSelectSlot={handleEditSlotSelect}
-        getSlotKey={getSlotKey}
-        getSlotTone={getEditSlotTone}
-        getSlotLabel={getSlotLabel}
-        getSlotDisabledHint={getEditSlotDisabledHint}
-        isSlotSelectable={isEditSlotSelectable}
-        onChange={handleEditFormChange}
-        onSubmit={handleEditSubmit}
-        onClose={closeEditModal}
-        isSubmitting={isSavingEdit}
-      />
+      {editingReservation ? (
+        <Suspense fallback={null}>
+          <ReservationEditModal
+            reservation={editingReservation}
+            labs={labs}
+            form={editForm}
+            slots={editSlots}
+            selectedSlotKey={editSelectedSlotKey}
+            isLoadingSlots={isLoadingEditSlots}
+            minDate={todayIso}
+            maxDate={maxReservationIso}
+            validationMessage={editValidationMessage}
+            onSelectSlot={handleEditSlotSelect}
+            getSlotKey={getSlotKey}
+            getSlotTone={getEditSlotTone}
+            getSlotLabel={getSlotLabel}
+            getSlotDisabledHint={getEditSlotDisabledHint}
+            isSlotSelectable={isEditSlotSelectable}
+            onChange={handleEditFormChange}
+            onSubmit={handleEditSubmit}
+            onClose={closeEditModal}
+            isSubmitting={isSavingEdit}
+          />
+        </Suspense>
+      ) : null}
 
       {isReservationDetailOpen && (focusedReservation || isLoadingReservationDetails) ? (
-        <ReservationDetailModal
-          reservation={focusedReservation}
-          actionState={focusedReservation ? getReservationActionState(focusedReservation) : null}
-          isLoading={isLoadingReservationDetails}
-          laboratoryName={
-            focusedReservation
-              ? (focusedReservation.laboratory_name || labNameById[String(focusedReservation.laboratory_id)] || 'Laboratorio')
-              : 'Laboratorio'
-          }
-          onClose={handleCloseReservationDetails}
-          onEdit={handleEditFromDetail}
-          onCancel={() => {
-            if (focusedReservation) {
-              handleCloseReservationDetails()
-              handleRequestCancel(focusedReservation)
+        <Suspense fallback={null}>
+          <ReservationDetailModal
+            reservation={focusedReservation}
+            actionState={focusedReservation ? getReservationActionState(focusedReservation) : null}
+            isLoading={isLoadingReservationDetails}
+            laboratoryName={
+              focusedReservation
+                ? (focusedReservation.laboratory_name || labNameById[String(focusedReservation.laboratory_id)] || 'Laboratorio')
+                : 'Laboratorio'
             }
-          }}
-        />
+            onClose={handleCloseReservationDetails}
+            onEdit={handleEditFromDetail}
+            onCancel={() => {
+              if (focusedReservation) {
+                handleCloseReservationDetails()
+                handleRequestCancel(focusedReservation)
+              }
+            }}
+          />
+        </Suspense>
       ) : null}
 
       {focusedTutorial ? (
-        <TutorialSessionDetailModal
-          session={focusedTutorial}
-          title="Tutoria en este bloque"
-          onClose={() => setFocusedTutorial(null)}
-          primaryActionLabel={tutorialAction?.label || ''}
-          primaryActionHint={tutorialAction?.hint || ''}
-          onPrimaryAction={() => {
-            const sessionId = focusedTutorial?.id
-            setFocusedTutorial(null)
-            openTutorialSessionFlow(sessionId, { navigate: true })
-          }}
-        />
+        <Suspense fallback={null}>
+          <TutorialSessionDetailModal
+            session={focusedTutorial}
+            title="Tutoria en este bloque"
+            onClose={() => setFocusedTutorial(null)}
+            primaryActionLabel={tutorialAction?.label || ''}
+            primaryActionHint={tutorialAction?.hint || ''}
+            onPrimaryAction={() => {
+              const sessionId = focusedTutorial?.id
+              setFocusedTutorial(null)
+              openTutorialSessionFlow(sessionId, { navigate: true })
+            }}
+          />
+        </Suspense>
       ) : null}
 
       {reservationToCancel ? (
