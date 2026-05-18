@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ArrowRight,
   BookOpen,
@@ -9,6 +9,7 @@ import {
   Microscope,
   Clock3,
   MapPin,
+  Search,
   Settings,
   ShieldCheck,
   Wrench,
@@ -26,10 +27,12 @@ import {
   getOccupancyDashboard,
   getMyAgendaSummary,
   listReservationNotifications,
+  listAvailableLabs,
   markAllReservationNotificationsAsRead,
   markReservationNotificationAsRead,
   subscribeReservationsRealtime,
 } from '../../reservations/services/reservationsService'
+import { listAdminLabs } from '../../admin/services/infrastructureService'
 import './HomeView.css'
 import { formatDateTime, formatStatus } from '../../../shared/utils/formatters'
 
@@ -62,6 +65,14 @@ const EMPTY_AGENDA_SUMMARY = {
   total_count: 0,
   upcoming_reservations: [],
   upcoming_tutorials: [],
+}
+
+function normalizeLabSearchValue(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('es')
+    .trim()
 }
 
 function formatAgendaTimeRange(startAt, endAt) {
@@ -126,6 +137,10 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const [notifications, setNotifications] = useState([])
   const [agendaSummary, setAgendaSummary] = useState(EMPTY_AGENDA_SUMMARY)
   const [agendaLoading, setAgendaLoading] = useState(false)
+  const [homeLabs, setHomeLabs] = useState([])
+  const [homeLabsLoading, setHomeLabsLoading] = useState(false)
+  const [homeLabsError, setHomeLabsError] = useState('')
+  const [homeLabSearch, setHomeLabSearch] = useState('')
   const [operationsSnapshot, setOperationsSnapshot] = useState({
     current_occupancy: 0,
     active_sessions: [],
@@ -149,6 +164,21 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const shouldTrackOperationsSnapshot = canManageStructure && activeSection === 'home'
   const unreadNotificationsCount = notifications.filter((notification) => !notification.is_read).length
   const agendaItems = buildAgendaItems(agendaSummary).slice(0, 6)
+  const normalizedHomeLabSearch = useMemo(() => normalizeLabSearchValue(homeLabSearch), [homeLabSearch])
+  const filteredHomeLabs = useMemo(() => {
+    const filtered = homeLabs.filter((lab) => {
+      if (!normalizedHomeLabSearch) {
+        return true
+      }
+
+      return normalizeLabSearchValue(lab?.name).includes(normalizedHomeLabSearch)
+    })
+
+    return filtered.sort((left, right) =>
+      String(left?.name || '').localeCompare(String(right?.name || ''), 'es', { sensitivity: 'base' }),
+    )
+  }, [homeLabs, normalizedHomeLabSearch])
+  const visibleHomeLabs = normalizedHomeLabSearch ? filteredHomeLabs : filteredHomeLabs.slice(0, 6)
 
   const loadNotifications = useCallback(async (options = {}) => {
     try {
@@ -176,6 +206,27 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
       setOperationsSnapshot({ current_occupancy: 0, active_sessions: [], lab_breakdown: [] })
     }
   }, [shouldTrackOperationsSnapshot])
+
+  const loadHomeLabs = useCallback(async () => {
+    if (activeSection !== 'home') {
+      setHomeLabs([])
+      setHomeLabsError('')
+      setHomeLabsLoading(false)
+      return
+    }
+
+    setHomeLabsLoading(true)
+    try {
+      const labsData = canManageSpaces ? await listAdminLabs() : await listAvailableLabs(user)
+      setHomeLabs(Array.isArray(labsData) ? labsData : [])
+      setHomeLabsError('')
+    } catch (err) {
+      setHomeLabs([])
+      setHomeLabsError(err.message || 'No se pudieron cargar los laboratorios.')
+    } finally {
+      setHomeLabsLoading(false)
+    }
+  }, [activeSection, canManageSpaces, user])
 
   const loadAgendaSummary = useCallback(async (options = {}) => {
     if (!shouldTrackAgenda) {
@@ -258,6 +309,13 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     }, 0)
     return () => window.clearTimeout(timer)
   }, [loadOperationsSnapshot])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      loadHomeLabs()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadHomeLabs, user?.user_id])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -582,6 +640,56 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
                       <p>{isAdmin ? 'Actividades en curso.' : 'Sesiones vigentes para ti.'}</p>
                     </article>
                   </div>
+                </section>
+
+                <section className="home-modern-section home-lab-search-section" aria-label="Buscar laboratorios">
+                  <div className="home-modern-section-head home-lab-search-head">
+                    <div>
+                      <p className="home-modern-kicker">Laboratorios</p>
+                      <h2>Encuentra rapido el laboratorio que necesitas.</h2>
+                    </div>
+                    <label className="home-lab-search-field">
+                      <Search size={18} aria-hidden="true" />
+                      <input
+                        type="search"
+                        placeholder="Buscar laboratorio por nombre"
+                        aria-label="Buscar laboratorio por nombre"
+                        value={homeLabSearch}
+                        onChange={(event) => setHomeLabSearch(event.target.value)}
+                      />
+                    </label>
+                  </div>
+
+                  {homeLabsLoading ? (
+                    <p className="home-lab-empty">Cargando laboratorios...</p>
+                  ) : homeLabsError ? (
+                    <p className="home-lab-empty">{homeLabsError}</p>
+                  ) : visibleHomeLabs.length === 0 ? (
+                    <p className="home-lab-empty">No se encontraron laboratorios</p>
+                  ) : (
+                    <div className="home-lab-result-grid" aria-live="polite">
+                      {visibleHomeLabs.map((lab) => (
+                        <button
+                          key={lab.id}
+                          type="button"
+                          className="home-lab-result-card"
+                          onClick={() => onNavigate?.(isAdmin ? '/app/admin/laboratorios' : '/app/reservas/nueva')}
+                        >
+                          <span className="home-lab-result-icon">
+                            <FlaskConical size={20} aria-hidden="true" />
+                          </span>
+                          <span className="home-lab-result-copy">
+                            <strong>{lab.name || 'Laboratorio sin nombre'}</strong>
+                            <small>
+                              {lab.location || lab.area_name || lab.area || 'Ubicacion por definir'}
+                              {lab.capacity ? ` · ${lab.capacity} personas` : ''}
+                            </small>
+                          </span>
+                          <ArrowRight size={16} aria-hidden="true" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </section>
 
                 <section className="home-modern-section">
