@@ -21,6 +21,7 @@ import './TutorialPages.css'
 
 const MIN_TOPIC_LENGTH = 5
 const MAX_DESCRIPTION_LENGTH = 400
+const MAX_TUTOR_OBSERVATION_LENGTH = 500
 const MAX_STUDENT_OBSERVATION_LENGTH = 200
 const MAX_SEATS = 50
 const CLOCK_REFRESH_MS = 30 * 1000
@@ -631,7 +632,7 @@ function TutorTutorialSessionsPage() {
   }
 
   useEffect(() => {
-    setObservationDraft(String(focusedSession?.tutor_observation || ''))
+    setObservationDraft(String(focusedSession?.tutor_observation || '').slice(0, MAX_TUTOR_OBSERVATION_LENGTH))
     setAttendanceDrafts(buildEnrollmentAttendanceDrafts(focusedSession?.enrolled_students))
   }, [focusedSession])
 
@@ -672,7 +673,7 @@ function TutorTutorialSessionsPage() {
       )
     })
 
-    const normalizedObservationDraft = String(observationDraft || '').trim()
+    const normalizedObservationDraft = String(observationDraft || '').trim().slice(0, MAX_TUTOR_OBSERVATION_LENGTH)
     const observationChanged = normalizedObservationDraft !== String(focusedSession.tutor_observation || '')
 
     if (!observationChanged && changedAttendance.length === 0) {
@@ -1322,17 +1323,17 @@ function TutorTutorialSessionsPage() {
                   </div>
                 ) : null}
 
-                <div className="tutorials-actions">
+                <div className="tutorials-actions tutorial-card-actions">
                   <button
                     type="button"
-                    className="tutorials-primary"
+                    className="tutorials-primary tutorial-card-primary-action"
                     onClick={() => handleOpenTutorialDetails(session.id)}
                   >
                     Tomar lista
                   </button>
                   <button
                     type="button"
-                    className="tutorials-secondary"
+                    className="tutorials-secondary tutorial-card-secondary-action"
                     disabled={hasStarted}
                     title={hasStarted ? 'No puedes editar una tutoria que ya inicio.' : undefined}
                     onClick={() => handleStartEditing(session)}
@@ -1341,7 +1342,7 @@ function TutorTutorialSessionsPage() {
                   </button>
                   <button
                     type="button"
-                    className="tutorials-danger"
+                    className="tutorials-danger tutorial-card-danger-action"
                     disabled={deletingId === session.id}
                     onClick={() => handleDelete(session)}
                   >
@@ -1361,7 +1362,7 @@ function TutorTutorialSessionsPage() {
           title="Tomar lista"
           showEnrollmentDetails
           observationDraft={observationDraft}
-          onObservationDraftChange={setObservationDraft}
+          onObservationDraftChange={(value) => setObservationDraft(String(value || '').slice(0, MAX_TUTOR_OBSERVATION_LENGTH))}
           onPrimaryAction={handleSaveAttendanceList}
           primaryActionLabel={isSavingAttendanceList ? 'Guardando lista...' : 'Guardar lista'}
           primaryActionDisabled={isSavingAttendanceList}

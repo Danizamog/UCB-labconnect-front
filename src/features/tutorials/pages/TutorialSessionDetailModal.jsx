@@ -15,6 +15,8 @@ function TutorialSessionDetailModal({
   onAttendanceDraftChange = null,
   isSavingAttendanceList = false,
 }) {
+  const TUTOR_OBSERVATION_MAX_LENGTH = 500
+
   if (!session) {
     return null
   }
@@ -47,6 +49,7 @@ function TutorialSessionDetailModal({
   }
 
   const enrolledStudents = Array.isArray(session.enrolled_students) ? session.enrolled_students : []
+  const tutorObservationCharacters = String(observationDraft || '').length
 
   return (
     <div className="tutorial-detail-backdrop" onClick={onClose} role="dialog" aria-modal="true">
@@ -70,14 +73,17 @@ function TutorialSessionDetailModal({
                 </div>
                 <textarea
                   rows="4"
-                  maxLength={1000}
+                  maxLength={TUTOR_OBSERVATION_MAX_LENGTH}
                   value={observationDraft}
-                  onChange={(event) => onObservationDraftChange(event.target.value)}
+                  onChange={(event) => onObservationDraftChange(event.target.value.slice(0, TUTOR_OBSERVATION_MAX_LENGTH))}
                   placeholder="Ej. El estudiante comprendio los ejercicios base, pero aun necesita refuerzo en recursion."
                   disabled={isSavingAttendanceList}
                 />
                 <div className="tutorial-detail-observation-actions">
                   {observationHint ? <p className="tutorial-detail-hint">{observationHint}</p> : null}
+                  <span className={`tutorial-character-count ${tutorObservationCharacters >= TUTOR_OBSERVATION_MAX_LENGTH ? 'is-full' : ''}`}>
+                    {tutorObservationCharacters}/{TUTOR_OBSERVATION_MAX_LENGTH}
+                  </span>
                 </div>
               </div>
             ) : session.tutor_observation ? (

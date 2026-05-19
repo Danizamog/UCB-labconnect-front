@@ -321,14 +321,26 @@
 .tutorial-detail-observation {
   display: grid;
   gap: 10px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  border: 1px solid rgba(10, 53, 89, 0.1);
-  background: rgba(6, 77, 144, 0.04);
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(10, 53, 89, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(239, 246, 255, 0.92));
+  box-shadow: 0 14px 28px rgba(13, 34, 61, 0.07);
 }
 
 .tutorial-detail-observation.is-readonly {
   background: rgba(244, 197, 66, 0.1);
+}
+
+.tutorial-detail-observation.is-readonly p {
+  margin: 0;
+  max-height: 12rem;
+  overflow: auto;
+  color: var(--ink-800);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .tutorial-detail-observation-head {
@@ -348,13 +360,14 @@
 .tutorial-detail-observation textarea {
   width: 100%;
   resize: vertical;
-  min-height: 96px;
+  min-height: 112px;
   border: 1.5px solid rgba(10, 53, 89, 0.14);
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 14px;
+  padding: 12px 14px;
   font: inherit;
   color: var(--ink-900);
   background: #fff;
+  line-height: 1.55;
 }
 
 .tutorial-detail-observation textarea:focus {
@@ -369,6 +382,28 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.tutorial-detail-observation-actions .tutorial-detail-hint {
+  flex: 1 1 320px;
+  padding: 10px 12px;
+  font-size: 0.84rem;
+}
+
+.tutorial-character-count {
+  justify-self: end;
+  min-width: max-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(10, 53, 89, 0.07);
+  color: var(--ink-700);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.tutorial-character-count.is-full {
+  background: rgba(185, 28, 28, 0.09);
+  color: #991b1b;
 }
 
 .tutorials-inline-meta,
@@ -408,7 +443,7 @@
 }
 
 .tutorial-detail-modal {
-  width: min(760px, 100%);
+  width: min(1040px, 100%);
   max-height: 90vh;
   overflow: auto;
   border-radius: 18px;
@@ -473,27 +508,6 @@
   grid-template-columns: minmax(0, 1.7fr) minmax(200px, 0.9fr);
   gap: 16px;
   align-items: start;
-
-.tutorial-card-observation {
-  display: grid;
-  gap: 0.35rem;
-  padding: 0.85rem 1rem;
-  border-radius: 0.9rem;
-  background: rgba(238, 244, 251, 0.95);
-  border: 1px solid rgba(169, 187, 214, 0.55);
-}
-
-.tutorial-card-observation strong {
-  color: #17325c;
-  font-size: 0.88rem;
-}
-
-.tutorial-card-observation p {
-  margin: 0;
-  color: #40536f;
-  line-height: 1.5;
-  white-space: pre-wrap;
-}
 }
 
 .tutorial-detail-hero-copy {
@@ -575,35 +589,44 @@
 .tutorial-detail-enrolled-table-wrap {
   width: 100%;
   overflow-x: auto;
-  border-radius: 12px;
-  border: 1px solid rgba(10, 53, 89, 0.12);
+  border-radius: 18px;
+  border: 1px solid rgba(10, 53, 89, 0.1);
   background: #fff;
+  box-shadow: 0 12px 30px rgba(13, 34, 61, 0.07);
 }
 
 .tutorial-detail-enrolled-table {
   width: 100%;
-  border-collapse: collapse;
-  min-width: 560px;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 860px;
 }
 
 .tutorial-detail-enrolled-table thead {
-  background: rgba(10, 53, 89, 0.08);
+  background: #0a3559;
 }
 
 .tutorial-detail-enrolled-table th,
 .tutorial-detail-enrolled-table td {
   text-align: left;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-bottom: 1px solid rgba(10, 53, 89, 0.08);
   color: var(--ink-800);
   font-size: 0.84rem;
+  vertical-align: top;
 }
 
 .tutorial-detail-enrolled-table th {
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #0a3559;
+  color: #fff;
+}
+
+.tutorial-detail-enrolled-table td:nth-child(2) {
+  font-weight: 800;
+  color: var(--ink-900);
+  min-width: 180px;
 }
 
 
@@ -614,6 +637,10 @@
   font-size: 0.84rem;
   font-weight: 700;
   color: var(--ink-800);
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(10, 53, 89, 0.06);
+  border: 1px solid rgba(10, 53, 89, 0.1);
 }
 
 .tutorial-attendance-toggle input {
@@ -645,7 +672,7 @@
 .tutorial-attendance-observation {
   display: grid;
   gap: 6px;
-  min-width: 220px;
+  min-width: 280px;
 }
 
 .tutorial-attendance-observation textarea {
@@ -653,11 +680,12 @@
   min-height: 84px;
   resize: vertical;
   border: 1px solid rgba(10, 53, 89, 0.12);
-  border-radius: 10px;
-  padding: 8px 10px;
+  border-radius: 12px;
+  padding: 10px 12px;
   font: inherit;
   color: var(--ink-900);
   background: #fff;
+  line-height: 1.5;
 }
 
 .tutorial-attendance-observation span {
@@ -671,6 +699,8 @@
   min-width: 180px;
   color: var(--ink-800);
   line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .tutorial-attendance-save {
@@ -754,9 +784,11 @@
   display: grid;
   gap: 14px;
   padding: 18px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #ffffff 0%, rgba(6, 77, 144, 0.03) 100%);
-  border: 1px solid rgba(10, 53, 89, 0.08);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, #ffffff 0%, rgba(241, 248, 255, 0.96) 100%);
+  border: 1px solid rgba(10, 53, 89, 0.1);
+  box-shadow: 0 12px 28px rgba(13, 34, 61, 0.06);
   transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
 }
 
@@ -787,8 +819,10 @@
 
 .tutorial-card-head h4 {
   margin: 8px 0 0;
-  font-size: 1rem;
+  font-size: 1.06rem;
   color: var(--ink-900);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .tutorial-badge {
@@ -814,6 +848,7 @@
   color: var(--ink-700);
   line-height: 1.6;
   font-size: 0.9rem;
+  overflow-wrap: anywhere;
 }
 
 .tutorial-meta,
@@ -830,6 +865,33 @@
   color: var(--ink-700);
   font-size: 0.84rem;
   margin: 0;
+}
+
+.tutorial-card-observation {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(239, 246, 255, 0.92));
+  border: 1px solid rgba(10, 53, 89, 0.12);
+}
+
+.tutorial-card-observation strong {
+  color: #0a3559;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.tutorial-card-observation p {
+  margin: 0;
+  max-height: 8.8rem;
+  overflow: auto;
+  color: var(--ink-800);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .tutorial-students strong,
@@ -985,6 +1047,30 @@
   flex-wrap: wrap;
 }
 
+.tutorial-card-actions {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.tutorial-card-actions .tutorials-primary,
+.tutorial-card-actions .tutorials-secondary,
+.tutorial-card-actions .tutorials-danger {
+  min-height: 42px;
+  padding-inline: 14px;
+}
+
+.tutorial-card-primary-action {
+  justify-content: center;
+}
+
+.tutorial-card-secondary-action,
+.tutorial-card-danger-action {
+  background: #fff;
+}
+
 .tutorials-primary,
 .tutorials-secondary,
 .tutorials-danger {
@@ -996,6 +1082,10 @@
   font-weight: 800;
   cursor: pointer;
   transition: opacity 0.14s ease, transform 0.1s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .tutorials-primary:active,
@@ -1434,4 +1524,19 @@
   background: #fff;
   color: #0a3559;
   box-shadow: 0 4px 12px rgba(10, 53, 89, 0.08);
+}
+
+@media (max-width: 720px) {
+  .tutorial-detail-hero,
+  .tutorial-focus-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .tutorial-detail-hero-badges {
+    justify-content: flex-start;
+  }
+
+  .tutorial-card-actions {
+    grid-template-columns: 1fr;
+  }
 }
