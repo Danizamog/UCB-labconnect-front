@@ -28,7 +28,7 @@ const SUPPLY_STATUS_LABELS = {
   cancelled: 'Cancelada',
 }
 
-const defaultMaterialForm = { name: '', category: '', unit: 'unidad', quantity_available: 0, minimum_stock: 0, laboratory_id: '', description: '' }
+const defaultMaterialForm = { name: '', category: '', unit: 'unidad', quantity_available: 0, minimum_stock: 0, laboratory_id: '', description: '', limite_reserva_usuario: '' }
 const defaultMovementForm = { stock_item_id: '', movement_type: 'entry', quantity: 1, notes: '' }
 const defaultReportFilters = { laboratory_id: '', status_filter: '', search: '', only_low_or_out: true, include_general: true }
 const defaultUsageReportFilters = { borrower_id: '', practice: '', date_from: '', date_to: '' }
@@ -184,6 +184,12 @@ function AdminMaterialesPage({ user }) {
       return
     }
 
+    const selectedMat = materials.find(m => String(m.id) === String(supplyCreateForm.stock_item_id))
+    if (selectedMat && selectedMat.limite_reserva_usuario && quantity > selectedMat.limite_reserva_usuario) {
+      setError('Has superado la cantidad máxima permitida para este insumo.')
+      return
+    }
+
     setIsCreatingSupply(true)
     try {
       await createSupplyReservation({
@@ -326,6 +332,16 @@ function AdminMaterialesPage({ user }) {
     return Number(movementForm.quantity || 0) > Number(selectedMovementMaterial.quantity_available || 0)
   }, [movementForm.movement_type, movementForm.quantity, selectedMovementMaterial])
 
+  const selectedSupplyMaterial = useMemo(
+    () => materials.find((m) => String(m.id) === String(supplyCreateForm.stock_item_id)) || null,
+    [materials, supplyCreateForm.stock_item_id],
+  )
+
+  const supplyWillExceedLimit = useMemo(() => {
+    if (!selectedSupplyMaterial || !selectedSupplyMaterial.limite_reserva_usuario) return false
+    return Number(supplyCreateForm.quantity || 0) > selectedSupplyMaterial.limite_reserva_usuario
+  }, [supplyCreateForm.quantity, selectedSupplyMaterial])
+
   const handleRefreshData = async () => {
     setError('')
     await loadData()
@@ -462,6 +478,7 @@ function AdminMaterialesPage({ user }) {
         minimum_stock: material.minimum_stock,
         laboratory_id: material.laboratory_id ? String(material.laboratory_id) : '',
         description: material.description || '',
+        limite_reserva_usuario: material.limite_reserva_usuario !== null && material.limite_reserva_usuario !== undefined ? material.limite_reserva_usuario : '',
       })
     } else {
       resetMaterialForm()
@@ -497,6 +514,7 @@ function AdminMaterialesPage({ user }) {
       quantity_available: Number(materialForm.quantity_available),
       minimum_stock: Number(materialForm.minimum_stock),
       laboratory_id: normalizeLabId(materialForm.laboratory_id),
+      limite_reserva_usuario: materialForm.limite_reserva_usuario !== '' ? Number(materialForm.limite_reserva_usuario) : null,
     }
     try {
       if (editingId) {
@@ -670,6 +688,17 @@ function AdminMaterialesPage({ user }) {
                         value={materialForm.minimum_stock}
                         onChange={(e) => setMaterialForm((prev) => ({ ...prev, minimum_stock: e.target.value }))}
                         required
+                        disabled={!canManageMaterials}
+                      />
+                    </label>
+                    <label>
+                      <span>Límite máx. por reserva</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={materialForm.limite_reserva_usuario}
+                        onChange={(e) => setMaterialForm((prev) => ({ ...prev, limite_reserva_usuario: e.target.value }))}
+                        placeholder="Sin límite"
                         disabled={!canManageMaterials}
                       />
                     </label>
@@ -1447,8 +1476,12 @@ function AdminMaterialesPage({ user }) {
                   />
                 </label>
 
+                {supplyWillExceedLimit ? (
+                  <p className="infra-inline-error">Has superado la cantidad máxima permitida para este insumo ({selectedSupplyMaterial.limite_reserva_usuario}).</p>
+                ) : null}
+
                 <div className="infra-actions">
-                  <button type="submit" className="infra-primary" disabled={isCreatingSupply}>
+                  <button type="submit" className="infra-primary" disabled={isCreatingSupply || supplyWillExceedLimit}>
                     {isCreatingSupply ? 'Creando...' : 'Crear solicitud'}
                   </button>
                 </div>
