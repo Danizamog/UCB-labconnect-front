@@ -1712,7 +1712,10 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                         {form.requested_materials.map((entry, index) => {
                           const material = materialsCatalog.find((item) => String(item.id) === String(entry.stock_item_id))
                           const stock = Number(material?.quantity_available || 0)
+                          const limit = Number(material?.limite_reserva_usuario || 0)
                           const isOutOfStock = stock <= 0
+                          const effectiveMax = limit > 0 ? Math.min(stock, limit) : stock
+
                           return (
                             <li key={`${entry.stock_item_id}-${index}`} className={`reservation-material-row${isOutOfStock ? ' out-of-stock' : ''}`}>
                               <div className="reservation-material-row-info">
@@ -1720,17 +1723,27 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                                 <span>
                                   {isOutOfStock
                                     ? <span className="material-badge agotado">Agotado</span>
-                                    : `${stock} ${material?.unit || ''} disponibles`}
+                                    : (
+                                      <>
+                                        {stock} {material?.unit || ''} disponibles
+                                        {limit > 0 && (
+                                          <span className="material-limit-hint"> (Máx: {limit} por reserva)</span>
+                                        )}
+                                      </>
+                                    )}
                                 </span>
                               </div>
                               <input
                                 type="number"
                                 min="1"
-                                max={Math.max(stock, 1)}
+                                max={Math.max(effectiveMax, 1)}
                                 value={entry.quantity}
                                 disabled={isOutOfStock}
                                 onChange={(event) => {
-                                  const value = Math.max(1, Number(event.target.value) || 1)
+                                  let value = Math.max(1, Number(event.target.value) || 1)
+                                  if (effectiveMax > 0) {
+                                    value = Math.min(value, effectiveMax)
+                                  }
                                   setForm((previous) => {
                                     const next = previous.requested_materials.slice()
                                     next[index] = { ...next[index], quantity: value }
@@ -1780,10 +1793,12 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                         .filter((material) => !form.requested_materials.some((entry) => String(entry.stock_item_id) === String(material.id)))
                         .map((material) => {
                           const stock = Number(material.quantity_available || 0)
+                          const limit = Number(material.limite_reserva_usuario || 0)
                           const out = stock <= 0
+                          const limitText = limit > 0 ? ` (Máx: ${limit})` : ''
                           return (
                             <option key={material.id} value={material.id} disabled={out}>
-                              {material.name}{out ? ' (Agotado)' : ` - ${stock} ${material.unit || ''}`}
+                              {material.name}{out ? ' (Agotado)' : ` - ${stock} ${material.unit || ''}${limitText}`}
                             </option>
                           )
                         })}
