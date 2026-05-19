@@ -14,7 +14,10 @@ import './TutorialPages.css'
 const CLOCK_REFRESH_MS = 30 * 1000
 
 function parseSessionDate(value) {
-  const parsed = new Date(value || '')
+  if (!value) return null
+  // Eliminar la 'Z' para evitar que JS lo convierta de UTC a hora local
+  const normalizedValue = value.replace('Z', '')
+  const parsed = new Date(normalizedValue)
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
@@ -23,8 +26,19 @@ function getEnrollmentState(session, userId, referenceNow = new Date()) {
   const isOwnSession = session.tutor_id === normalizedUserId
   const isEnrolled = session.enrolled_students.some((student) => student.student_id === normalizedUserId)
   const isFull = session.seats_left <= 0
-  const sessionStart = parseSessionDate(session?.start_at)
-  const sessionEnd = parseSessionDate(session?.end_at)
+  
+  const rawStart = session?.start_at;
+  const sessionStart = parseSessionDate(rawStart);
+  const sessionEnd = parseSessionDate(session?.end_at);
+  
+  console.log("DEBUG DATE:", {
+    topic: session.topic,
+    rawStart: rawStart,
+    parsedStart: sessionStart,
+    referenceNow: referenceNow,
+    hasStarted: sessionStart && sessionStart.getTime() <= referenceNow.getTime()
+  });
+
   const hasStarted = Boolean(sessionStart) && sessionStart.getTime() <= referenceNow.getTime()
   const hasEnded = Boolean(sessionEnd) && sessionEnd.getTime() <= referenceNow.getTime()
 
