@@ -279,7 +279,10 @@ export function deleteAsset(assetId) {
 export function listMaterials(laboratoryId = '') {
   const normalized = String(laboratoryId || '').trim()
   const query = normalized ? `?laboratory_id=${encodeURIComponent(normalized)}` : ''
-  return request(`${inventoryBase}/stock-items${query}`, { cacheTtlMs: 5000 })
+  return request(`${inventoryBase}/stock-items${query}`, { cacheTtlMs: 5000 }).then(data => {
+    console.log("[DEBUG FRONTEND] listMaterials received:", data);
+    return data;
+  });
 }
 
 export function getStockItemsReport({
@@ -307,6 +310,7 @@ export function getStockItemsReport({
 }
 
 export function createMaterial(payload) {
+  console.log("[DEBUG FRONTEND] Creating material with payload:", payload);
   return request(`${inventoryBase}/stock-items`, {
     method: 'POST',
     body: JSON.stringify(payload),
