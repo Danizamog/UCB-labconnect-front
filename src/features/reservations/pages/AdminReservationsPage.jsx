@@ -224,7 +224,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   const tableQueryRef = useRef({ ...defaultTableFilters, pageNumber: 0 })
   const realtimeRefreshTimeoutRef = useRef(null)
 
-  const canManage = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
+  const canManage = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio', 'gestionar_tutorias'])
   const isAdmin = isAdminUser(user)
 
   const loadReferenceData = useCallback(async () => {
@@ -311,15 +311,25 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     try {
       const sessions = await listPendingTutorialSessions()
       setPendingTutorials(sessions)
+      const allPendingSupplies = await listSupplyReservations({ status: 'pending', skipCache: true }).catch(() => [])
 
       const supplyResults = await Promise.all(
         sessions.map(async (session) => {
           try {
-            const supplies = await listSupplyReservations({
+            const linkedSupplies = await listSupplyReservations({
               tutorial_session_id: session.id,
               skipCache: true,
             })
-            return [session.id, supplies]
+            const linkedIds = new Set(linkedSupplies.map((supply) => supply.id))
+            const fallbackSupplies = allPendingSupplies.filter((supply) => {
+              const requestedFor = String(supply.requested_for || '').trim().toLowerCase()
+              const expectedRequestedFor = `tutoria: ${String(session.topic || '').trim()}`.toLowerCase()
+              return !linkedIds.has(supply.id)
+                && !String(supply.tutorial_session_id || '').trim()
+                && requestedFor === expectedRequestedFor
+                && String(supply.requested_by || '') === String(session.tutor_id || '')
+            })
+            return [session.id, [...linkedSupplies, ...fallbackSupplies]]
           } catch {
             return [session.id, []]
           }
@@ -1710,130 +1720,136 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                 const isActioning = tutorialActionId === session.id
                 const rejectionDraft = tutorialRejectionDrafts[session.id] || ''
                 const labName = labNameById[String(session.laboratory_id)] || session.location || '-'
+                const pendingSupplies = supplies.filter((supply) => supply.status === 'pending')
+                const selectedSuppliesCount = pendingSupplies.filter((supply) => selection[supply.id]).length
 
                 return (
                   <article
                     key={session.id}
-                    className="reservations-panel"
-                    style={{ marginBottom: 16 }}
+                    className="tutorial-approval-card"
                   >
-                    <div className="reservations-panel-header">
-                      <h4>{session.topic}</h4>
-                      <p className="reservations-panel-subtitle">
-                        Tutor: <strong>{session.tutor_name || 'Sin asignar'}</strong>
-                        {session.tutor_email ? ` (${session.tutor_email})` : ''}
-                      </p>
+                    <div className="tutorial-approval-head">
+                      <div>
+                        <span className="tutorial-approval-kicker">Tutoria pendiente</span>
+                        <h4>{session.topic}</h4>
+                        <p>
+                          Tutor: <strong>{session.tutor_name || 'Sin asignar'}</strong>
+                          {session.tutor_email ? ` (${session.tutor_email})` : ''}
+                        </p>
+                      </div>
+                      <div className="tutorial-approval-capacity">
+                        <strong>{session.max_students}</strong>
+                        <span>cupos</span>
+                      </div>
                     </div>
 
-                    <div className="reservations-controls">
+                    <div className="tutorial-approval-meta">
                       <div>
-                        <span style={{ display: 'block', fontSize: 12, opacity: 0.7 }}>Laboratorio</span>
+                        <span>Laboratorio</span>
                         <strong>{labName}</strong>
                       </div>
                       <div>
-                        <span style={{ display: 'block', fontSize: 12, opacity: 0.7 }}>Fecha</span>
+                        <span>Fecha</span>
                         <strong>{formatDate(session.session_date)}</strong>
                       </div>
                       <div>
-                        <span style={{ display: 'block', fontSize: 12, opacity: 0.7 }}>Horario</span>
+                        <span>Horario</span>
                         <strong>{session.start_time} - {session.end_time}</strong>
                       </div>
                       <div>
-                        <span style={{ display: 'block', fontSize: 12, opacity: 0.7 }}>Cupos</span>
-                        <strong>{session.max_students}</strong>
+                        <span>Materiales</span>
+                        <strong>{supplies.length > 0 ? `${selectedSuppliesCount}/${pendingSupplies.length || supplies.length}` : '0'}</strong>
                       </div>
                     </div>
 
                     {session.description ? (
-                      <p style={{ marginTop: 12 }}>{session.description}</p>
+                      <p className="tutorial-approval-description">{session.description}</p>
                     ) : null}
 
-                    <div className="reservations-panel" style={{ marginTop: 12 }}>
-                      <div className="reservations-panel-header">
+                    <div className="tutorial-approval-supplies">
+                      <div className="tutorial-approval-section-head">
                         <h5>Materiales solicitados</h5>
                         <p className="reservations-panel-subtitle">
                           Marca cuales aceptas. Los desmarcados se cancelaran cuando apruebes la tutoria.
                         </p>
                       </div>
                       {supplies.length === 0 ? (
-                        <p className="reservations-empty">Esta tutoria no incluye materiales.</p>
+                        <p className="tutorial-approval-empty">Esta tutoria no incluye materiales.</p>
                       ) : (
-                        <table className="supplies-table">
-                          <thead>
-                            <tr>
-                              <th>Aceptar</th>
-                              <th>Reactivo</th>
-                              <th>Cantidad</th>
-                              <th>Disponible</th>
-                              <th>Estado</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {supplies.map((supply) => {
-                              const isPending = supply.status === 'pending'
-                              const isChecked = isPending ? Boolean(selection[supply.id]) : false
-                              return (
-                                <tr key={supply.id}>
-                                  <td>
-                                    <input
-                                      type="checkbox"
-                                      checked={isChecked}
-                                      disabled={!isPending || isActioning}
-                                      onChange={() => toggleTutorialSupply(session.id, supply.id)}
-                                    />
-                                  </td>
-                                  <td><strong>{supply.stock_item_name || supply.stock_item_id}</strong></td>
-                                  <td>{supply.quantity}</td>
-                                  <td>{supply.quantity_available}</td>
-                                  <td>
-                                    <span className={`reservations-status ${supply.status}`}>
-                                      {supply.status === 'pending' ? 'Pendiente'
-                                        : supply.status === 'approved' ? 'Aprobada'
-                                        : supply.status === 'delivered' ? 'Entregada'
-                                        : supply.status === 'cancelled' ? 'Cancelada'
-                                        : supply.status}
-                                    </span>
-                                  </td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
+                        <div className="tutorial-supply-list">
+                          {supplies.map((supply) => {
+                            const isPending = supply.status === 'pending'
+                            const isChecked = isPending ? Boolean(selection[supply.id]) : false
+                            const insufficientStock = isPending && Number(supply.quantity || 0) > Number(supply.quantity_available || 0)
+                            return (
+                              <label
+                                key={supply.id}
+                                className={`tutorial-supply-card${isChecked ? ' is-selected' : ''}${!isPending ? ' is-locked' : ''}${insufficientStock ? ' has-warning' : ''}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  disabled={!isPending || isActioning}
+                                  onChange={() => toggleTutorialSupply(session.id, supply.id)}
+                                />
+                                <span className="tutorial-supply-main">
+                                  <strong>{supply.stock_item_name || supply.stock_item_id}</strong>
+                                  <small>
+                                    Solicita {supply.quantity} unidad(es) · disponible {supply.quantity_available}
+                                  </small>
+                                  {insufficientStock ? <small className="tutorial-supply-warning">Stock insuficiente para aprobar este material.</small> : null}
+                                </span>
+                                <span className={`reservations-status ${supply.status}`}>
+                                  {supply.status === 'pending' ? 'Pendiente'
+                                    : supply.status === 'approved' ? 'Aprobada'
+                                    : supply.status === 'delivered' ? 'Entregada'
+                                    : supply.status === 'cancelled' ? 'Cancelada'
+                                    : supply.status}
+                                </span>
+                              </label>
+                            )
+                          })}
+                        </div>
                       )}
                     </div>
 
-                    <div className="reservations-actions">
-                      <button
-                        type="button"
-                        className="reservations-primary"
-                        disabled={isActioning || !canManage}
-                        onClick={() => handleApproveTutorial(session)}
-                      >
-                        {isActioning ? 'Procesando...' : 'Aprobar tutoria'}
-                      </button>
-                    </div>
-
-                    <label style={{ marginTop: 12, display: 'block' }}>
-                      <span>Motivo de rechazo</span>
-                      <textarea
-                        rows="2"
-                        value={rejectionDraft}
-                        onChange={(event) => setTutorialRejectionDrafts((previous) => ({
-                          ...previous,
-                          [session.id]: event.target.value,
-                        }))}
-                        placeholder="Explica por que no puedes aprobar esta tutoria."
-                      />
-                    </label>
-                    <div className="reservations-actions">
-                      <button
-                        type="button"
-                        className="reservations-danger"
-                        disabled={isActioning || !canManage || !rejectionDraft.trim()}
-                        onClick={() => handleRejectTutorial(session)}
-                      >
-                        Rechazar tutoria
-                      </button>
+                    <div className="tutorial-approval-decision">
+                      <div>
+                        <h5>Decision</h5>
+                        <p>
+                          Aprueba la tutoria con los materiales marcados o escribe un motivo para rechazarla.
+                        </p>
+                      </div>
+                      <label className="tutorial-rejection-field">
+                        <span>Motivo de rechazo</span>
+                        <textarea
+                          rows="3"
+                          value={rejectionDraft}
+                          onChange={(event) => setTutorialRejectionDrafts((previous) => ({
+                            ...previous,
+                            [session.id]: event.target.value,
+                          }))}
+                          placeholder="Ej. El laboratorio ya no esta disponible o faltan datos de la tutoria."
+                        />
+                      </label>
+                      <div className="tutorial-approval-actions">
+                        <button
+                          type="button"
+                          className="reservations-primary"
+                          disabled={isActioning || !canManage}
+                          onClick={() => handleApproveTutorial(session)}
+                        >
+                          {isActioning ? 'Procesando...' : 'Aprobar tutoria'}
+                        </button>
+                        <button
+                          type="button"
+                          className="reservations-danger"
+                          disabled={isActioning || !canManage || !rejectionDraft.trim()}
+                          onClick={() => handleRejectTutorial(session)}
+                        >
+                          Rechazar tutoria
+                        </button>
+                      </div>
                     </div>
                   </article>
                 )
