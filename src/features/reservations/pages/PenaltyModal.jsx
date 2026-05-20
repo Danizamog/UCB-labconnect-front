@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import './PenaltyModal.css'
 
 const DURATION_PRESETS = [
@@ -43,13 +45,25 @@ function PenaltyModal({
   isSubmitting = false,
   isLoadingData = false,
 }) {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('penalty-modal-open')
+    } else {
+      document.body.classList.remove('penalty-modal-open')
+    }
+
+    return () => {
+      document.body.classList.remove('penalty-modal-open')
+    }
+  }, [isOpen])
+
   if (!isOpen) {
     return null
   }
 
   const submitDisabled = isSubmitting || isLoadingData || Boolean(validationMessage)
 
-  return (
+  const modalContent = (
     <div className="reservation-modal-backdrop penalty-backdrop" onClick={onClose} role="dialog" aria-modal="true">
       <section className="reservation-modal penalty-modal" onClick={(event) => event.stopPropagation()}>
         <header className="reservation-modal-header penalty-modal-hero">
@@ -413,6 +427,8 @@ function PenaltyModal({
       </section>
     </div>
   )
+
+  return createPortal(modalContent, document.body)
 }
 
 export default PenaltyModal
