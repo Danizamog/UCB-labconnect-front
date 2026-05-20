@@ -57,6 +57,8 @@ function dedupeProfiles(records) {
   })
 }
 
+import { formatLocalDateTime } from '../../../shared/utils/formatters'
+
 function getProfileDisplayName(profile) {
   const name = String(profile?.name || '').trim()
   if (name) {
@@ -748,9 +750,9 @@ function AdminProfilesPage({ user }) {
                             <div>
                               <span className="profiles-panel-label">Vigencia</span>
                               <strong>
-                                {formatDateTime(reactivationContext.active_penalty.starts_at)}
+                                {formatLocalDateTime(reactivationContext.active_penalty.starts_at)}
                                 {' - '}
-                                {formatDateTime(reactivationContext.active_penalty.ends_at)}
+                                {formatLocalDateTime(reactivationContext.active_penalty.ends_at)}
                               </strong>
                             </div>
                             <div>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { formatLocalDateTime } from '../../../shared/utils/formatters'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import { listAdminLabs, listAssetMaintenanceTickets, listAssets } from '../../admin/services/infrastructureService'
 import { listUserProfiles } from '../../admin/services/profileService'
@@ -127,14 +128,6 @@ function buildPenaltyValidation(form) {
   }
 
   return errors
-}
-
-function formatPenaltyDateTime(value) {
-  if (!value) {
-    return 'Sin fecha'
-  }
-
-  return String(value).replace('T', ' ').replace('Z', '').slice(0, 16)
 }
 
 function getAssetLabel(asset) {
@@ -595,7 +588,7 @@ function AdminPenaltiesPage({ user }) {
                   <span><strong>Incidente:</strong> {penalty.incident_date || 'Sin fecha'} {penalty.incident_start_time && penalty.incident_end_time ? `· ${penalty.incident_start_time} - ${penalty.incident_end_time}` : ''}</span>
                   <span><strong>Alcance:</strong> {penalty.incident_scope === 'laboratory' ? 'Dano al laboratorio' : 'Dano a equipo'}</span>
                   <span><strong>Equipo:</strong> {getAssetLabel(assetById.get(String(penalty.asset_id || ''))) || penalty.asset_id || 'No especificado'}</span>
-                  <span><strong>Vigencia:</strong> {formatPenaltyDateTime(penalty.starts_at)} hasta {formatPenaltyDateTime(penalty.ends_at)}</span>
+                  <span><strong>Vigencia:</strong> {formatLocalDateTime(penalty.starts_at)} hasta {formatLocalDateTime(penalty.ends_at)}</span>
                   <span><strong>Correo enviado:</strong> {penalty.email_sent ? 'Si' : 'No confirmado'}</span>
                 </div>
 
