@@ -849,9 +849,37 @@ export async function listPenalties(filters = {}) {
   if (filters.active_only) {
     search.set('active_only', 'true')
   }
+  if (filters.page) {
+    search.set('paginate', 'true')
+    search.set('page', filters.page)
+  }
+  if (filters.per_page) {
+    search.set('per_page', filters.per_page)
+  }
+  if (filters.sort) {
+    search.set('sort', filters.sort)
+  }
+  
   const query = search.toString() ? `?${search.toString()}` : ''
   const data = await request(`${reservationsBase}/penalties${query}`, { cacheTtlMs: 1500 })
-  return Array.isArray(data) ? data.map(mapPenalty) : []
+  
+  if (Array.isArray(data)) {
+    return {
+      items: data.map(mapPenalty),
+      totalItems: data.length,
+      totalPages: 1,
+      page: 1,
+      perPage: data.length || 20
+    }
+  }
+  
+  return {
+    items: Array.isArray(data?.items) ? data.items.map(mapPenalty) : [],
+    totalItems: data?.total_items || 0,
+    totalPages: data?.total_pages || 1,
+    page: data?.page || 1,
+    perPage: data?.per_page || 20
+  }
 }
 
 export async function createPenalty(payload) {

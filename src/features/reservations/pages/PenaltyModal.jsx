@@ -416,11 +416,27 @@ function PenaltyModal({
           </section>
 
           <div className="reservation-modal-actions penalty-modal-actions">
-            <button type="button" className="reservation-modal-secondary" onClick={onClose}>
-              Cerrar
+            <button
+              type="button"
+              className="reservation-modal-secondary penalty-action-secondary"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Cancelar
             </button>
-            <button type="submit" className="reservation-modal-primary" disabled={submitDisabled}>
-              {isSubmitting ? 'Guardando...' : 'Guardar penalizacion'}
+            <button
+              type="submit"
+              className="reservation-modal-primary penalty-action-primary"
+              disabled={submitDisabled}
+            >
+              {isSubmitting ? (
+                <>
+                  <span className="penalty-action-spinner" aria-hidden="true" />
+                  Guardando...
+                </>
+              ) : (
+                'Guardar penalizacion'
+              )}
             </button>
           </div>
         </form>

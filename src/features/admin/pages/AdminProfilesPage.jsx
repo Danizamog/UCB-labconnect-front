@@ -168,7 +168,7 @@ function AdminProfilesPage({ user }) {
       const nextProfiles = dedupeProfiles(rawProfiles.map(normalizeProfileRecord))
       const nextRoles = Array.isArray(roleResult.value) ? roleResult.value : []
       const nextFlags = flagResult.status === 'fulfilled' && Array.isArray(flagResult.value) ? flagResult.value : []
-      const nextPenalties = penaltyResult.status === 'fulfilled' && Array.isArray(penaltyResult.value) ? penaltyResult.value : []
+      const nextPenalties = penaltyResult.status === 'fulfilled' && Array.isArray(penaltyResult.value?.items) ? penaltyResult.value.items : []
 
       setProfiles(nextProfiles)
       setRoles(nextRoles)

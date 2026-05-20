@@ -545,6 +545,76 @@
   font-weight: 600;
 }
 
+/* ── Filters toolbar ───────────────────────────────────── */
+.reservations-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, rgba(6, 77, 144, 0.04), rgba(6, 77, 144, 0.01));
+  border: 1px solid var(--line-300);
+  border-radius: 14px;
+}
+
+.reservations-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+  flex: 1 1 180px;
+}
+
+.reservations-filter-field.is-grow {
+  flex: 2 1 240px;
+}
+
+.reservations-filter-field > span {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--ink-700);
+}
+
+.reservations-filter-field select,
+.reservations-filter-field input {
+  border: 1.5px solid var(--line-300);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 0.9rem;
+  background: #fff;
+  color: var(--ink-900);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.reservations-filter-field select:focus,
+.reservations-filter-field input:focus {
+  outline: none;
+  border-color: rgba(6, 77, 144, 0.5);
+  box-shadow: 0 0 0 3px rgba(6, 77, 144, 0.08);
+}
+
+.reservations-filter-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(6, 77, 144, 0.07);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-700);
+  white-space: nowrap;
+}
+
+.reservations-filter-meta.is-loading {
+  background: rgba(234, 179, 8, 0.12);
+  color: #854d0e;
+}
+
 /* ── Messages ──────────────────────────────────────────── */
 .reservations-empty {
   margin: 0;

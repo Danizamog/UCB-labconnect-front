@@ -147,6 +147,15 @@ const STATUS_LABELS = {
 
 function AdminPenaltiesPage({ user }) {
   const [penalties, setPenalties] = useState([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [sort, setSort] = useState('-created')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [totalItems, setTotalItems] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [isLoadingPenalties, setIsLoadingPenalties] = useState(false)
+
   const [reservations, setReservations] = useState([])
   const [assets, setAssets] = useState([])
   const [tickets, setTickets] = useState([])
@@ -165,9 +174,21 @@ function AdminPenaltiesPage({ user }) {
   const canManage = hasAnyPermission(user, ['gestionar_penalizaciones'])
 
   const loadPenalties = useCallback(async () => {
-    const data = await listPenalties()
-    setPenalties(Array.isArray(data) ? data : [])
-  }, [])
+    setIsLoadingPenalties(true)
+    try {
+      const data = await listPenalties({
+        page,
+        per_page: pageSize,
+        sort,
+        active_only: statusFilter === 'active',
+      })
+      setPenalties(Array.isArray(data?.items) ? data.items : [])
+      setTotalItems(data?.totalItems || 0)
+      setTotalPages(data?.totalPages || 1)
+    } finally {
+      setIsLoadingPenalties(false)
+    }
+  }, [page, pageSize, sort, statusFilter])
 
   const loadDisplaySupportData = useCallback(async () => {
     const [assetsResult, labsResult] = await Promise.allSettled([
@@ -217,21 +238,32 @@ function AdminPenaltiesPage({ user }) {
   }, [])
 
   useEffect(() => {
-    Promise.all([loadPenalties(), loadDisplaySupportData()]).catch((err) => {
+    loadPenalties().catch((err) => {
       setError(err?.message || 'No se pudo cargar el panel de penalizaciones.')
     })
+  }, [loadPenalties])
 
+  useEffect(() => {
+    loadDisplaySupportData().catch(() => {})
+  }, [loadDisplaySupportData])
+
+  const loadPenaltiesRef = useRef(loadPenalties)
+  useEffect(() => {
+    loadPenaltiesRef.current = loadPenalties
+  }, [loadPenalties])
+
+  useEffect(() => {
     const unsubscribe = subscribeReservationsRealtime((event) => {
       if (event?.topic === 'user_penalty') {
         setPenalties((prev) => applyRealtimeRecordPatch(prev, event, { mapper: mapPenaltyRecord }))
       }
     }, {
       topics: ['user_penalty'],
-      onResync: () => loadPenalties().catch(() => {}),
+      onResync: () => loadPenaltiesRef.current?.().catch(() => {}),
     })
 
     return () => unsubscribe?.()
-  }, [loadPenalties, loadDisplaySupportData])
+  }, [])
 
   const assetById = useMemo(() => {
     const mapped = new Map()
@@ -364,6 +396,27 @@ function AdminPenaltiesPage({ user }) {
 
   const activePenalties = penalties.filter((penalty) => penalty.is_active)
   const emailSentCount = penalties.filter((penalty) => penalty.email_sent).length
+
+  const visiblePenalties = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase()
+    if (!term) {
+      return penalties
+    }
+    return penalties.filter((penalty) => {
+      const haystack = [
+        penalty.user_name,
+        penalty.user_email,
+        penalty.user_id,
+        penalty.reason,
+      ]
+        .map((value) => String(value || '').toLowerCase())
+        .join(' ')
+      return haystack.includes(term)
+    })
+  }, [penalties, searchTerm])
+
+  const rangeStart = totalItems === 0 ? 0 : (page - 1) * pageSize + 1
+  const rangeEnd = Math.min(page * pageSize, totalItems)
 
   const openModal = () => {
     setForm(createDefaultForm())
@@ -534,7 +587,7 @@ function AdminPenaltiesPage({ user }) {
           <p>Registra evidencias, bloquea nuevas reservas y rehabilita cuentas cuando corresponda.</p>
         </div>
         <div className="reservations-summary">
-          <div><span>Total</span><strong>{penalties.length}</strong></div>
+          <div><span>Total</span><strong>{totalItems}</strong></div>
           <div><span>Activas</span><strong>{activePenalties.length}</strong></div>
           <div><span>Correos</span><strong>{emailSentCount}</strong></div>
         </div>
@@ -564,12 +617,66 @@ function AdminPenaltiesPage({ user }) {
             Las penalizaciones activas bloquean nuevas solicitudes; las levantadas o expiradas se mantienen solo como historial.
           </p>
         </div>
+        
+        <div className="reservations-filters">
+          <label className="reservations-filter-field is-grow">
+            <span>Buscar</span>
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Nombre, correo o motivo"
+            />
+          </label>
+          <label className="reservations-filter-field">
+            <span>Estado</span>
+            <select
+              value={statusFilter}
+              onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }}
+            >
+              <option value="all">Todas</option>
+              <option value="active">Solo activas</option>
+            </select>
+          </label>
+          <label className="reservations-filter-field">
+            <span>Ordenar por</span>
+            <select
+              value={sort}
+              onChange={(event) => { setSort(event.target.value); setPage(1) }}
+            >
+              <option value="-created">Mas recientes</option>
+              <option value="created">Mas antiguos</option>
+            </select>
+          </label>
+          <label className="reservations-filter-field">
+            <span>Mostrar</span>
+            <select
+              value={pageSize}
+              onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}
+            >
+              <option value={20}>20 por pagina</option>
+              <option value={50}>50 por pagina</option>
+              <option value={100}>100 por pagina</option>
+            </select>
+          </label>
+          <span className={`reservations-filter-meta${isLoadingPenalties ? ' is-loading' : ''}`}>
+            {isLoadingPenalties
+              ? 'Cargando...'
+              : totalItems === 0
+                ? 'Sin resultados'
+                : `Mostrando ${rangeStart}-${rangeEnd} de ${totalItems}`}
+          </span>
+        </div>
 
-        {penalties.length === 0 ? (
-          <p className="reservations-empty">Aun no hay penalizaciones registradas.</p>
+        {visiblePenalties.length === 0 ? (
+          <p className="reservations-empty">
+            {penalties.length === 0
+              ? 'Aun no hay penalizaciones registradas.'
+              : 'Ninguna penalizacion coincide con la busqueda actual.'}
+          </p>
         ) : (
           <div className="penalty-card-grid">
-            {penalties.map((penalty) => (
+            {visiblePenalties.map((penalty) => (
               <article key={penalty.id} className={`penalty-card${penalty.is_active ? ' is-active' : ''}`}>
                 <div className="penalty-card-head">
                   <div>
@@ -611,6 +718,28 @@ function AdminPenaltiesPage({ user }) {
             ))}
           </div>
         )}
+
+        {totalPages > 1 ? (
+          <div className="reservations-pagination">
+            <button
+              type="button"
+              className="reservations-secondary"
+              disabled={page <= 1 || isLoadingPenalties}
+              onClick={() => setPage(page - 1)}
+            >
+              Anterior
+            </button>
+            <span>Pagina {page} de {totalPages}</span>
+            <button
+              type="button"
+              className="reservations-secondary"
+              disabled={page >= totalPages || isLoadingPenalties}
+              onClick={() => setPage(page + 1)}
+            >
+              Siguiente
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <PenaltyModal
