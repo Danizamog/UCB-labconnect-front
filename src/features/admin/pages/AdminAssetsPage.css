@@ -135,6 +135,88 @@
   font-size: 0.88rem;
 }
 
+.infra-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px 0;
+}
+
+.infra-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 280px;
+  min-width: 0;
+  border-radius: 16px;
+  border: 1px solid rgba(177, 198, 220, 0.8);
+  background: rgba(247, 251, 255, 0.9);
+  padding: 10px 14px;
+  color: var(--ink-600);
+}
+
+.infra-search input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-900);
+  font: inherit;
+}
+
+.infra-search input:focus {
+  outline: none;
+}
+
+.infra-directory-controls {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.infra-select-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-700);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.infra-select-control select {
+  border-radius: 10px;
+  border: 1px solid rgba(177, 198, 220, 0.85);
+  background: rgba(247, 251, 255, 0.95);
+  padding: 6px 8px;
+  color: var(--ink-900);
+  font: inherit;
+}
+
+.infra-inline-hint {
+  color: var(--ink-700);
+  font-size: 0.84rem;
+}
+
+.infra-load-more {
+  width: 100%;
+}
+
+.infra-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 14px 18px 18px;
+  flex-wrap: wrap;
+}
+
+.infra-pagination .infra-secondary {
+  min-width: 110px;
+}
+
 .infra-low-stock-report {
   border-color: rgba(185, 28, 28, 0.12);
   background:

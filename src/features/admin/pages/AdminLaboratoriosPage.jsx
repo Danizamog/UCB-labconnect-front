@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Search } from 'lucide-react'
 import {
   createLab,
   deleteLab,
   listAdminAreas,
-  listAdminLabs,
+  listAdminLabsPaginated,
   updateLab,
 } from '../services/infrastructureService'
 import { listUsersWithRoles } from '../services/rolesService'
@@ -22,6 +23,8 @@ const defaultForm = {
   is_active: true,
 }
 
+const LAB_PAGE_SIZE_OPTIONS = [8, 12, 20, 40]
+
 function AdminLaboratoriosPage({ user }) {
   const [areas, setAreas] = useState([])
   const [labs, setLabs] = useState([])
@@ -35,44 +38,84 @@ function AdminLaboratoriosPage({ user }) {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [form, setForm] = useState(defaultForm)
   const [confirmModal, setConfirmModal] = useState(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [labsPerPage, setLabsPerPage] = useState(12)
+  const [page, setPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [initialLoad, setInitialLoad] = useState(true)
 
   const canManage = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
 
-  const loadData = async () => {
-    setLoading(true)
+  const loadReferenceData = async () => {
     try {
-      const [areasData, labsData, usersData] = await Promise.all([
+      const [areasData, usersData] = await Promise.all([
         listAdminAreas(),
-        listAdminLabs(),
-        listUsersWithRoles()
+        listUsersWithRoles(),
       ])
       setAreas(areasData)
-      setLabs(labsData)
-      
       const potentialManagers = usersData.filter(
         (u) => u.role?.nombre === 'Encargado de Laboratorio' || u.role?.nombre === 'Administrador'
       )
       setManagers(potentialManagers)
-      
+    } catch (err) {
+      setError(err.message || 'No se pudieron cargar las areas o encargados')
+    }
+  }
+
+  const loadLabs = async ({ page: nextPage = page, perPage = labsPerPage, search = debouncedSearch } = {}) => {
+    setLoading(true)
+    try {
+      const result = await listAdminLabsPaginated({ page: nextPage, perPage, search })
+      setLabs(result.items)
+      setTotalItems(result.total_items)
+      setTotalPages(result.total_pages)
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudieron cargar los laboratorios')
     } finally {
       setLoading(false)
+      setInitialLoad(false)
     }
   }
 
-  useEffect(() => { loadData() }, [])
+  const refreshAll = async () => {
+    await Promise.all([loadReferenceData(), loadLabs({ page, perPage: labsPerPage, search: debouncedSearch })])
+  }
+
+  useEffect(() => { loadReferenceData() }, [])
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300)
+    return () => clearTimeout(handle)
+  }, [searchTerm])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, labsPerPage])
+
+  useEffect(() => {
+    loadLabs({ page, perPage: labsPerPage, search: debouncedSearch })
+  }, [page, labsPerPage, debouncedSearch])
+
+  useEffect(() => {
+    if (totalPages > 0 && page > totalPages) {
+      setPage(totalPages)
+    }
+  }, [totalPages, page])
 
   const areaNameById = useMemo(
     () => Object.fromEntries(areas.map((area) => [String(area.id), area.name])),
     [areas],
   )
-  
+
   const managerNameById = useMemo(
     () => Object.fromEntries(managers.map((u) => [String(u.id), u.name || u.email || 'Usuario'])),
     [managers],
   )
+
+  const safeTotalPages = Math.max(totalPages, 1)
 
   const resetForm = () => {
     setEditingId(null)
@@ -108,7 +151,7 @@ function AdminLaboratoriosPage({ user }) {
       }
       resetForm()
       setIsFormOpen(false)
-      await loadData()
+      await refreshAll()
     } catch (err) {
       setError(err.message || 'No se pudo guardar el laboratorio')
     }
@@ -124,7 +167,7 @@ function AdminLaboratoriosPage({ user }) {
         try {
           await deleteLab(labId)
           setMessage('Laboratorio eliminado correctamente.')
-          await loadData()
+          await refreshAll()
         } catch (err) {
           setError(err.message || 'No se pudo eliminar el laboratorio')
         }
@@ -149,15 +192,15 @@ function AdminLaboratoriosPage({ user }) {
           <p>Define capacidad, ubicacion y area para que cada reserva use datos confiables.</p>
         </div>
         <div className="infra-summary">
-          <div><span>Total</span><strong>{labs.length}</strong></div>
-          <div><span>Activos</span><strong>{labs.filter((l) => l.is_active !== false).length}</strong></div>
+          <div><span>Total</span><strong>{totalItems}</strong></div>
+          <div><span>En esta pagina</span><strong>{labs.length}</strong></div>
         </div>
       </header>
 
       {message ? <p className="infra-alert infra-success">{message}</p> : null}
       {error ? <p className="infra-alert infra-error">{error}</p> : null}
 
-      {loading ? (
+      {initialLoad ? (
         <p className="infra-empty" style={{margin: '24px 40px'}}>Cargando laboratorios...</p>
       ) : (
         <div className="infra-grid">
@@ -177,6 +220,38 @@ function AdminLaboratoriosPage({ user }) {
               </button>
             </div>
 
+            <div className="infra-toolbar">
+              <label className="infra-search">
+                <Search size={16} />
+                <input
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Buscar por nombre, ubicacion, area o encargado"
+                />
+              </label>
+              <div className="infra-directory-controls">
+                <label className="infra-select-control">
+                  <span>Mostrar</span>
+                  <select
+                    value={labsPerPage}
+                    onChange={(event) => setLabsPerPage(Number(event.target.value) || 12)}
+                  >
+                    {LAB_PAGE_SIZE_OPTIONS.map((value) => (
+                      <option key={value} value={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <span className="infra-inline-hint">
+                  Pagina {page} de {safeTotalPages} · {totalItems} laboratorio{totalItems === 1 ? '' : 's'}
+                </span>
+              </div>
+            </div>
+
+            {labs.length === 0 ? (
+              <p className="infra-empty" style={{ margin: '24px 40px' }}>
+                {debouncedSearch ? 'No encontramos laboratorios con ese criterio.' : 'Aun no hay laboratorios registrados.'}
+              </p>
+            ) : (
             <div className="infra-list">
               {labs.map((lab) => (
                 <article key={lab.id} className="infra-item">
@@ -226,6 +301,29 @@ function AdminLaboratoriosPage({ user }) {
                 </article>
               ))}
             </div>
+            )}
+
+            {totalPages > 1 ? (
+              <div className="infra-pagination">
+                <button
+                  type="button"
+                  className="infra-secondary"
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage((current) => Math.max(current - 1, 1))}
+                >
+                  Anterior
+                </button>
+                <span className="infra-inline-hint">Pagina {page} de {safeTotalPages}</span>
+                <button
+                  type="button"
+                  className="infra-secondary"
+                  disabled={page >= safeTotalPages || loading}
+                  onClick={() => setPage((current) => Math.min(current + 1, safeTotalPages))}
+                >
+                  Siguiente
+                </button>
+              </div>
+            ) : null}
 
             {isFormOpen && createPortal(
               <div className="infra-modal-backdrop" onClick={resetForm} role="dialog" aria-modal="true">

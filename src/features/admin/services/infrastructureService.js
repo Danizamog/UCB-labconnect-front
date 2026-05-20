@@ -130,6 +130,28 @@ export function listAdminLabs() {
   return request(`${reservationsBase}/labs/all`, { cacheTtlMs: 60000 })
 }
 
+export async function listAdminLabsPaginated({ page = 1, perPage = 12, search = '', areaId = '' } = {}) {
+  const params = new URLSearchParams()
+  params.set('page', String(page))
+  params.set('per_page', String(perPage))
+  const normalizedSearch = String(search || '').trim()
+  if (normalizedSearch) {
+    params.set('search', normalizedSearch)
+  }
+  const normalizedArea = String(areaId || '').trim()
+  if (normalizedArea) {
+    params.set('area_id', normalizedArea)
+  }
+  const data = await request(`${reservationsBase}/labs/paginated?${params.toString()}`, { cacheTtlMs: 5000 })
+  return {
+    items: Array.isArray(data?.items) ? data.items : [],
+    page: Number(data?.page || page),
+    per_page: Number(data?.per_page || perPage),
+    total_items: Number(data?.total_items || 0),
+    total_pages: Number(data?.total_pages || 0),
+  }
+}
+
 export function createLab(payload) {
   return request(`${reservationsBase}/labs`, {
     method: 'POST',
