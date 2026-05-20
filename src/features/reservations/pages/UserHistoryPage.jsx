@@ -7,7 +7,7 @@ import {
   listMyEnrolledTutorialSessions,
   listMyTutorialSessions,
 } from '../../tutorials/services/tutorialSessionsService'
-import { formatDateTime, formatStatus } from '../../../shared/utils/formatters'
+import { formatLocalDateTime, formatStatus, parseLocalDateTime } from '../../../shared/utils/formatters'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import './UserHistoryPage.css'
 
@@ -20,9 +20,11 @@ const RESERVATION_PAGE_SIZE_OPTIONS = [10, 25, 50]
 const TUTORIAL_VISIBLE_INITIAL = 20
 const TUTORIAL_VISIBLE_STEP = 20
 
+// Usar parseLocalDateTime para que start_at/end_at (que el backend devuelve
+// como UTC pero contiene la hora local del usuario) no se corra por la zona
+// horaria del navegador al hacer comparaciones contra Date.now().
 function parseDateTimeValue(value) {
-  const parsed = new Date(String(value || '').replace(' ', 'T'))
-  return Number.isNaN(parsed.getTime()) ? null : parsed
+  return parseLocalDateTime(value)
 }
 
 function parseDateTime(obj, dateField, timeField, datetimeField) {
@@ -73,7 +75,7 @@ function filterByKeyword(items, normalizedKeyword, fieldsExtractor) {
 
 function formatTutorialExactDate(session) {
   if (session?.start_at) {
-    return formatDateTime(session.start_at)
+    return formatLocalDateTime(session.start_at)
   }
 
   if (session?.session_date) {
@@ -412,7 +414,7 @@ function UserHistoryPage({ user }) {
                 <h4>{reservation.laboratory_name || reservation.laboratory_id || 'Laboratorio'}</h4>
                 <p>{reservation.purpose || 'Sin motivo registrado'}</p>
                 <div className="history-meta">
-                  <span>{formatDateTime(reservation.start_at)}</span>
+                  <span>{formatLocalDateTime(reservation.start_at)}</span>
                   <span>{reservation.start_time} - {reservation.end_time}</span>
                 </div>
                 {reservation.cancel_reason ? <p className="history-warning">Motivo: {reservation.cancel_reason}</p> : null}

@@ -34,7 +34,7 @@ import {
 } from '../../reservations/services/reservationsService'
 import { listAdminLabs } from '../../admin/services/infrastructureService'
 import './HomeView.css'
-import { formatStatus } from '../../../shared/utils/formatters'
+import { formatLocalDateTime, formatStatus, parseLocalDateTime } from '../../../shared/utils/formatters'
 
 const AdminLabAnalyticsPage = lazy(() => import('../../analytics/pages/AdminLabAnalyticsPage'))
 const AdminAreasPage = lazy(() => import('../../admin/pages/AdminAreasPage'))
@@ -76,43 +76,6 @@ function normalizeLabSearchValue(value) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLocaleLowerCase('es')
     .trim()
-}
-
-// El backend devuelve start_at/end_at en ISO con sufijo Z (UTC) aunque la hora
-// representa el reloj local en que se creó la reserva. Si lo pasamos directo a
-// `new Date(...)`, JS le aplica la conversión a la zona del navegador y, en
-// Bolivia (UTC-4), una reserva a las 07:00 se ve a las 03:00. Para evitarlo,
-// extraemos los componentes locales del string antes de formatear.
-function parseLocalDateTime(value) {
-  if (!value) return null
-  const normalized = String(value).replace(' ', 'T')
-  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/)
-  if (!match) {
-    const fallback = new Date(normalized)
-    return Number.isNaN(fallback.getTime()) ? null : fallback
-  }
-  const [, year, month, day, hour, minute, second] = match
-  return new Date(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour),
-    Number(minute),
-    Number(second || 0),
-    0,
-  )
-}
-
-function formatLocalDateTime(value) {
-  const date = parseLocalDateTime(value)
-  if (!date) return 'Sin fecha'
-  return new Intl.DateTimeFormat('es-BO', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
 }
 
 function formatAgendaTimeRange(startAt, endAt) {

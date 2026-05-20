@@ -166,7 +166,12 @@ function isPastSlotForDate(slot, dateValue, referenceNow = new Date()) {
 }
 
 function parseSessionDate(value) {
-  const parsed = new Date(value || '')
+  // start_at/end_at se guardan como UTC pero llevan la hora LOCAL del usuario.
+  // Si dejamos que Date() interprete el sufijo Z, las comparaciones de
+  // hasStarted/hasEnded se corren 4 hs en Bolivia (UTC-4).
+  if (!value) return null
+  const normalized = String(value).replace('Z', '').replace(' ', 'T')
+  const parsed = new Date(normalized)
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 

@@ -4,13 +4,15 @@ import {
   listMyTutorialSessions,
   subscribeTutorialSessionsRealtime,
 } from '../services/tutorialSessionsService'
-import { formatDateTime } from '../../../shared/utils/formatters'
+import { formatLocalDateTime, parseLocalDateTime } from '../../../shared/utils/formatters'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import './UserTutorialAttendanceHistoryPage.css'
 
+// start_at/end_at del backend vienen marcados con 'Z' aunque la hora es local.
+// parseLocalDateTime evita que Date() les aplique la conversion UTC -> local
+// (en Bolivia, UTC-4, esto correria las horas 4 hs hacia atras).
 function parseDateTimeValue(value) {
-  const parsed = new Date(String(value || '').replace(' ', 'T'))
-  return Number.isNaN(parsed.getTime()) ? null : parsed
+  return parseLocalDateTime(value)
 }
 
 function normalizeTimeValue(timeValue) {
@@ -66,10 +68,20 @@ function parseSessionEnd(session) {
 }
 
 function getSessionDateLabel(session) {
+  if (session?.start_at) {
+    return formatLocalDateTime(session.start_at)
+  }
   const sessionStartAt = parseSessionStart(session)
-  return sessionStartAt
-    ? formatDateTime(sessionStartAt.toISOString())
-    : (session?.session_date || 'Sin fecha')
+  if (!sessionStartAt) {
+    return session?.session_date || 'Sin fecha'
+  }
+  return new Intl.DateTimeFormat('es-BO', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(sessionStartAt)
 }
 
 function UserTutorialAttendanceHistoryPage({ user }) {
