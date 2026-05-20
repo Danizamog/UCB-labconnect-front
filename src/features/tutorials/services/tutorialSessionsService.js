@@ -41,6 +41,25 @@ function clearTutorialSessionsCache() {
   inFlightRequests.clear()
 }
 
+// Prefijos de URL para invalidacion granular. Mutaciones de tutorias no deberian
+// tirar todo el cache (afectaba listados publicos / mine / my-enrollments por
+// cada accion del tutor o estudiante).
+const CACHE_PREFIXES = {
+  tutorials: '/tutorial-sessions',
+}
+
+function clearCacheByNamespaces(...namespaces) {
+  const prefixes = namespaces.map((ns) => CACHE_PREFIXES[ns] || ns).filter(Boolean)
+  if (prefixes.length === 0) return
+  const matches = (key) => prefixes.some((prefix) => key.includes(prefix))
+  for (const key of [...requestCache.keys()]) {
+    if (matches(key)) requestCache.delete(key)
+  }
+  for (const key of [...inFlightRequests.keys()]) {
+    if (matches(key)) inFlightRequests.delete(key)
+  }
+}
+
 async function request(url, options = {}) {
   const { cacheTtlMs = 0, skipCache = false, ...fetchOptions } = options
   const method = String(fetchOptions.method || 'GET').toUpperCase()
@@ -172,7 +191,7 @@ export async function updateTutorialSessionApproval(sessionId, statusValue, reas
       reason: String(reason || ''),
     }),
   })
-  clearTutorialSessionsCache()
+  clearCacheByNamespaces('tutorials')
   return mapTutorialSession(record)
 }
 
@@ -205,7 +224,7 @@ export async function createTutorialSession(payload) {
       ...(payload.tutor_name ? { tutor_name: String(payload.tutor_name).trim() } : {}),
     }),
   })
-  clearTutorialSessionsCache()
+  clearCacheByNamespaces('tutorials')
   return mapTutorialSession(record)
 }
 
@@ -229,7 +248,7 @@ export async function updateTutorialSession(sessionId, payload) {
       ...(payload.tutor_email ? { tutor_email: String(payload.tutor_email).trim() } : {}),
     }),
   })
-  clearTutorialSessionsCache()
+  clearCacheByNamespaces('tutorials')
   return mapTutorialSession(record)
 }
 
@@ -244,7 +263,7 @@ export async function updateTutorialSessionObservation(sessionId, tutorObservati
       tutor_observation: String(tutorObservation || '').trim(),
     }),
   })
-  clearTutorialSessionsCache()
+  clearCacheByNamespaces('tutorials')
   return mapTutorialSession(record)
 }
 
@@ -263,7 +282,7 @@ export async function updateTutorialEnrollmentAttendance(sessionId, studentId, p
       performance_observation: String(payload?.performance_observation || '').trim().slice(0, 200),
     }),
   })
-  clearTutorialSessionsCache()
+  clearCacheByNamespaces('tutorials')
   return mapTutorialSession(record)
 }
 
@@ -271,14 +290,14 @@ export async function deleteTutorialSession(sessionId) {
   await request(`${tutorialsBase}/tutorial-sessions/${sessionId}`, {
     method: 'DELETE',
   })
-  clearTutorialSessionsCache()
+  clearCacheByNamespaces('tutorials')
 }
 
 export async function enrollInTutorialSession(sessionId) {
   const record = await request(`${tutorialsBase}/tutorial-sessions/${sessionId}/enroll`, {
     method: 'POST',
   })
-  clearTutorialSessionsCache()
+  clearCacheByNamespaces('tutorials')
   return mapTutorialSession(record)
 }
 
@@ -286,7 +305,7 @@ export async function cancelTutorialEnrollment(sessionId) {
   const record = await request(`${tutorialsBase}/tutorial-sessions/${sessionId}/enroll`, {
     method: 'DELETE',
   })
-  clearTutorialSessionsCache()
+  clearCacheByNamespaces('tutorials')
   return mapTutorialSession(record)
 }
 

@@ -44,6 +44,31 @@ function clearReservationsCache() {
   inFlightRequests.clear()
 }
 
+// Prefijos de URL para invalidacion granular del cache. La idea es que una
+// mutacion solo borre los listados/recursos que realmente puede afectar, en
+// vez de tirar todo el cache (con eso una mutacion en /reservations forzaba
+// refetch de penalties, notificaciones, supplies, etc.).
+const CACHE_PREFIXES = {
+  reservations: '/reservations',
+  availability: '/availability/labs/',
+  notifications: '/notifications',
+  penalties: '/penalties',
+  supplies: '/supply-reservations',
+}
+
+function clearCacheByNamespaces(...namespaces) {
+  const prefixes = namespaces.map((ns) => CACHE_PREFIXES[ns] || ns).filter(Boolean)
+  if (prefixes.length === 0) return
+
+  const matches = (key) => prefixes.some((prefix) => key.includes(prefix))
+  for (const key of [...requestCache.keys()]) {
+    if (matches(key)) requestCache.delete(key)
+  }
+  for (const key of [...inFlightRequests.keys()]) {
+    if (matches(key)) inFlightRequests.delete(key)
+  }
+}
+
 async function request(url, options = {}) {
   const { cacheTtlMs = 0, skipCache = false, ...fetchOptions } = options
   const method = String(fetchOptions.method || 'GET').toUpperCase()
@@ -550,7 +575,7 @@ export async function createReservation(payload, user) {
     method: 'POST',
     body: JSON.stringify(normalized),
   })
-  clearReservationsCache()
+  clearCacheByNamespaces('reservations', 'availability', 'notifications')
   return mapReservation(record)
 }
 
@@ -572,7 +597,7 @@ export async function updateReservation(reservationId, payload) {
     method: 'PATCH',
     body: JSON.stringify(normalized),
   })
-  clearReservationsCache()
+  clearCacheByNamespaces('reservations', 'availability', 'notifications')
   return mapReservation(record)
 }
 
@@ -584,7 +609,7 @@ export async function deleteReservation(reservationId) {
   await request(`${reservationsBase}/reservations/${reservationId}`, {
     method: 'DELETE',
   })
-  clearReservationsCache()
+  clearCacheByNamespaces('reservations', 'availability', 'notifications')
 }
 
 export async function updateReservationStatus(reservationId, status, options = {}) {
@@ -596,7 +621,7 @@ export async function updateReservationStatus(reservationId, status, options = {
       cancel_reason: status === 'rejected' ? cancelReason : '',
     }),
   })
-  clearReservationsCache()
+  clearCacheByNamespaces('reservations', 'availability', 'notifications')
   return mapReservation(record)
 }
 
@@ -610,7 +635,7 @@ export async function registerReservationEntry(reservationId, payload = {}) {
       notes: String(payload.notes || '').trim(),
     }),
   })
-  clearReservationsCache()
+  clearCacheByNamespaces('reservations', 'availability')
   return mapReservation(record)
 }
 
@@ -618,7 +643,7 @@ export async function registerReservationExit(reservationId) {
   const record = await request(`${reservationsBase}/reservations/${reservationId}/check-out`, {
     method: 'PATCH',
   })
-  clearReservationsCache()
+  clearCacheByNamespaces('reservations', 'availability')
   return mapReservation(record)
 }
 
@@ -626,7 +651,7 @@ export async function markReservationAbsent(reservationId) {
   const record = await request(`${reservationsBase}/reservations/${reservationId}/absent`, {
     method: 'PATCH',
   })
-  clearReservationsCache()
+  clearCacheByNamespaces('reservations', 'availability')
   return mapReservation(record)
 }
 
@@ -635,7 +660,7 @@ export async function createWalkInReservation(payload) {
     method: 'POST',
     body: JSON.stringify(payload),
   })
-  clearReservationsCache()
+  clearCacheByNamespaces('reservations', 'availability')
   return mapReservation(record)
 }
 
@@ -732,7 +757,7 @@ export async function markReservationNotificationAsRead(notificationId) {
   const record = await request(`${reservationsBase}/notifications/${notificationId}/read`, {
     method: 'PUT',
   })
-  clearReservationsCache()
+  clearCacheByNamespaces('notifications')
   return mapNotification(record)
 }
 
@@ -740,7 +765,7 @@ export async function markAllReservationNotificationsAsRead() {
   const data = await request(`${reservationsBase}/notifications/read-all`, {
     method: 'PUT',
   })
-  clearReservationsCache()
+  clearCacheByNamespaces('notifications')
   return data
 }
 
@@ -794,7 +819,7 @@ export async function createSupplyReservation(payload) {
     method: 'POST',
     body: JSON.stringify(body),
   })
-  clearReservationsCache()
+  clearCacheByNamespaces('supplies', 'reservations')
   return mapSupplyReservation(record)
 }
 
@@ -810,7 +835,7 @@ export async function updateSupplyReservationStatus(reservationId, statusValue, 
       notes: options.notes !== undefined ? String(options.notes) : null,
     }),
   })
-  clearReservationsCache()
+  clearCacheByNamespaces('supplies', 'reservations')
   return mapSupplyReservation(record)
 }
 
@@ -851,7 +876,7 @@ export async function createPenalty(payload) {
       notes: String(payload.notes || '').trim(),
     }),
   })
-  clearReservationsCache()
+  clearCacheByNamespaces('penalties', 'notifications', 'reservations')
   return mapPenalty(record)
 }
 
@@ -862,7 +887,7 @@ export async function liftPenalty(penaltyId, options = {}) {
       lift_reason: String(options.lift_reason || '').trim(),
     }),
   })
-  clearReservationsCache()
+  clearCacheByNamespaces('penalties', 'notifications', 'reservations')
   return mapPenalty(data?.penalty || {})
 }
 
@@ -888,7 +913,7 @@ export async function reactivateUserAccount(penaltyId, payload = {}) {
       action_source: String(payload.action_source || 'admin_profile').trim() || 'admin_profile',
     }),
   })
-  clearReservationsCache()
+  clearCacheByNamespaces('penalties', 'notifications', 'reservations')
 
   return {
     penalty: mapPenalty(data?.penalty || {}),

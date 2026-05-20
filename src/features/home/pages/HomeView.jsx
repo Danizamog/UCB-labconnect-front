@@ -58,6 +58,9 @@ const OPEN_RESERVATION_EVENT = 'labconnect:open-reservation-details'
 const FOCUSED_TUTORIAL_KEY = 'labconnect.focus_tutorial_session_id'
 const OPEN_TUTORIAL_EVENT = 'labconnect:open-tutorial-session'
 const OPERATIONS_RECIPIENT_ID = '__operations__'
+const HOME_LAB_DEFAULT_LIMIT = 6
+const HOME_LAB_SEARCH_LIMIT = 24
+const HOME_LAB_SEARCH_DEBOUNCE_MS = 200
 const EMPTY_AGENDA_SUMMARY = {
   generated_at: '',
   reservation_count: 0,
@@ -141,6 +144,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const [homeLabsLoading, setHomeLabsLoading] = useState(false)
   const [homeLabsError, setHomeLabsError] = useState('')
   const [homeLabSearch, setHomeLabSearch] = useState('')
+  const [debouncedHomeLabSearch, setDebouncedHomeLabSearch] = useState('')
   const [operationsSnapshot, setOperationsSnapshot] = useState({
     current_occupancy: 0,
     active_sessions: [],
@@ -164,21 +168,24 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const shouldTrackOperationsSnapshot = canManageStructure && activeSection === 'home'
   const unreadNotificationsCount = notifications.filter((notification) => !notification.is_read).length
   const agendaItems = buildAgendaItems(agendaSummary).slice(0, 6)
-  const normalizedHomeLabSearch = useMemo(() => normalizeLabSearchValue(homeLabSearch), [homeLabSearch])
-  const filteredHomeLabs = useMemo(() => {
-    const filtered = homeLabs.filter((lab) => {
-      if (!normalizedHomeLabSearch) {
-        return true
-      }
-
-      return normalizeLabSearchValue(lab?.name).includes(normalizedHomeLabSearch)
-    })
-
-    return filtered.sort((left, right) =>
+  const normalizedHomeLabSearch = useMemo(() => normalizeLabSearchValue(debouncedHomeLabSearch), [debouncedHomeLabSearch])
+  const sortedHomeLabs = useMemo(() => {
+    return [...homeLabs].sort((left, right) =>
       String(left?.name || '').localeCompare(String(right?.name || ''), 'es', { sensitivity: 'base' }),
     )
-  }, [homeLabs, normalizedHomeLabSearch])
-  const visibleHomeLabs = normalizedHomeLabSearch ? filteredHomeLabs : filteredHomeLabs.slice(0, 6)
+  }, [homeLabs])
+  const filteredHomeLabs = useMemo(() => {
+    if (!normalizedHomeLabSearch) {
+      return sortedHomeLabs
+    }
+    return sortedHomeLabs.filter((lab) =>
+      normalizeLabSearchValue(lab?.name).includes(normalizedHomeLabSearch),
+    )
+  }, [sortedHomeLabs, normalizedHomeLabSearch])
+  const visibleHomeLabs = normalizedHomeLabSearch
+    ? filteredHomeLabs.slice(0, HOME_LAB_SEARCH_LIMIT)
+    : filteredHomeLabs.slice(0, HOME_LAB_DEFAULT_LIMIT)
+  const hasMoreHomeLabs = filteredHomeLabs.length > visibleHomeLabs.length
 
   const loadNotifications = useCallback(async (options = {}) => {
     try {
@@ -295,6 +302,13 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     isAdmin,
     onNavigate,
   ])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedHomeLabSearch(homeLabSearch)
+    }, HOME_LAB_SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [homeLabSearch])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -667,28 +681,37 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
                   ) : visibleHomeLabs.length === 0 ? (
                     <p className="home-lab-empty">No se encontraron laboratorios</p>
                   ) : (
-                    <div className="home-lab-result-grid" aria-live="polite">
-                      {visibleHomeLabs.map((lab) => (
-                        <button
-                          key={lab.id}
-                          type="button"
-                          className="home-lab-result-card"
-                          onClick={() => onNavigate?.(isAdmin ? '/app/admin/laboratorios' : '/app/reservas/nueva')}
-                        >
-                          <span className="home-lab-result-icon">
-                            <FlaskConical size={20} aria-hidden="true" />
-                          </span>
-                          <span className="home-lab-result-copy">
-                            <strong>{lab.name || 'Laboratorio sin nombre'}</strong>
-                            <small>
-                              {lab.location || lab.area_name || lab.area || 'Ubicacion por definir'}
-                              {lab.capacity ? ` · ${lab.capacity} personas` : ''}
-                            </small>
-                          </span>
-                          <ArrowRight size={16} aria-hidden="true" />
-                        </button>
-                      ))}
-                    </div>
+                    <>
+                      <div className="home-lab-result-grid" aria-live="polite">
+                        {visibleHomeLabs.map((lab) => (
+                          <button
+                            key={lab.id}
+                            type="button"
+                            className="home-lab-result-card"
+                            onClick={() => onNavigate?.(isAdmin ? '/app/admin/laboratorios' : '/app/reservas/nueva')}
+                          >
+                            <span className="home-lab-result-icon">
+                              <FlaskConical size={20} aria-hidden="true" />
+                            </span>
+                            <span className="home-lab-result-copy">
+                              <strong>{lab.name || 'Laboratorio sin nombre'}</strong>
+                              <small>
+                                {lab.location || lab.area_name || lab.area || 'Ubicacion por definir'}
+                                {lab.capacity ? ` · ${lab.capacity} personas` : ''}
+                              </small>
+                            </span>
+                            <ArrowRight size={16} aria-hidden="true" />
+                          </button>
+                        ))}
+                      </div>
+                      {hasMoreHomeLabs ? (
+                        <p className="home-lab-empty">
+                          {normalizedHomeLabSearch
+                            ? 'Mostrando los primeros resultados. Refina tu búsqueda para encontrar otro laboratorio.'
+                            : 'Mostrando los más relevantes. Usa el buscador para encontrar otros laboratorios.'}
+                        </p>
+                      ) : null}
+                    </>
                   )}
                 </section>
 
