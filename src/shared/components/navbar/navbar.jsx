@@ -99,7 +99,7 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
 
   const visibleLinks = NAVIGATION_LINKS.filter((link) => {
     if (link.requiredAnyPermission) return hasAnyPermission(user, link.requiredAnyPermission)
-    if (link.userOnly) return true
+    if (link.userOnly) return !isAdmin
     return true
   })
 

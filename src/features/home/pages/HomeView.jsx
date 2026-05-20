@@ -272,11 +272,11 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
       (activeSection === 'horarios_laboratorios' && canManageSpaces) ||
       (activeSection === 'equipos' && canManageEquipos) ||
       (activeSection === 'materiales' && canManageMateriales) ||
-      activeSection === 'calendar' ||
-      activeSection === 'tutorials_public' ||
-      activeSection === 'tutorials_history' ||
-      activeSection === 'history' ||
-      activeSection === 'reserve'
+      (!isAdmin && activeSection === 'calendar') ||
+      (!isAdmin && activeSection === 'tutorials_public') ||
+      (!isAdmin && activeSection === 'tutorials_history') ||
+      (!isAdmin && activeSection === 'history') ||
+      (!isAdmin && activeSection === 'reserve')
 
     const isUnknownApplicationRoute =
       normalizedPath !== APP_ROOT_PATH &&
@@ -288,6 +288,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     }
   }, [
     activeSection,
+    isAdmin,
     canManageEquipos,
     canManageMateriales,
     canManagePenalties,
@@ -508,11 +509,11 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
           {canManageSpaces && activeSection === 'horarios_laboratorios' ? <AdminLabSchedulesPage user={user} /> : null}
           {canManageEquipos && activeSection === 'equipos' ? <AdminEquiposPage user={user} /> : null}
           {canManageMateriales && activeSection === 'materiales' ? <AdminMaterialesPage user={user} /> : null}
-          {activeSection === 'calendar' ? <UserAvailabilityCalendarPage user={user} /> : null}
-          {activeSection === 'tutorials_public' ? <StudentTutorialSessionsPage user={user} /> : null}
-          {activeSection === 'tutorials_history' ? <UserTutorialAttendanceHistoryPage user={user} /> : null}
-          {activeSection === 'history' ? <UserHistoryPage user={user} /> : null}
-          {activeSection === 'reserve' ? (
+          {!isAdmin && activeSection === 'calendar' ? <UserAvailabilityCalendarPage user={user} /> : null}
+          {!isAdmin && activeSection === 'tutorials_public' ? <StudentTutorialSessionsPage user={user} /> : null}
+          {!isAdmin && activeSection === 'tutorials_history' ? <UserTutorialAttendanceHistoryPage user={user} /> : null}
+          {!isAdmin && activeSection === 'history' ? <UserHistoryPage user={user} /> : null}
+          {!isAdmin && activeSection === 'reserve' ? (
             <UserReserveLabPage
               user={user}
               notifications={notifications}
