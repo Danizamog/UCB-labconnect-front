@@ -259,21 +259,19 @@ function UserHistoryPage({ user }) {
   const tutorialHistory = useMemo(() => {
     const now = Date.now()
     const currentUserId = String(user?.user_id || '')
-
-    return tutorials
-      .filter((session) => {
-        const endAt = parseTutorialEnd(session)
-        return Boolean(endAt) && endAt.getTime() <= now
-      })
-      .sort((left, right) => {
-        const leftTime = parseTutorialEnd(left)?.getTime() || 0
-        const rightTime = parseTutorialEnd(right)?.getTime() || 0
-        return rightTime - leftTime
-      })
-      .map((session) => ({
-        ...session,
-        audience: mapTutorialAudience(session, currentUserId),
-      }))
+    // Parsea end_at una sola vez por sesion, evita reparsear durante el sort.
+    const entries = []
+    for (const session of tutorials) {
+      const endMs = parseTutorialEnd(session)?.getTime() ?? 0
+      if (endMs && endMs <= now) {
+        entries.push({ session, endMs })
+      }
+    }
+    entries.sort((a, b) => b.endMs - a.endMs)
+    return entries.map(({ session }) => ({
+      ...session,
+      audience: mapTutorialAudience(session, currentUserId),
+    }))
   }, [tutorials, user?.user_id])
 
   const normalizedKeyword = useMemo(() => normalizeKeyword(keyword), [keyword])

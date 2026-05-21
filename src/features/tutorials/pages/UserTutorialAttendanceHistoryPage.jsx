@@ -179,33 +179,35 @@ function UserTutorialAttendanceHistoryPage({ user }) {
     }
   }, [loadSessions, user?.user_id])
 
-  const completedSessions = useMemo(() => {
+  // Parsea fechas una sola vez por sesion: filter + sort + total horas comparten
+  // este array preprocesado. Sin esto el sort llama parseSessionEnd 2 veces por
+  // elemento y el total recorre todo otra vez.
+  const completedEntries = useMemo(() => {
     const now = Date.now()
-
-    return sessions
-      .filter((session) => {
-        const endAt = parseSessionEnd(session)
-        return Boolean(endAt) && endAt.getTime() <= now
-      })
-      .sort((left, right) => {
-        const leftTime = parseSessionEnd(left)?.getTime() || 0
-        const rightTime = parseSessionEnd(right)?.getTime() || 0
-        return rightTime - leftTime
-      })
+    const entries = []
+    for (const session of sessions) {
+      const startMs = parseSessionStart(session)?.getTime() ?? 0
+      const endMs = parseSessionEnd(session)?.getTime() ?? 0
+      if (endMs && endMs <= now) {
+        entries.push({ session, startMs, endMs })
+      }
+    }
+    entries.sort((a, b) => b.endMs - a.endMs)
+    return entries
   }, [sessions])
 
-  const totalHours = useMemo(() => {
-    return completedSessions.reduce((acc, session) => {
-      const startAt = parseSessionStart(session)
-      const endAt = parseSessionEnd(session)
-      if (!startAt || !endAt) {
-        return acc
-      }
+  const completedSessions = useMemo(
+    () => completedEntries.map((entry) => entry.session),
+    [completedEntries],
+  )
 
-      const durationMs = Math.max(endAt.getTime() - startAt.getTime(), 0)
-      return acc + durationMs
-    }, 0)
-  }, [completedSessions])
+  const totalHours = useMemo(() => {
+    let acc = 0
+    for (const { startMs, endMs } of completedEntries) {
+      if (startMs && endMs) acc += Math.max(endMs - startMs, 0)
+    }
+    return acc
+  }, [completedEntries])
 
   const totalHoursRounded = Math.round((totalHours / (1000 * 60 * 60)) * 10) / 10
 

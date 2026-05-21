@@ -66,19 +66,19 @@ function StudentTutorialSessionsPage({ user }) {
   const [publicPageSize, setPublicPageSize] = useState(PAGE_SIZE_OPTIONS[1])
   const [myPage, setMyPage] = useState(0)
 
-  const loadPublicSessions = useCallback(async (currentFilters = filters) => {
+  const loadPublicSessions = useCallback(async (currentFilters) => {
     try {
       const publicSessions = await listPublicTutorialSessions({
-        topic_search: currentFilters.topic_search,
-        session_date: currentFilters.session_date,
-        laboratory_id: currentFilters.laboratory_id,
+        topic_search: currentFilters?.topic_search,
+        session_date: currentFilters?.session_date,
+        laboratory_id: currentFilters?.laboratory_id,
       })
       setSessions(publicSessions)
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudo cargar la cartelera de tutorias.')
     }
-  }, [filters])
+  }, [])
 
   const loadLaboratories = useCallback(async () => {
     try {
@@ -98,24 +98,53 @@ function StudentTutorialSessionsPage({ user }) {
     }
   }, [])
 
-  const loadSessions = useCallback(async () => {
-    await Promise.all([loadPublicSessions(), loadMyEnrollments(), loadLaboratories()])
-  }, [loadMyEnrollments, loadPublicSessions, loadLaboratories])
-
   const publicReloadTimerRef = useRef(null)
   const myReloadTimerRef = useRef(null)
+  const filtersRef = useRef(filters)
+  const loadPublicSessionsRef = useRef(loadPublicSessions)
+  const loadMyEnrollmentsRef = useRef(loadMyEnrollments)
 
+  useEffect(() => { filtersRef.current = filters }, [filters])
+  useEffect(() => { loadPublicSessionsRef.current = loadPublicSessions }, [loadPublicSessions])
+  useEffect(() => { loadMyEnrollmentsRef.current = loadMyEnrollments }, [loadMyEnrollments])
+
+  // Labs cambian raramente: una sola carga.
+  useEffect(() => { loadLaboratories() }, [loadLaboratories])
+
+  // Mis inscripciones: una carga inicial; el realtime las refresca despues.
+  useEffect(() => { loadMyEnrollments() }, [loadMyEnrollments])
+
+  // Cartelera publica: debounce de la busqueda; fecha/lab refrescan apenas cambian.
   useEffect(() => {
-    loadSessions()
+    const handle = window.setTimeout(() => {
+      loadPublicSessions({
+        topic_search: filters.topic_search,
+        session_date: filters.session_date,
+        laboratory_id: filters.laboratory_id,
+      })
+    }, filters.topic_search ? 350 : 0)
+    return () => window.clearTimeout(handle)
+  }, [filters.topic_search, filters.session_date, filters.laboratory_id, loadPublicSessions])
 
+  // Realtime: solo se suscribe cuando cambia el usuario. Los reloads usan refs
+  // para no resuscribir en cada cambio de filtro.
+  useEffect(() => {
     const userId = String(user?.user_id || '')
     const schedulePublicReload = () => {
       window.clearTimeout(publicReloadTimerRef.current)
-      publicReloadTimerRef.current = window.setTimeout(loadPublicSessions, 1000)
+      publicReloadTimerRef.current = window.setTimeout(() => {
+        loadPublicSessionsRef.current?.({
+          topic_search: filtersRef.current.topic_search,
+          session_date: filtersRef.current.session_date,
+          laboratory_id: filtersRef.current.laboratory_id,
+        })
+      }, 1000)
     }
     const scheduleMyReload = () => {
       window.clearTimeout(myReloadTimerRef.current)
-      myReloadTimerRef.current = window.setTimeout(loadMyEnrollments, 1000)
+      myReloadTimerRef.current = window.setTimeout(() => {
+        loadMyEnrollmentsRef.current?.()
+      }, 1000)
     }
 
     const unsubscribe = subscribeTutorialSessionsRealtime((event) => {
@@ -143,7 +172,7 @@ function StudentTutorialSessionsPage({ user }) {
       window.clearTimeout(myReloadTimerRef.current)
       unsubscribe?.()
     }
-  }, [loadMyEnrollments, loadPublicSessions, loadSessions, user?.user_id])
+  }, [user?.user_id])
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -239,21 +268,33 @@ function StudentTutorialSessionsPage({ user }) {
     setPublicPage(0)
   }, [filters.topic_search, filters.session_date, filters.laboratory_id, filters.status, publicPageSize])
 
+  const visibleAvailableStates = useMemo(() => {
+    const map = new Map()
+    visibleAvailableSessions.forEach((session) => {
+      map.set(session.id, getEnrollmentState(session, user?.user_id, nowReference))
+    })
+    return map
+  }, [visibleAvailableSessions, user?.user_id, nowReference])
+
+  const visibleMyStates = useMemo(() => {
+    const map = new Map()
+    visibleMySessions.forEach((session) => {
+      map.set(session.id, getEnrollmentState(session, user?.user_id, nowReference))
+    })
+    return map
+  }, [visibleMySessions, user?.user_id, nowReference])
+
   const focusedState = useMemo(
     () => (focusedSession ? getEnrollmentState(focusedSession, user?.user_id, nowReference) : null),
     [focusedSession, nowReference, user?.user_id],
   )
 
   const handleFilterChange = (key, value) => {
-    const nextFilters = { ...filters, [key]: value }
-    setFilters(nextFilters)
-    loadPublicSessions(nextFilters)
+    setFilters((prev) => ({ ...prev, [key]: value }))
   }
 
   const handleResetFilters = () => {
-    const reset = { topic_search: '', session_date: '', laboratory_id: '', status: 'all' }
-    setFilters(reset)
-    loadPublicSessions(reset)
+    setFilters({ topic_search: '', session_date: '', laboratory_id: '', status: 'all' })
   }
 
   const handleEnroll = async (session) => {
@@ -265,7 +306,14 @@ function StudentTutorialSessionsPage({ user }) {
       await enrollInTutorialSession(session.id)
       setMessage('Inscripcion realizada correctamente. Ya tienes tu cupo reservado en la tutoria.')
       setFocusedSessionId(session.id)
-      await loadSessions()
+      await Promise.all([
+        loadPublicSessions({
+          topic_search: filtersRef.current.topic_search,
+          session_date: filtersRef.current.session_date,
+          laboratory_id: filtersRef.current.laboratory_id,
+        }),
+        loadMyEnrollments(),
+      ])
     } catch (err) {
       setError(err.message || 'No se pudo completar la inscripcion.')
     } finally {
@@ -281,7 +329,14 @@ function StudentTutorialSessionsPage({ user }) {
     try {
       await cancelTutorialEnrollment(session.id)
       setMessage('Tu asistencia fue cancelada y el cupo se libero automaticamente para otros estudiantes.')
-      await loadSessions()
+      await Promise.all([
+        loadPublicSessions({
+          topic_search: filtersRef.current.topic_search,
+          session_date: filtersRef.current.session_date,
+          laboratory_id: filtersRef.current.laboratory_id,
+        }),
+        loadMyEnrollments(),
+      ])
     } catch (err) {
       setError(err.message || 'No se pudo cancelar la asistencia a la tutoria.')
     } finally {
@@ -401,7 +456,8 @@ function StudentTutorialSessionsPage({ user }) {
           <>
           <div className="tutorials-grid">
             {visibleMySessions.map((session) => {
-              const sessionState = getEnrollmentState(session, user?.user_id, nowReference)
+              const sessionState = visibleMyStates.get(session.id)
+                ?? getEnrollmentState(session, user?.user_id, nowReference)
 
               return (
                 <article key={session.id} className="tutorial-card is-enrolled">
@@ -573,7 +629,8 @@ function StudentTutorialSessionsPage({ user }) {
           <div className="tutorials-grid">
             {visibleAvailableSessions.map((session) => {
               const isFocused = focusedSessionId === session.id
-              const sessionState = getEnrollmentState(session, user?.user_id, nowReference)
+              const sessionState = visibleAvailableStates.get(session.id)
+                ?? getEnrollmentState(session, user?.user_id, nowReference)
 
               return (
                 <article
