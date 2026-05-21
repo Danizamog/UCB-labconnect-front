@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getTutorialSessionById } from '../../tutorials/services/tutorialSessionsService'
 import TutorialSessionDetailModal from '../../tutorials/pages/TutorialSessionDetailModal'
 import { openTutorialSessionFlow } from '../../tutorials/utils/focusTutorialNavigation'
+import LabPicker from './LabPicker'
 import {
   getLabAvailability,
   getMyAgendaSummary,
@@ -142,6 +143,8 @@ function getTutorialPrimaryAction(session, userId) {
   }
 }
 
+const RESERVATIONS_PAGE_SIZE = 6
+
 function UserAvailabilityCalendarPage({ user }) {
   const today = todayLocalDateString()
   const [labs, setLabs] = useState([])
@@ -154,6 +157,7 @@ function UserAvailabilityCalendarPage({ user }) {
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false)
   const [myReservations, setMyReservations] = useState([])
   const [isLoadingReservations, setIsLoadingReservations] = useState(false)
+  const [reservationsPage, setReservationsPage] = useState(0)
 
   const loadLabs = useCallback(async () => {
     try {
@@ -169,7 +173,7 @@ function UserAvailabilityCalendarPage({ user }) {
   const loadMyReservations = useCallback(async (options = {}) => {
     setIsLoadingReservations(true)
     try {
-      const summary = await getMyAgendaSummary({ limit: 6, skipCache: options.skipCache })
+      const summary = await getMyAgendaSummary({ limit: 24, skipCache: options.skipCache })
       setMyReservations(Array.isArray(summary?.upcoming_reservations) ? summary.upcoming_reservations : [])
     } catch {
       setMyReservations([])
@@ -360,6 +364,19 @@ function UserAvailabilityCalendarPage({ user }) {
     [slots],
   )
 
+  const reservationsTotalPages = Math.max(1, Math.ceil(myReservations.length / RESERVATIONS_PAGE_SIZE))
+
+  useEffect(() => {
+    if (reservationsPage >= reservationsTotalPages) {
+      setReservationsPage(0)
+    }
+  }, [reservationsPage, reservationsTotalPages])
+
+  const paginatedReservations = useMemo(() => {
+    const start = reservationsPage * RESERVATIONS_PAGE_SIZE
+    return myReservations.slice(start, start + RESERVATIONS_PAGE_SIZE)
+  }, [myReservations, reservationsPage])
+
   const goToPrevWeek = () => {
     const d = new Date(`${weekStart}T00:00:00`)
     d.setDate(d.getDate() - 7)
@@ -409,54 +426,12 @@ function UserAvailabilityCalendarPage({ user }) {
       {error ? <p className="reservations-message error">{error}</p> : null}
 
       <section className="reservations-panel">
-        <div className="reservations-panel-header">
-          <h3>Tus próximas reservas</h3>
-          <p className="reservations-panel-subtitle">
-            Vista rápida de tus reservas pendientes, aprobadas o en curso. {isLoadingReservations ? 'Actualizando...' : ''}
-          </p>
-        </div>
-        {myReservations.length === 0 ? (
-          <p className="reservations-empty">
-            {isLoadingReservations ? 'Cargando tus reservas...' : 'No tienes reservas próximas registradas.'}
-          </p>
-        ) : (
-          <div className="reservation-card-grid">
-            {myReservations.map((reservation) => {
-              const labName = reservation.laboratory_name || labNameById[String(reservation.laboratory_id)] || 'Laboratorio'
-              const statusLabel = RESERVATION_STATUS_LABELS[reservation.status] || reservation.status
-              return (
-                <article key={reservation.id} className="reservation-user-card">
-                  <div className="reservation-user-card-head">
-                    <div>
-                      <span className="reservation-user-card-kicker">Reserva</span>
-                      <h4>{labName}</h4>
-                    </div>
-                    <span className={`reservations-status ${reservation.status}`}>{statusLabel}</span>
-                  </div>
-                  <div className="reservation-user-card-meta">
-                    <span>{reservation.date}</span>
-                    <span>{reservation.start_time} - {reservation.end_time}</span>
-                    <span>{reservation.purpose || 'Sin motivo registrado'}</span>
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="reservations-panel">
-        <div className="reservations-controls cal-lab-controls">
-          <label>
-            <span>Laboratorio</span>
-            <select value={selectedLab} onChange={(event) => setSelectedLab(event.target.value)}>
-              <option value="">Selecciona un laboratorio</option>
-              {labs.map((lab) => (
-                <option key={lab.id} value={lab.id}>{lab.name}</option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <LabPicker
+          labs={labs}
+          selectedLabId={selectedLab}
+          onSelect={(labId) => setSelectedLab(labId)}
+          emptyHint="No tienes permisos para reservar en los laboratorios disponibles."
+        />
       </section>
 
       <section className="reservations-panel cal-panel">
@@ -558,6 +533,69 @@ function UserAvailabilityCalendarPage({ user }) {
           <p className="reservations-empty">Selecciona un laboratorio para ver disponibilidad.</p>
         </section>
       )}
+
+      <section className="reservations-panel">
+        <div className="reservations-panel-header">
+          <h3>Tus próximas reservas</h3>
+          <p className="reservations-panel-subtitle">
+            Vista rápida de tus reservas pendientes, aprobadas o en curso. {isLoadingReservations ? 'Actualizando...' : ''}
+          </p>
+        </div>
+        {myReservations.length === 0 ? (
+          <p className="reservations-empty">
+            {isLoadingReservations ? 'Cargando tus reservas...' : 'No tienes reservas próximas registradas.'}
+          </p>
+        ) : (
+          <>
+            <div className="reservation-card-grid">
+              {paginatedReservations.map((reservation) => {
+                const labName = reservation.laboratory_name || labNameById[String(reservation.laboratory_id)] || 'Laboratorio'
+                const statusLabel = RESERVATION_STATUS_LABELS[reservation.status] || reservation.status
+                return (
+                  <article key={reservation.id} className="reservation-user-card">
+                    <div className="reservation-user-card-head">
+                      <div>
+                        <span className="reservation-user-card-kicker">Reserva</span>
+                        <h4>{labName}</h4>
+                      </div>
+                      <span className={`reservations-status ${reservation.status}`}>{statusLabel}</span>
+                    </div>
+                    <div className="reservation-user-card-meta">
+                      <span>{reservation.date}</span>
+                      <span>{reservation.start_time} - {reservation.end_time}</span>
+                      <span>{reservation.purpose || 'Sin motivo registrado'}</span>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+
+            {reservationsTotalPages > 1 ? (
+              <div className="reservations-pager" role="navigation" aria-label="Paginacion de reservas">
+                <button
+                  type="button"
+                  className="reservations-secondary"
+                  onClick={() => setReservationsPage((prev) => Math.max(prev - 1, 0))}
+                  disabled={reservationsPage <= 0}
+                >
+                  Anterior
+                </button>
+                <span className="reservations-pager-status">
+                  Pagina {reservationsPage + 1} de {reservationsTotalPages}
+                </span>
+                <button
+                  type="button"
+                  className="reservations-secondary"
+                  onClick={() => setReservationsPage((prev) => Math.min(prev + 1, reservationsTotalPages - 1))}
+                  disabled={reservationsPage + 1 >= reservationsTotalPages}
+                >
+                  Siguiente
+                </button>
+              </div>
+            ) : null}
+          </>
+        )}
+      </section>
 
       {focusedTutorial ? (
         <TutorialSessionDetailModal

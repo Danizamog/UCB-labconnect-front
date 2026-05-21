@@ -716,6 +716,26 @@
   gap: 14px;
 }
 
+.reservations-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.reservations-pager .reservations-secondary {
+  min-width: 96px;
+}
+
+.reservations-pager-status {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink-700, #1f3b56);
+  letter-spacing: 0.01em;
+}
+
 .reservation-user-card {
   display: grid;
   gap: 14px;
@@ -2094,6 +2114,325 @@
 .reservations-lab-empty {
   padding: 16px;
   text-align: left;
+}
+
+.reservations-lab-picker.is-collapsed {
+  padding: 10px;
+}
+
+.reservations-lab-collapsed-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(6, 77, 144, 0.25);
+  background: linear-gradient(180deg, #ffffff 0%, rgba(6, 77, 144, 0.06) 100%);
+  box-shadow: 0 6px 16px rgba(6, 77, 144, 0.08);
+}
+
+.reservations-lab-collapsed-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.reservations-lab-collapsed-kicker {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ucb-blue);
+  opacity: 0.85;
+}
+
+.reservations-lab-collapsed-name {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--ink-900);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reservations-lab-collapsed-meta {
+  font-size: 0.78rem;
+  color: var(--ink-700);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reservations-lab-change-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(6, 77, 144, 0.3);
+  background: #fff;
+  color: var(--ucb-blue);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.reservations-lab-change-btn:hover:not(:disabled) {
+  background: rgba(6, 77, 144, 0.08);
+  border-color: var(--ucb-blue);
+}
+
+.reservations-lab-change-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.reservations-lab-change-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (max-width: 520px) {
+  .reservations-lab-collapsed-card {
+    flex-wrap: wrap;
+  }
+
+  .reservations-lab-change-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+.reservations-lab-scroll {
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 4px;
+  margin: 0 -4px;
+  border-radius: 14px;
+  scrollbar-width: thin;
+}
+
+.reservations-lab-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.reservations-lab-scroll::-webkit-scrollbar-thumb {
+  background: rgba(10, 53, 89, 0.18);
+  border-radius: 8px;
+}
+
+.reservations-lab-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.reservations-lab-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reservations-lab-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: rgba(10, 53, 89, 0.045);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.reservations-lab-group-head:hover {
+  background: rgba(6, 77, 144, 0.09);
+}
+
+.reservations-lab-group-head:focus-visible {
+  outline: none;
+  border-color: rgba(6, 77, 144, 0.4);
+  box-shadow: 0 0 0 3px rgba(6, 77, 144, 0.12);
+}
+
+.reservations-lab-group.is-open .reservations-lab-group-head {
+  background: rgba(6, 77, 144, 0.08);
+}
+
+.reservations-lab-group-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.reservations-lab-group-caret {
+  transition: transform 0.18s ease;
+  color: var(--ucb-blue);
+  flex: 0 0 auto;
+  transform: rotate(-90deg);
+}
+
+.reservations-lab-group.is-open .reservations-lab-group-caret {
+  transform: rotate(0deg);
+}
+
+.reservations-lab-group-head strong {
+  color: var(--ucb-blue);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reservations-lab-group-head > span:last-child {
+  color: var(--ink-700);
+  font-size: 0.74rem;
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+
+.reservations-lab-more {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px dashed rgba(6, 77, 144, 0.35);
+  background: transparent;
+  color: var(--ucb-blue);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.reservations-lab-more:hover {
+  background: rgba(6, 77, 144, 0.08);
+  border-style: solid;
+}
+
+.reservations-lab-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.reservations-lab-chip {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(10, 53, 89, 0.12);
+  background: #fff;
+  color: var(--ink-900);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.reservations-lab-chip:hover:not(:disabled) {
+  border-color: rgba(6, 77, 144, 0.4);
+  box-shadow: 0 6px 18px rgba(6, 77, 144, 0.08);
+  transform: translateY(-1px);
+}
+
+.reservations-lab-chip:focus-visible {
+  outline: none;
+  border-color: rgba(6, 77, 144, 0.6);
+  box-shadow: 0 0 0 3px rgba(6, 77, 144, 0.18);
+}
+
+.reservations-lab-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.reservations-lab-chip.is-selected {
+  border-color: rgba(6, 77, 144, 0.7);
+  background: linear-gradient(180deg, rgba(6, 77, 144, 0.07) 0%, rgba(244, 197, 66, 0.08) 100%);
+  box-shadow: 0 6px 18px rgba(6, 77, 144, 0.12);
+}
+
+.reservations-lab-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(6, 77, 144, 0.09);
+  color: var(--ucb-blue);
+  flex: 0 0 auto;
+}
+
+.reservations-lab-chip.is-selected .reservations-lab-chip-icon {
+  background: var(--ucb-blue);
+  color: #fff;
+}
+
+.reservations-lab-chip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.reservations-lab-chip-name {
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: var(--ink-900);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reservations-lab-chip-area {
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--ink-700);
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.reservations-lab-chip-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--ink-700);
+}
+
+.reservations-lab-chip-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reservations-lab-chip-meta svg {
+  flex: 0 0 auto;
+  color: var(--ink-500, #6b7a8a);
 }
 
 @media (max-width: 720px) {

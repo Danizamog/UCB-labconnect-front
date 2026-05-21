@@ -252,19 +252,30 @@ function AdminLaboratoriosPage({ user }) {
                 {debouncedSearch ? 'No encontramos laboratorios con ese criterio.' : 'Aun no hay laboratorios registrados.'}
               </p>
             ) : (
-            <div className="infra-list">
+            <div className="infra-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '20px', alignItems: 'stretch' }}>
               {labs.map((lab) => (
-                <article key={lab.id} className="infra-item">
-                  <div>
-                    <strong>{lab.name}</strong>
-                    <p>{lab.location} · Capacidad {lab.capacity}</p>
-                      <small>
-                        {lab.area_name || areaNameById[String(lab.area_id)] || 'Sin area'}
-                        {lab.manager ? ` · Encargado: ${lab.manager_name || managerNameById[String(lab.manager)] || 'Desconocido'}` : ''}
+                <article key={lab.id} className="infra-item" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '20px' }}>
+                  <div style={{ width: '100%', flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '12px' }}>
+                      <strong style={{ fontSize: '1.15rem', lineHeight: '1.3', color: 'var(--ink-900)' }}>{lab.name}</strong>
+                      <span className={`infra-status-badge ${lab.is_active !== false ? 'available' : 'maintenance'}`} style={{ whiteSpace: 'nowrap' }}>
+                        {lab.is_active !== false ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </div>
+                    <p style={{ margin: '0 0 12px', color: 'var(--ink-700)', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                      <strong>Ubicación:</strong> {lab.location} <br/>
+                      <strong>Capacidad:</strong> {lab.capacity} personas
+                    </p>
+                    <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid var(--line-300)', marginTop: 'auto' }}>
+                      <small style={{ display: 'block', margin: '0 0 6px', color: 'var(--ink-600)', fontSize: '0.85rem' }}>
+                        <strong>Área:</strong> {lab.area_name || areaNameById[String(lab.area_id)] || 'Sin área'}
                       </small>
-
+                      <small style={{ display: 'block', margin: 0, color: 'var(--ink-600)', fontSize: '0.85rem' }}>
+                        <strong>Encargado:</strong> {lab.manager ? (lab.manager_name || managerNameById[String(lab.manager)] || 'Desconocido') : 'Sin asignar'}
+                      </small>
+                    </div>
                   </div>
-                  <div className="infra-actions compact">
+                  <div className="infra-actions compact" style={{ width: '100%', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(10, 53, 89, 0.08)', justifyContent: 'flex-end' }}>
                     <button
                       type="button"
                       className="infra-secondary"

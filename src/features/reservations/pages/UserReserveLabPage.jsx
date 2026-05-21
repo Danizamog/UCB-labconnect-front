@@ -1,6 +1,6 @@
 ﻿import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FlaskConical, Search } from 'lucide-react'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
+import LabPicker from './LabPicker'
 import { getTutorialSessionById } from '../../tutorials/services/tutorialSessionsService'
 import { openTutorialSessionFlow } from '../../tutorials/utils/focusTutorialNavigation'
 
@@ -29,6 +29,7 @@ import './ReservationsPages.css'
 
 const MIN_PURPOSE_LENGTH = 5
 const CLOCK_REFRESH_MS = 30 * 1000
+const RESERVATIONS_PAGE_SIZE = 6
 
 function todayLocalDateString() {
   const value = new Date()
@@ -264,18 +265,8 @@ function isCreatableSlot(slot) {
   return Boolean(slot) && slot.state === 'available'
 }
 
-function normalizeLabSearchValue(value) {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLocaleLowerCase('es')
-    .trim()
-}
-
 function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead }) {
   const [labs, setLabs] = useState([])
-  const [labSearch, setLabSearch] = useState('')
-  const [labSort, setLabSort] = useState('name') // 'name', 'capacity'
   const [reservations, setReservations] = useState([])
   const [penalties, setPenalties] = useState([])
   const [slots, setSlots] = useState([])
@@ -298,6 +289,8 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
   const [isCancelling, setIsCancelling] = useState(false)
   const [isSubmittingReservation, setIsSubmittingReservation] = useState(false)
   const [focusedTutorial, setFocusedTutorial] = useState(null)
+  const [upcomingPage, setUpcomingPage] = useState(0)
+  const [historyPage, setHistoryPage] = useState(0)
   const [materialsCatalog, setMaterialsCatalog] = useState([])
   const [isLoadingMaterials, setIsLoadingMaterials] = useState(false)
   const [error, setError] = useState('')
@@ -617,52 +610,21 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     [labs],
   )
 
-  const normalizedLabSearch = useMemo(() => normalizeLabSearchValue(labSearch), [labSearch])
-
-  const filteredLabs = useMemo(() => {
-    let result = labs.filter((lab) => {
-      if (!normalizedLabSearch) {
-        return true
+  const handleLabSelect = useCallback((labId) => {
+    setForm((previous) => {
+      if (String(previous.laboratory_id || '') === String(labId || '')) {
+        return previous
       }
-
-      return normalizeLabSearchValue(lab?.name).includes(normalizedLabSearch)
+      return {
+        ...previous,
+        laboratory_id: labId,
+        start_time: '',
+        end_time: '',
+        requested_materials: [],
+      }
     })
-
-    if (labSort === 'capacity') {
-      result = [...result].sort((a, b) => (b.capacity || 0) - (a.capacity || 0))
-    } else {
-      result = [...result].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'es', { sensitivity: 'base' }))
-    }
-
-    return result
-  }, [labs, normalizedLabSearch, labSort])
-
-  useEffect(() => {
-    if (labs.length === 0) {
-      return
-    }
-
-    const currentLabId = String(form.laboratory_id || '')
-    const currentLabIsVisible = filteredLabs.some((lab) => String(lab.id) === currentLabId)
-
-    if (currentLabId && currentLabIsVisible) {
-      return
-    }
-
-    const nextLabId = String(filteredLabs[0]?.id || '')
-    if (currentLabId === nextLabId) {
-      return
-    }
-
-    setForm((previous) => ({
-      ...previous,
-      laboratory_id: nextLabId,
-      start_time: '',
-      end_time: '',
-      requested_materials: [],
-    }))
     setSelectedSlotKey('')
-  }, [filteredLabs, form.laboratory_id, labs.length])
+  }, [])
 
   const selectedSlot = useMemo(
     () => slots.find((slot) => getSlotKey(slot) === selectedSlotKey) || null,
@@ -735,6 +697,31 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     () => myReservations.filter((item) => HISTORY_STATUSES.has(item.status) || getReservationActionState(item).hasStarted).reverse(),
     [myReservations],
   )
+
+  const upcomingTotalPages = Math.max(1, Math.ceil(upcomingReservations.length / RESERVATIONS_PAGE_SIZE))
+  const historyTotalPages = Math.max(1, Math.ceil(reservationHistory.length / RESERVATIONS_PAGE_SIZE))
+
+  useEffect(() => {
+    if (upcomingPage >= upcomingTotalPages) {
+      setUpcomingPage(0)
+    }
+  }, [upcomingPage, upcomingTotalPages])
+
+  useEffect(() => {
+    if (historyPage >= historyTotalPages) {
+      setHistoryPage(0)
+    }
+  }, [historyPage, historyTotalPages])
+
+  const paginatedUpcoming = useMemo(() => {
+    const start = upcomingPage * RESERVATIONS_PAGE_SIZE
+    return upcomingReservations.slice(start, start + RESERVATIONS_PAGE_SIZE)
+  }, [upcomingPage, upcomingReservations])
+
+  const paginatedHistory = useMemo(() => {
+    const start = historyPage * RESERVATIONS_PAGE_SIZE
+    return reservationHistory.slice(start, start + RESERVATIONS_PAGE_SIZE)
+  }, [historyPage, reservationHistory])
 
   const focusedReservation = useMemo(
     () => {
@@ -1448,88 +1435,14 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
         <form className="reservations-form" onSubmit={handleSubmit}>
           <div className="reservations-form-section">
             <span className="reservations-form-section-label">1 - Laboratorio</span>
-            <div className="reservations-lab-picker">
-              <div className="reservations-lab-picker-head">
-                <div>
-                  <h4>Elige un espacio disponible</h4>
-                  <p>
-                    {normalizedLabSearch
-                      ? `${filteredLabs.length} resultado${filteredLabs.length === 1 ? '' : 's'} para "${labSearch.trim()}"`
-                      : `${filteredLabs.length} laboratorio${filteredLabs.length === 1 ? '' : 's'} disponible${filteredLabs.length === 1 ? '' : 's'}`}
-                  </p>
-                </div>
-                <div className="reservations-sort-group" aria-label="Orden de laboratorios">
-                  <button
-                    type="button"
-                    className={`reservations-sort-chip ${labSort === 'name' ? 'is-active' : ''}`}
-                    onClick={() => setLabSort('name')}
-                  >
-                    Nombre
-                  </button>
-                  <button
-                    type="button"
-                    className={`reservations-sort-chip ${labSort === 'capacity' ? 'is-active' : ''}`}
-                    onClick={() => setLabSort('capacity')}
-                  >
-                    Capacidad
-                  </button>
-                </div>
-              </div>
-
-              <div className="reservations-lab-finder">
-                <label className="reservations-search-field">
-                  <Search size={18} aria-hidden="true" />
-                  <input
-                    type="search"
-                    placeholder="Buscar laboratorio por nombre"
-                    aria-label="Buscar laboratorio por nombre"
-                    value={labSearch}
-                    onChange={(e) => setLabSearch(e.target.value)}
-                  />
-                </label>
-              </div>
-
-              <label className="reservations-lab-select-field">
-                <span>Laboratorio seleccionado</span>
-                <div className="reservations-lab-select-control">
-                  <span className="reservations-lab-select-icon" aria-hidden="true">
-                    <FlaskConical size={18} />
-                  </span>
-                  <select
-                    value={form.laboratory_id}
-                    onChange={(event) => setForm((prev) => ({
-                      ...prev,
-                      laboratory_id: event.target.value,
-                      start_time: '',
-                      end_time: '',
-                    }))}
-                    disabled={Boolean(activePenalty) || filteredLabs.length === 0}
-                    required
-                  >
-                    <option value="">Selecciona un laboratorio</option>
-                    {filteredLabs.map((lab) => (
-                      <option key={lab.id} value={lab.id}>
-                        {lab.name} {lab.capacity ? `(${lab.capacity} personas)` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </label>
-
-              {selectedLab ? (
-                <div className="reservations-lab-selected-card">
-                  <strong>{selectedLab.name}</strong>
-                  <span>
-                    {selectedLab.location || selectedLab.area_name || selectedLab.area || 'Ubicacion por definir'}
-                    {selectedLab.capacity ? ` · Capacidad: ${selectedLab.capacity} personas` : ''}
-                  </span>
-                </div>
-              ) : null}
-
-              {normalizedLabSearch && filteredLabs.length === 0 ? (
-                <p className="reservations-empty reservations-lab-empty">No se encontraron laboratorios</p>
-              ) : null}
-            </div>
+            <LabPicker
+              labs={labs}
+              selectedLabId={form.laboratory_id}
+              onSelect={handleLabSelect}
+              disabled={Boolean(activePenalty)}
+              emptyHint="No tienes permisos para reservar en los laboratorios disponibles."
+              title="Elige un espacio disponible"
+            />
             {!selectedLabIsAccessible && form.laboratory_id ? (
               <p className="reservation-inline-hint">
                 No tienes permisos para reservar este laboratorio. El formulario se deshabilita hasta elegir uno habilitado.
@@ -1848,7 +1761,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
               <p className="reservations-empty">No tienes reservas futuras disponibles para gestionar.</p>
             ) : (
               <div className="reservation-card-grid">
-                {upcomingReservations.map((item) => {
+                {paginatedUpcoming.map((item) => {
                   const actionState = getReservationActionState(item)
                   return (
                     <article
@@ -1932,6 +1845,30 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
               </div>
             )}
 
+            {upcomingReservations.length > RESERVATIONS_PAGE_SIZE ? (
+              <div className="reservations-pager" role="navigation" aria-label="Paginacion de reservas futuras">
+                <button
+                  type="button"
+                  className="reservations-secondary"
+                  onClick={() => setUpcomingPage((prev) => Math.max(prev - 1, 0))}
+                  disabled={upcomingPage <= 0}
+                >
+                  Anterior
+                </button>
+                <span className="reservations-pager-status">
+                  Pagina {upcomingPage + 1} de {upcomingTotalPages}
+                </span>
+                <button
+                  type="button"
+                  className="reservations-secondary"
+                  onClick={() => setUpcomingPage((prev) => Math.min(prev + 1, upcomingTotalPages - 1))}
+                  disabled={upcomingPage + 1 >= upcomingTotalPages}
+                >
+                  Siguiente
+                </button>
+              </div>
+            ) : null}
+
             <div className="reservations-panel-header reservation-history-header">
               <h4>Historial reciente</h4>
               <p className="reservations-panel-subtitle">
@@ -1943,7 +1880,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
               <p className="reservations-empty">Aun no tienes reservas transcurridas en el historial.</p>
             ) : (
               <div className="reservation-card-grid">
-                {reservationHistory.map((item) => (
+                {paginatedHistory.map((item) => (
                   <article
                     key={item.id}
                     className={`reservation-user-card${focusedReservationId === item.id ? ' is-focused' : ''}`}
@@ -1983,6 +1920,30 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                 ))}
               </div>
             )}
+
+            {reservationHistory.length > RESERVATIONS_PAGE_SIZE ? (
+              <div className="reservations-pager" role="navigation" aria-label="Paginacion del historial">
+                <button
+                  type="button"
+                  className="reservations-secondary"
+                  onClick={() => setHistoryPage((prev) => Math.max(prev - 1, 0))}
+                  disabled={historyPage <= 0}
+                >
+                  Anterior
+                </button>
+                <span className="reservations-pager-status">
+                  Pagina {historyPage + 1} de {historyTotalPages}
+                </span>
+                <button
+                  type="button"
+                  className="reservations-secondary"
+                  onClick={() => setHistoryPage((prev) => Math.min(prev + 1, historyTotalPages - 1))}
+                  disabled={historyPage + 1 >= historyTotalPages}
+                >
+                  Siguiente
+                </button>
+              </div>
+            ) : null}
           </>
         )}
       </section>
