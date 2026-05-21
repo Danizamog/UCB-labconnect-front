@@ -8,6 +8,16 @@ import { formatLocalDateTime, parseLocalDateTime } from '../../../shared/utils/f
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import './UserTutorialAttendanceHistoryPage.css'
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50]
+
+function normalizeKeyword(value) {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+}
+
 // start_at/end_at del backend vienen marcados con 'Z' aunque la hora es local.
 // parseLocalDateTime evita que Date() les aplique la conversion UTC -> local
 // (en Bolivia, UTC-4, esto correria las horas 4 hs hacia atras).
@@ -88,6 +98,9 @@ function UserTutorialAttendanceHistoryPage({ user }) {
   const [sessions, setSessions] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [keyword, setKeyword] = useState('')
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0])
   const canManageTutorials = hasAnyPermission(user, ['gestionar_tutorias'])
 
   const loadSessions = useCallback(async () => {
@@ -196,6 +209,37 @@ function UserTutorialAttendanceHistoryPage({ user }) {
 
   const totalHoursRounded = Math.round((totalHours / (1000 * 60 * 60)) * 10) / 10
 
+  const normalizedKeyword = useMemo(() => normalizeKeyword(keyword), [keyword])
+
+  const filteredSessions = useMemo(() => {
+    if (!normalizedKeyword) return completedSessions
+    return completedSessions.filter((session) => {
+      const searchable = [
+        session?.topic,
+        session?.description,
+        session?.tutor_name,
+        session?.location,
+        session?.laboratory_id,
+        session?.session_date,
+        session?.tutor_observation,
+      ]
+        .map((field) => normalizeKeyword(field))
+        .join(' ')
+      return searchable.includes(normalizedKeyword)
+    })
+  }, [completedSessions, normalizedKeyword])
+
+  const totalPages = Math.max(1, Math.ceil(filteredSessions.length / pageSize))
+  const safePage = Math.min(page, totalPages - 1)
+  const visibleSessions = useMemo(() => {
+    const start = safePage * pageSize
+    return filteredSessions.slice(start, start + pageSize)
+  }, [filteredSessions, safePage, pageSize])
+
+  useEffect(() => {
+    setPage(0)
+  }, [normalizedKeyword, pageSize])
+
   return (
     <section className="tutorial-history-page" aria-label="Historial de tutorias atendidas">
       <header className="tutorial-history-header">
@@ -228,13 +272,29 @@ function UserTutorialAttendanceHistoryPage({ user }) {
           <p>Se incluyen las tutorias inscritas por ti que ya concluyeron.</p>
         </div>
 
-        {isLoading && completedSessions.length === 0 ? (
+        <label className="tutorial-history-search">
+          <span>Buscar</span>
+          <input
+            type="search"
+            placeholder="Tema, tutor, ubicación, fecha..."
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            aria-label="Buscar tutoria por palabra clave"
+          />
+        </label>
+
+        {isLoading && filteredSessions.length === 0 ? (
           <p className="tutorial-history-empty">Cargando historial de tutorias...</p>
-        ) : completedSessions.length === 0 ? (
-          <p className="tutorial-history-empty">Aun no tienes tutorias atendidas en tu historial.</p>
+        ) : filteredSessions.length === 0 ? (
+          <p className="tutorial-history-empty">
+            {normalizedKeyword
+              ? 'Ninguna tutoria de tu historial coincide con la búsqueda.'
+              : 'Aun no tienes tutorias atendidas en tu historial.'}
+          </p>
         ) : (
+          <>
           <div className="tutorial-history-list">
-            {completedSessions.map((session) => (
+            {visibleSessions.map((session) => (
               <article key={session.id} className="tutorial-history-card">
                 <div className="tutorial-history-card-top">
                   <span className="tutorial-history-chip">Tutoria atendida</span>
@@ -260,6 +320,43 @@ function UserTutorialAttendanceHistoryPage({ user }) {
               </article>
             ))}
           </div>
+
+          {filteredSessions.length > pageSize ? (
+            <div className="tutorial-history-pagination">
+              <span className="tutorial-history-pagination-info">
+                Página {safePage + 1} de {totalPages} — {filteredSessions.length} tutoria{filteredSessions.length === 1 ? '' : 's'}
+              </span>
+              <div className="tutorial-history-pagination-controls">
+                <label>
+                  <span className="visually-hidden">Tutorias por página</span>
+                  <select
+                    value={pageSize}
+                    onChange={(event) => setPageSize(Number(event.target.value) || PAGE_SIZE_OPTIONS[0])}
+                    aria-label="Tutorias por página"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>{size} por página</option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
+                  disabled={safePage <= 0}
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((prev) => Math.min(prev + 1, totalPages - 1))}
+                  disabled={safePage + 1 >= totalPages}
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          ) : null}
+          </>
         )}
       </section>
     </section>

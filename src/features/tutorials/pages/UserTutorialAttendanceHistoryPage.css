@@ -197,6 +197,82 @@
   color: rgba(10, 37, 64, 0.86);
 }
 
+.tutorial-history-search {
+  display: grid;
+  gap: 6px;
+  color: rgba(10, 37, 64, 0.78);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.tutorial-history-search input {
+  border: 1px solid rgba(10, 37, 64, 0.2);
+  border-radius: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  font: inherit;
+  color: #0a2540;
+  background: #fff;
+}
+
+.tutorial-history-search input:focus {
+  outline: 2px solid rgba(6, 63, 119, 0.22);
+  border-color: rgba(6, 63, 119, 0.45);
+}
+
+.tutorial-history-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 6px;
+  flex-wrap: wrap;
+}
+
+.tutorial-history-pagination-info {
+  font-size: 0.85rem;
+  color: rgba(10, 37, 64, 0.72);
+  font-weight: 600;
+}
+
+.tutorial-history-pagination-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tutorial-history-pagination button {
+  border: 1px solid rgba(10, 37, 64, 0.2);
+  background: #fff;
+  color: #0a2540;
+  border-radius: 10px;
+  min-height: 34px;
+  padding: 0 14px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tutorial-history-pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tutorial-history-pagination button:not(:disabled):hover {
+  border-color: #063f77;
+  color: #063f77;
+}
+
+.tutorial-history-pagination select {
+  border: 1px solid rgba(10, 37, 64, 0.2);
+  background: #fff;
+  color: #0a2540;
+  border-radius: 10px;
+  min-height: 34px;
+  padding: 0 8px;
+  font: inherit;
+}
+
 @media (max-width: 980px) {
   .tutorial-history-list {
     grid-template-columns: minmax(0, 1fr);

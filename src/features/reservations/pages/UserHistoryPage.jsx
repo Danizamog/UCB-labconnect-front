@@ -17,8 +17,7 @@ const FILTER_TYPES = {
   TUTORIALS: 'tutorials',
 }
 const RESERVATION_PAGE_SIZE_OPTIONS = [10, 25, 50]
-const TUTORIAL_VISIBLE_INITIAL = 20
-const TUTORIAL_VISIBLE_STEP = 20
+const TUTORIAL_PAGE_SIZE_OPTIONS = [10, 25, 50]
 
 // Usar parseLocalDateTime para que start_at/end_at (que el backend devuelve
 // como UTC pero contiene la hora local del usuario) no se corra por la zona
@@ -93,7 +92,8 @@ function UserHistoryPage({ user }) {
   const [reservationTotalPages, setReservationTotalPages] = useState(0)
   const [isLoadingReservations, setIsLoadingReservations] = useState(false)
   const [tutorials, setTutorials] = useState([])
-  const [tutorialVisibleCount, setTutorialVisibleCount] = useState(TUTORIAL_VISIBLE_INITIAL)
+  const [tutorialPage, setTutorialPage] = useState(0)
+  const [tutorialPageSize, setTutorialPageSize] = useState(TUTORIAL_PAGE_SIZE_OPTIONS[0])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [activeFilter, setActiveFilter] = useState(FILTER_TYPES.ALL)
@@ -303,14 +303,16 @@ function UserHistoryPage({ user }) {
     ])
   }, [normalizedKeyword, tutorialHistory])
 
-  const visibleTutorialHistory = useMemo(
-    () => filteredTutorialHistory.slice(0, tutorialVisibleCount),
-    [filteredTutorialHistory, tutorialVisibleCount],
-  )
+  const tutorialTotalPages = Math.max(1, Math.ceil(filteredTutorialHistory.length / tutorialPageSize))
+  const safeTutorialPage = Math.min(tutorialPage, tutorialTotalPages - 1)
+  const visibleTutorialHistory = useMemo(() => {
+    const start = safeTutorialPage * tutorialPageSize
+    return filteredTutorialHistory.slice(start, start + tutorialPageSize)
+  }, [filteredTutorialHistory, safeTutorialPage, tutorialPageSize])
 
   useEffect(() => {
-    setTutorialVisibleCount(TUTORIAL_VISIBLE_INITIAL)
-  }, [normalizedKeyword])
+    setTutorialPage(0)
+  }, [normalizedKeyword, tutorialPageSize, activeFilter])
 
   const shouldShowReservations = activeFilter === FILTER_TYPES.ALL || activeFilter === FILTER_TYPES.RESERVATIONS
   const shouldShowTutorials = activeFilter === FILTER_TYPES.ALL || activeFilter === FILTER_TYPES.TUTORIALS
@@ -497,17 +499,38 @@ function UserHistoryPage({ user }) {
               </article>
             ))}
           </div>
-          {filteredTutorialHistory.length > visibleTutorialHistory.length ? (
+          {filteredTutorialHistory.length > tutorialPageSize ? (
             <div className="history-pagination">
               <span className="history-pagination-info">
-                Mostrando {visibleTutorialHistory.length} de {filteredTutorialHistory.length}
+                Página {safeTutorialPage + 1} de {tutorialTotalPages}
+                {' '}— {filteredTutorialHistory.length} tutoria{filteredTutorialHistory.length === 1 ? '' : 's'}
               </span>
               <div className="history-pagination-controls">
+                <label>
+                  <span className="visually-hidden">Tutorias por página</span>
+                  <select
+                    value={tutorialPageSize}
+                    onChange={(event) => setTutorialPageSize(Number(event.target.value) || TUTORIAL_PAGE_SIZE_OPTIONS[0])}
+                    aria-label="Tutorias por página"
+                  >
+                    {TUTORIAL_PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>{size} por página</option>
+                    ))}
+                  </select>
+                </label>
                 <button
                   type="button"
-                  onClick={() => setTutorialVisibleCount((prev) => prev + TUTORIAL_VISIBLE_STEP)}
+                  onClick={() => setTutorialPage((prev) => Math.max(prev - 1, 0))}
+                  disabled={safeTutorialPage <= 0}
                 >
-                  Ver mas
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTutorialPage((prev) => Math.min(prev + 1, tutorialTotalPages - 1))}
+                  disabled={safeTutorialPage + 1 >= tutorialTotalPages}
+                >
+                  Siguiente
                 </button>
               </div>
             </div>

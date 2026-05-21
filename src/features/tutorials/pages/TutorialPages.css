@@ -1526,6 +1526,61 @@
   box-shadow: 0 4px 12px rgba(10, 53, 89, 0.08);
 }
 
+.tutorials-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  flex-wrap: wrap;
+}
+
+.tutorials-pagination-info {
+  font-size: 0.86rem;
+  color: var(--ink-700);
+  font-weight: 600;
+}
+
+.tutorials-pagination-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tutorials-pagination button {
+  border: 1px solid rgba(10, 53, 89, 0.16);
+  background: #fff;
+  color: var(--ink-900);
+  border-radius: 12px;
+  min-height: 36px;
+  padding: 0 14px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+}
+
+.tutorials-pagination button:not(:disabled):hover {
+  border-color: #0a3559;
+  color: #0a3559;
+  background: rgba(10, 53, 89, 0.04);
+}
+
+.tutorials-pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tutorials-pagination select {
+  border: 1px solid rgba(10, 53, 89, 0.16);
+  background: #fff;
+  color: var(--ink-900);
+  border-radius: 12px;
+  min-height: 36px;
+  padding: 0 10px;
+  font: inherit;
+}
+
 @media (max-width: 720px) {
   .tutorial-detail-hero,
   .tutorial-focus-hero {

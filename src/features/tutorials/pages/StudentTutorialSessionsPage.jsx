@@ -8,10 +8,12 @@ import {
 } from '../services/tutorialSessionsService'
 import { listAdminLabs as getLaboratories } from '../../admin/services/infrastructureService'
 import { FOCUSED_TUTORIAL_KEY, OPEN_TUTORIAL_EVENT } from '../utils/focusTutorialNavigation'
-import { Search, SlidersHorizontal, X } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 import './TutorialPages.css'
 
 const CLOCK_REFRESH_MS = 30 * 1000
+const PAGE_SIZE_OPTIONS = [6, 12, 24]
+const MY_SESSIONS_PAGE_SIZE = 6
 
 function parseSessionDate(value) {
   if (!value) return null
@@ -27,17 +29,8 @@ function getEnrollmentState(session, userId, referenceNow = new Date()) {
   const isEnrolled = session.enrolled_students.some((student) => student.student_id === normalizedUserId)
   const isFull = session.seats_left <= 0
   
-  const rawStart = session?.start_at;
-  const sessionStart = parseSessionDate(rawStart);
+  const sessionStart = parseSessionDate(session?.start_at);
   const sessionEnd = parseSessionDate(session?.end_at);
-  
-  console.log("DEBUG DATE:", {
-    topic: session.topic,
-    rawStart: rawStart,
-    parsedStart: sessionStart,
-    referenceNow: referenceNow,
-    hasStarted: sessionStart && sessionStart.getTime() <= referenceNow.getTime()
-  });
 
   const hasStarted = Boolean(sessionStart) && sessionStart.getTime() <= referenceNow.getTime()
   const hasEnded = Boolean(sessionEnd) && sessionEnd.getTime() <= referenceNow.getTime()
@@ -69,6 +62,9 @@ function StudentTutorialSessionsPage({ user }) {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [clockTick, setClockTick] = useState(() => Date.now())
+  const [publicPage, setPublicPage] = useState(0)
+  const [publicPageSize, setPublicPageSize] = useState(PAGE_SIZE_OPTIONS[1])
+  const [myPage, setMyPage] = useState(0)
 
   const loadPublicSessions = useCallback(async (currentFilters = filters) => {
     try {
@@ -224,6 +220,24 @@ function StudentTutorialSessionsPage({ user }) {
     () => filteredSessions.filter((session) => session.is_published),
     [filteredSessions],
   )
+
+  const publicTotalPages = Math.max(1, Math.ceil(availableSessions.length / publicPageSize))
+  const safePublicPage = Math.min(publicPage, publicTotalPages - 1)
+  const visibleAvailableSessions = useMemo(() => {
+    const start = safePublicPage * publicPageSize
+    return availableSessions.slice(start, start + publicPageSize)
+  }, [availableSessions, safePublicPage, publicPageSize])
+
+  const myTotalPages = Math.max(1, Math.ceil(mySessions.length / MY_SESSIONS_PAGE_SIZE))
+  const safeMyPage = Math.min(myPage, myTotalPages - 1)
+  const visibleMySessions = useMemo(() => {
+    const start = safeMyPage * MY_SESSIONS_PAGE_SIZE
+    return mySessions.slice(start, start + MY_SESSIONS_PAGE_SIZE)
+  }, [mySessions, safeMyPage])
+
+  useEffect(() => {
+    setPublicPage(0)
+  }, [filters.topic_search, filters.session_date, filters.laboratory_id, filters.status, publicPageSize])
 
   const focusedState = useMemo(
     () => (focusedSession ? getEnrollmentState(focusedSession, user?.user_id, nowReference) : null),
@@ -384,8 +398,9 @@ function StudentTutorialSessionsPage({ user }) {
         {mySessions.length === 0 ? (
           <p className="tutorials-empty">Todavia no reservaste cupos en tutorias. Cuando te inscribas, tus sesiones apareceran aqui.</p>
         ) : (
+          <>
           <div className="tutorials-grid">
-            {mySessions.map((session) => {
+            {visibleMySessions.map((session) => {
               const sessionState = getEnrollmentState(session, user?.user_id, nowReference)
 
               return (
@@ -443,6 +458,30 @@ function StudentTutorialSessionsPage({ user }) {
               )
             })}
           </div>
+          {mySessions.length > MY_SESSIONS_PAGE_SIZE ? (
+            <div className="tutorials-pagination">
+              <span className="tutorials-pagination-info">
+                Página {safeMyPage + 1} de {myTotalPages} — {mySessions.length} tutoria{mySessions.length === 1 ? '' : 's'} reservada{mySessions.length === 1 ? '' : 's'}
+              </span>
+              <div className="tutorials-pagination-controls">
+                <button
+                  type="button"
+                  onClick={() => setMyPage((prev) => Math.max(prev - 1, 0))}
+                  disabled={safeMyPage <= 0}
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMyPage((prev) => Math.min(prev + 1, myTotalPages - 1))}
+                  disabled={safeMyPage + 1 >= myTotalPages}
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          ) : null}
+          </>
         )}
       </section>
 
@@ -530,8 +569,9 @@ function StudentTutorialSessionsPage({ user }) {
         {availableSessions.length === 0 ? (
           <p className="tutorials-empty">No hay tutorias publicadas por el momento.</p>
         ) : (
+          <>
           <div className="tutorials-grid">
-            {availableSessions.map((session) => {
+            {visibleAvailableSessions.map((session) => {
               const isFocused = focusedSessionId === session.id
               const sessionState = getEnrollmentState(session, user?.user_id, nowReference)
 
@@ -610,6 +650,42 @@ function StudentTutorialSessionsPage({ user }) {
               )
             })}
           </div>
+          {availableSessions.length > publicPageSize ? (
+            <div className="tutorials-pagination">
+              <span className="tutorials-pagination-info">
+                Página {safePublicPage + 1} de {publicTotalPages} — {availableSessions.length} tutoria{availableSessions.length === 1 ? '' : 's'}
+              </span>
+              <div className="tutorials-pagination-controls">
+                <label>
+                  <span className="visually-hidden">Tutorias por página</span>
+                  <select
+                    value={publicPageSize}
+                    onChange={(event) => setPublicPageSize(Number(event.target.value) || PAGE_SIZE_OPTIONS[1])}
+                    aria-label="Tutorias por página"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>{size} por página</option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setPublicPage((prev) => Math.max(prev - 1, 0))}
+                  disabled={safePublicPage <= 0}
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPublicPage((prev) => Math.min(prev + 1, publicTotalPages - 1))}
+                  disabled={safePublicPage + 1 >= publicTotalPages}
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          ) : null}
+          </>
         )}
       </section>
     </section>
