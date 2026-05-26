@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { jsPDF } from 'jspdf'
+import QRCode from 'qrcode'
+import ucbEscudoLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
 import {
   cancelTutorialEnrollment,
   enrollInTutorialSession,
@@ -14,6 +17,25 @@ import './TutorialPages.css'
 const CLOCK_REFRESH_MS = 30 * 1000
 const PAGE_SIZE_OPTIONS = [6, 12, 24]
 const MY_SESSIONS_PAGE_SIZE = 6
+
+function normalizeFilePart(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+async function loadImageAsDataUrl(src) {
+  const response = await fetch(src)
+  const blob = await response.blob()
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('No se pudo leer el logo institucional'))
+    reader.readAsDataURL(blob)
+  })
+}
 
 function parseSessionDate(value) {
   if (!value) return null
@@ -44,6 +66,34 @@ function getEnrollmentState(session, userId, referenceNow = new Date()) {
     canEnroll: !isOwnSession && !isEnrolled && !isFull && !hasStarted && !hasEnded,
     canCancel: isEnrolled && !hasStarted && !hasEnded,
   }
+}
+
+function resolveCurrentEnrollment(session, user) {
+  const normalizedUserId = String(user?.user_id || '')
+  const enrolledStudents = Array.isArray(session?.enrolled_students) ? session.enrolled_students : []
+  const currentEnrollment = enrolledStudents.find((student) => String(student?.student_id || '') === normalizedUserId) || null
+
+  return {
+    studentId: currentEnrollment?.student_id || normalizedUserId || '-',
+    studentName: currentEnrollment?.student_name || user?.name || user?.username || 'Estudiante',
+    studentEmail: currentEnrollment?.student_email || user?.email || user?.username || '-',
+    enrolledAt: currentEnrollment?.created_at || session?.updated || session?.created || '',
+  }
+}
+
+function buildReceiptQrPayload(session, enrollment) {
+  return [
+    'LABCONNECT_COMPROBANTE_TUTORIA',
+    `estudiante=${enrollment.studentName || '-'}`,
+    `correo=${enrollment.studentEmail || '-'}`,
+    `codigo=${enrollment.studentId || '-'}`,
+    `tutoria=${session?.topic || '-'}`,
+    `laboratorio=${session?.location || 'Por definir'}`,
+    `fecha=${session?.session_date || '-'}`,
+    `horario=${session?.start_time || '-'} - ${session?.end_time || '-'}`,
+    `tutor=${session?.tutor_name || '-'}`,
+    `inscrito=${enrollment.enrolledAt || '-'}`,
+  ].join('\n')
 }
 
 function StudentTutorialSessionsPage({ user }) {
@@ -344,6 +394,156 @@ function StudentTutorialSessionsPage({ user }) {
     }
   }
 
+  const handleDownloadEnrollmentReceipt = useCallback(async (session) => {
+    if (!session) return
+
+    const enrollment = resolveCurrentEnrollment(session, user)
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+    const marginX = 44
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
+    const contentWidth = pageWidth - (marginX * 2)
+    let cursorY = 54
+
+    const writeLine = (label, value, options = {}) => {
+      const { muted = false, multiline = false } = options
+      const text = `${label}: ${value || '-'}`
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(11)
+      doc.setTextColor(19, 33, 68)
+      doc.text(label + ':', marginX, cursorY)
+
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(muted ? 96 : 36, muted ? 112 : 52, muted ? 138 : 82)
+      if (multiline) {
+        const lines = doc.splitTextToSize(String(value || '-'), contentWidth - 110)
+        doc.text(lines, marginX + 110, cursorY)
+        cursorY += (lines.length * 14) + 8
+        return
+      }
+
+      doc.text(String(value || '-'), marginX + 110, cursorY)
+      cursorY += 20
+    }
+
+    const drawFooter = () => {
+      doc.setDrawColor(214, 224, 238)
+      doc.line(marginX, pageHeight - 32, pageWidth - marginX, pageHeight - 32)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(96, 112, 138)
+      doc.text('Universidad Catolica Boliviana - LabConnect', marginX, pageHeight - 18)
+      doc.text(`Generado: ${new Date().toLocaleString('es-BO')}`, pageWidth - marginX, pageHeight - 18, { align: 'right' })
+    }
+
+    doc.setFillColor(10, 53, 89)
+    doc.rect(0, 0, pageWidth, 88, 'F')
+    doc.setFillColor(244, 197, 66)
+    doc.rect(0, 84, pageWidth, 4, 'F')
+
+    try {
+      const logoDataUrl = await loadImageAsDataUrl(ucbEscudoLogo)
+      doc.addImage(logoDataUrl, 'PNG', marginX, 16, 44, 56)
+    } catch {
+      // El comprobante sigue siendo valido aunque no cargue el logo.
+    }
+
+    let qrDataUrl = ''
+    try {
+      qrDataUrl = await QRCode.toDataURL(buildReceiptQrPayload(session, enrollment), {
+        margin: 1,
+        width: 220,
+        color: {
+          dark: '#0A3559',
+          light: '#FFFFFF',
+        },
+      })
+    } catch {
+      qrDataUrl = ''
+    }
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(18)
+    doc.setTextColor(255, 255, 255)
+    doc.text('Comprobante de Inscripcion a Tutoria', marginX + 56, 38)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(11)
+    doc.text('LabConnect - Soporte Academico', marginX + 56, 58)
+
+    cursorY = 120
+
+    doc.setFillColor(248, 251, 255)
+    doc.roundedRect(marginX, cursorY - 18, contentWidth, 84, 16, 16, 'F')
+    doc.setDrawColor(220, 230, 240)
+    doc.roundedRect(marginX, cursorY - 18, contentWidth, 84, 16, 16)
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(14)
+    doc.setTextColor(10, 53, 89)
+    doc.text(session.topic || 'Tutoria', marginX + 18, cursorY + 8)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(11)
+    doc.setTextColor(63, 85, 108)
+    doc.text(`Tutor: ${session.tutor_name || '-'}`, marginX + 18, cursorY + 30)
+    doc.text(`Laboratorio: ${session.location || 'Por definir'}`, marginX + 18, cursorY + 48)
+    doc.text(`Horario exacto: ${session.session_date || '-'} | ${session.start_time || '-'} - ${session.end_time || '-'}`, marginX + 18, cursorY + 66)
+
+    cursorY += 92
+    writeLine('Estudiante', enrollment.studentName)
+    writeLine('Correo', enrollment.studentEmail)
+    writeLine('Codigo', enrollment.studentId)
+    writeLine('Tutoria', session.topic || '-')
+    writeLine('Laboratorio asignado', session.location || 'Por definir')
+    writeLine('Fecha', session.session_date || '-')
+    writeLine('Horario', `${session.start_time || '-'} - ${session.end_time || '-'}`)
+    writeLine('Tutor responsable', session.tutor_name || '-')
+    writeLine('Inscripcion registrada', enrollment.enrolledAt ? new Date(enrollment.enrolledAt).toLocaleString('es-BO') : '-')
+    writeLine('Estado', 'Inscripcion confirmada')
+
+    cursorY += 10
+    if (qrDataUrl) {
+      const qrBoxY = cursorY - 2
+      const qrBoxHeight = 152
+      doc.setFillColor(248, 251, 255)
+      doc.roundedRect(marginX, qrBoxY, contentWidth, qrBoxHeight, 14, 14, 'F')
+      doc.setDrawColor(220, 230, 240)
+      doc.roundedRect(marginX, qrBoxY, contentWidth, qrBoxHeight, 14, 14)
+      doc.addImage(qrDataUrl, 'PNG', marginX + 14, qrBoxY + 16, 96, 96)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(11)
+      doc.setTextColor(10, 53, 89)
+      doc.text('QR de verificacion del comprobante', marginX + 126, qrBoxY + 30)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      doc.setTextColor(63, 85, 108)
+      const qrHelpLines = doc.splitTextToSize(
+        'Al escanearlo se muestran los datos clave de esta inscripcion para validacion rapida del estudiante, laboratorio y horario.',
+        contentWidth - 144,
+      )
+      doc.text(qrHelpLines, marginX + 126, qrBoxY + 50)
+      cursorY += qrBoxHeight + 10
+    }
+
+    doc.setFillColor(255, 248, 225)
+    doc.roundedRect(marginX, cursorY - 6, contentWidth, 58, 12, 12, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(122, 85, 0)
+    doc.text('Presenta este comprobante al ingresar a la tutoria.', marginX + 14, cursorY + 14)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(110, 84, 12)
+    const noteLines = doc.splitTextToSize('Verifica que el nombre del estudiante, el laboratorio asignado y los horarios exactos coincidan con la sesion programada.', contentWidth - 28)
+    doc.text(noteLines, marginX + 14, cursorY + 30)
+
+    drawFooter()
+
+    const fileSafeTopic = normalizeFilePart(session.topic) || 'tutoria'
+    const fileSafeDate = normalizeFilePart(session.session_date) || 'fecha'
+    doc.save(`comprobante-tutoria-${fileSafeTopic}-${fileSafeDate}.pdf`)
+    setMessage('Comprobante de inscripcion descargado en PDF.')
+    setError('')
+  }, [user])
+
   return (
     <section className="tutorials-page tutorials-page-student" aria-label="Tutorias disponibles">
       <header className="tutorials-header">
@@ -412,18 +612,36 @@ function StudentTutorialSessionsPage({ user }) {
                 Es tu tutoria
               </button>
             ) : focusedState?.canCancel ? (
-              <button
-                type="button"
-                className="tutorials-danger"
-                disabled={cancellingId === focusedSession.id}
-                onClick={() => handleCancelEnrollment(focusedSession)}
-              >
-                {cancellingId === focusedSession.id ? 'Cancelando...' : 'Cancelar asistencia'}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="tutorials-secondary"
+                  onClick={() => handleDownloadEnrollmentReceipt(focusedSession)}
+                >
+                  Descargar comprobante PDF
+                </button>
+                <button
+                  type="button"
+                  className="tutorials-danger"
+                  disabled={cancellingId === focusedSession.id}
+                  onClick={() => handleCancelEnrollment(focusedSession)}
+                >
+                  {cancellingId === focusedSession.id ? 'Cancelando...' : 'Cancelar asistencia'}
+                </button>
+              </>
             ) : focusedState?.isEnrolled ? (
-              <button type="button" className="tutorials-secondary" disabled>
-                {focusedState.hasStarted ? 'Tutoria en curso' : 'Ya inscrito'}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="tutorials-secondary"
+                  onClick={() => handleDownloadEnrollmentReceipt(focusedSession)}
+                >
+                  Descargar comprobante PDF
+                </button>
+                <button type="button" className="tutorials-secondary" disabled>
+                  {focusedState.hasStarted ? 'Tutoria en curso' : 'Ya inscrito'}
+                </button>
+              </>
             ) : focusedState?.hasStarted ? (
               <button type="button" className="tutorials-secondary" disabled>
                 Sesion iniciada
@@ -484,6 +702,14 @@ function StudentTutorialSessionsPage({ user }) {
                   </div>
 
                   <div className="tutorial-card-action-row">
+                    <button
+                      type="button"
+                      className="tutorials-secondary"
+                      onClick={() => handleDownloadEnrollmentReceipt(session)}
+                    >
+                      Descargar PDF
+                    </button>
+
                     <button
                       type="button"
                       className="tutorials-secondary"

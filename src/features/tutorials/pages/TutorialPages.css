@@ -776,13 +776,16 @@
 
 .tutorials-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+  align-items: stretch;
 }
 
 .tutorial-card {
   display: grid;
+  grid-template-rows: auto auto auto auto 1fr auto;
   gap: 14px;
+  height: 100%;
   padding: 18px;
   border-radius: 20px;
   background:
@@ -1049,9 +1052,10 @@
 
 .tutorial-card-actions {
   display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
   gap: 8px;
+  margin-top: auto;
   padding-top: 4px;
 }
 
@@ -1060,9 +1064,13 @@
 .tutorial-card-actions .tutorials-danger {
   min-height: 42px;
   padding-inline: 14px;
+  width: 100%;
+  white-space: normal;
+  text-align: center;
 }
 
 .tutorial-card-primary-action {
+  grid-column: 1 / -1;
   justify-content: center;
 }
 
@@ -1086,6 +1094,22 @@
   align-items: center;
   justify-content: center;
   white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .tutorials-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .tutorial-card-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .tutorial-card-primary-action {
+    grid-column: auto;
+  }
 }
 
 .tutorials-primary:active,
