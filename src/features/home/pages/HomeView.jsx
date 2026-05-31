@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowRight,
   BookOpen,
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import Navbar from '../../../shared/components/navbar/navbar'
 import NotificationBell from '../../../shared/components/NotificationBell'
+import ScrollToTopButton from '../../../shared/components/ScrollToTopButton'
 import ucbEscudoLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
 import {
   APP_ROOT_PATH,
@@ -61,6 +62,7 @@ const OPERATIONS_RECIPIENT_ID = '__operations__'
 const HOME_LAB_DEFAULT_LIMIT = 6
 const HOME_LAB_SEARCH_LIMIT = 24
 const HOME_LAB_SEARCH_DEBOUNCE_MS = 200
+const SCROLL_TO_TOP_SECTIONS = new Set(['admin_reservas', 'analytics', 'tutorials_manage', 'equipos', 'materiales', 'penalties'])
 const EMPTY_AGENDA_SUMMARY = {
   generated_at: '',
   reservation_count: 0,
@@ -142,6 +144,7 @@ function buildAgendaItems(summary) {
 }
 
 function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession, onLogout }) {
+  const contentWindowRef = useRef(null)
   const [notifications, setNotifications] = useState([])
   const [agendaSummary, setAgendaSummary] = useState(EMPTY_AGENDA_SUMMARY)
   const [agendaLoading, setAgendaLoading] = useState(false)
@@ -169,6 +172,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const hasManagementModules =
     canManageRoles || canManageProfiles || canManageStructure || canManagePenalties || canManageEquipos || canManageMateriales || canManageTutorials
   const activeSection = getSectionIdFromPath(currentPath) || 'home'
+  const showScrollToTopButton = SCROLL_TO_TOP_SECTIONS.has(activeSection)
   const shouldTrackAgenda = !isAdmin && activeSection === 'home'
   const shouldTrackOperationsSnapshot = canManageStructure && activeSection === 'home'
   const unreadNotificationsCount = notifications.filter((notification) => !notification.is_read).length
@@ -499,7 +503,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
             />
           </div>
         </header>
-        <section className="content-window" aria-label="Ventana principal">
+        <section ref={contentWindowRef} className="content-window" aria-label="Ventana principal">
           <Suspense fallback={<div className="module-loading">Cargando modulo...</div>}>
           {canManageProfiles && activeSection === 'profiles' ? <AdminProfilesPage user={user} /> : null}
           {canManageRoles && activeSection === 'roles' ? <AdminRolesPage user={user} onSessionRefresh={onRefreshSession} /> : null}
@@ -768,6 +772,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
           ) : null}
           </Suspense>
         </section>
+        <ScrollToTopButton scrollContainerRef={contentWindowRef} enabled={showScrollToTopButton} />
       </main>
     </div>
   )
