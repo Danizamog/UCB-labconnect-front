@@ -518,6 +518,15 @@ function SupplyDetailChart({ stockItemId }) {
             {data.confidence === 'low' ? ' · baja confianza' : ''}
           </strong>
         </div>
+        {data.metrics ? (
+          <div className="pred-stat" title="Error medido por backtesting temporal (menor es mejor)">
+            <small>Error de validacion</small>
+            <strong>
+              MAE {data.metrics.mae} · RMSE {data.metrics.rmse}
+              <span style={{ fontWeight: 400, color: '#94a3b8' }}> ({data.metrics.test_days}d prueba)</span>
+            </strong>
+          </div>
+        ) : null}
       </div>
       <ForecastChart history={data.history} forecast={demandForecast} valueSuffix={`${data.unit || 'unidades'}/dia`} />
     </div>

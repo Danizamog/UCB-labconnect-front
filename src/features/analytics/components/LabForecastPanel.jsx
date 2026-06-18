@@ -91,6 +91,12 @@ export default function LabForecastPanel({ labs = [] }) {
             ) : (
               <span style={{ color: '#15803d' }}>Modelo de red neuronal entrenado con el historico.</span>
             )}
+            {data.metrics ? (
+              <span title="Error medido por backtesting temporal (menor es mejor)">
+                Error (validacion): <strong>MAE {data.metrics.mae} · RMSE {data.metrics.rmse}</strong>{' '}
+                ({data.metrics.test_days}d de prueba)
+              </span>
+            ) : null}
           </div>
           <ForecastChart history={data.history} forecast={data.forecast} valueSuffix="horas/dia" />
         </div>
