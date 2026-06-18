@@ -38,6 +38,7 @@ import './HomeView.css'
 import { formatLocalDateTime, formatStatus, parseLocalDateTime } from '../../../shared/utils/formatters'
 
 const AdminLabAnalyticsPage = lazy(() => import('../../analytics/pages/AdminLabAnalyticsPage'))
+const AdminPredictionsPage = lazy(() => import('../../analytics/pages/AdminPredictionsPage'))
 const AdminAreasPage = lazy(() => import('../../admin/pages/AdminAreasPage'))
 const AdminEquiposPage = lazy(() => import('../../admin/pages/AdminEquiposPage'))
 const AdminLaboratoriosPage = lazy(() => import('../../admin/pages/AdminLaboratoriosPage'))
@@ -272,6 +273,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
       activeSection === 'home' ||
       (activeSection === 'admin_reservas' && canManageStructure) ||
       (activeSection === 'analytics' && canViewAnalytics) ||
+      (activeSection === 'ia_predicciones' && canViewAnalytics) ||
       (activeSection === 'tutorials_manage' && canManageTutorials) ||
       (activeSection === 'profiles' && canManageProfiles) ||
       (activeSection === 'roles' && canManageRoles) ||
@@ -512,6 +514,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
             <AdminReservationsPage user={user} currentHash={currentHash} onNavigate={onNavigate} />
           ) : null}
           {canViewAnalytics && activeSection === 'analytics' ? <AdminLabAnalyticsPage user={user} /> : null}
+          {canViewAnalytics && activeSection === 'ia_predicciones' ? <AdminPredictionsPage user={user} /> : null}
           {canManageTutorials && activeSection === 'tutorials_manage' ? <TutorTutorialSessionsPage /> : null}
           {canManageSpaces && activeSection === 'areas' ? <AdminAreasPage user={user} /> : null}
           {canManageSpaces && activeSection === 'laboratorios' ? <AdminLaboratoriosPage user={user} /> : null}

@@ -5,6 +5,7 @@ export const NAVIGATION_LINKS = [
   { id: 'home', label: 'Inicio', icon: 'home', path: APP_ROOT_PATH },
   { id: 'admin_reservas', label: 'Solicitudes y acceso', icon: 'admin_reservas', path: '/app/admin/reservas', requiredAnyPermission: ['*', 'gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'] },
   { id: 'analytics', label: 'Analisis de uso', icon: 'analytics', path: '/app/admin/analisis', requiredAnyPermission: ['*', 'consultar_estadisticas'] },
+  { id: 'ia_predicciones', label: 'Predicciones', icon: 'ia_predicciones', path: '/app/admin/predicciones', requiredAnyPermission: ['*', 'consultar_estadisticas'] },
   { id: 'tutorials_manage', label: 'Tutorias docentes', icon: 'tutorials_manage', path: '/app/tutorias/publicar', requiredAnyPermission: ['*', 'gestionar_tutorias'] },
   { id: 'profiles', label: 'Cuentas de usuarios', icon: 'profiles', path: '/app/admin/perfiles', requiredAnyPermission: ['*', 'gestionar_roles_permisos', 'reactivar_cuentas'] },
   { id: 'roles', label: 'Roles y permisos', icon: 'roles', path: '/app/admin/roles', requiredAnyPermission: ['*', 'gestionar_roles_permisos'] },
