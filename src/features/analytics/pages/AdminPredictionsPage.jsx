@@ -222,17 +222,6 @@ export default function AdminPredictionsPage() {
             <small>{formatNumber(overview.busiest_lab_hours)} h/dia proyectado (lab mas exigido)</small>
           </div>
         </article>
-        <article className="pred-kpi pred-kpi--ok">
-          <span className="pred-kpi-icon" style={{ background: '#dcfce7', color: '#15803d' }}>
-            <Database size={18} />
-          </span>
-          <div>
-            <strong>
-              {dq.used_records}/{dq.total_records}
-            </strong>
-            <small>registros usados tras limpieza</small>
-          </div>
-        </article>
       </div>
 
       {/* Tabla rankeada de riesgo de insumos */}
