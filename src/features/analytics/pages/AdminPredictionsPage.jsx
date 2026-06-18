@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   ChevronRight,
@@ -69,10 +69,15 @@ export default function AdminPredictionsPage() {
   const [onlyRisk, setOnlyRisk] = useState(true)
   const [search, setSearch] = useState('')
   const [selectedSupply, setSelectedSupply] = useState(null)
+  // Marca la proxima carga como "forzar recalculo" (bypass de cache). El primer
+  // render y los re-render normales leen de cache; solo "Actualizar" fuerza.
+  const forceNextRef = useRef(false)
 
   useEffect(() => {
     let active = true
-    getPredictionsOverview()
+    const force = forceNextRef.current
+    forceNextRef.current = false
+    getPredictionsOverview({ force })
       .then((data) => {
         if (active) {
           setOverview(data)
@@ -128,7 +133,14 @@ export default function AdminPredictionsPage() {
         <div className="pred-error">
           <AlertTriangle size={18} />
           <span>{requestState.error}</span>
-          <button type="button" className="infra-secondary" onClick={() => setReloadKey((k) => k + 1)}>
+          <button
+            type="button"
+            className="infra-secondary"
+            onClick={() => {
+              forceNextRef.current = true
+              setReloadKey((k) => k + 1)
+            }}
+          >
             Reintentar
           </button>
         </div>
@@ -151,6 +163,7 @@ export default function AdminPredictionsPage() {
   const hasUsage = peakHours.some((h) => h.occupied_hours > 0)
 
   const triggerRefresh = () => {
+    forceNextRef.current = true
     setRefreshing(true)
     setReloadKey((k) => k + 1)
   }

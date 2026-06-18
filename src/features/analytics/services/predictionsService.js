@@ -28,8 +28,9 @@ async function getJson(path) {
 }
 
 // Panorama agregado: riesgo de insumos, resumen de laboratorios y calidad de datos.
-export async function getPredictionsOverview() {
-  return getJson('/analytics/predict/overview')
+// force=true fuerza al backend a recalcular (ignora la cache) — usado por "Actualizar".
+export async function getPredictionsOverview({ force = false } = {}) {
+  return getJson(`/analytics/predict/overview${force ? '?refresh=true' : ''}`)
 }
 
 // Pronostico de ocupacion (horas reservadas por dia) para un laboratorio.
