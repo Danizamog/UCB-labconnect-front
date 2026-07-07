@@ -46,6 +46,7 @@ function createDefaultForm(overrides = {}) {
     start_time: '',
     end_time: '',
     purpose: '',
+    requires_full_lab: false,
     requested_materials: [],
     ...overrides,
   }
@@ -226,6 +227,10 @@ function getSlotTone(slot) {
     return 'blocked-other'
   }
 
+  if (slot.state === 'partial') {
+    return 'shared'
+  }
+
   if (slot.state === 'occupied') {
     return 'busy'
   }
@@ -254,6 +259,10 @@ function getSlotLabel(slot) {
     return 'Bloqueado'
   }
 
+  if (slot.state === 'partial') {
+    return 'Compartido'
+  }
+
   if (slot.state === 'occupied') {
     return 'Ocupado'
   }
@@ -261,8 +270,19 @@ function getSlotLabel(slot) {
   return 'Disponible'
 }
 
-function isCreatableSlot(slot) {
-  return Boolean(slot) && slot.state === 'available'
+function isCreatableSlot(slot, requiresFullLab = false) {
+  if (!slot) {
+    return false
+  }
+  if (slot.state === 'available') {
+    return true
+  }
+  // Un bloque 'partial' tiene reservas compartidas aprobadas: aun se puede sumar otra
+  // reserva compartida, pero no una que necesite todo el laboratorio.
+  if (slot.state === 'partial') {
+    return !requiresFullLab
+  }
+  return false
 }
 
 function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead }) {
@@ -284,6 +304,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
   const [reservationToCancel, setReservationToCancel] = useState(null)
   const [selectedSlotKey, setSelectedSlotKey] = useState('')
   const selectedSlotKeyRef = useRef('')
+  const requiresFullLabRef = useRef(false)
   const availabilityRefreshRef = useRef(null)
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
@@ -313,6 +334,10 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
   useEffect(() => {
     selectedSlotKeyRef.current = selectedSlotKey
   }, [selectedSlotKey])
+
+  useEffect(() => {
+    requiresFullLabRef.current = Boolean(form.requires_full_lab)
+  }, [form.requires_full_lab])
 
   const loadLabs = useCallback(async () => {
     try {
@@ -509,7 +534,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
 
         const currentFormKey = selectedSlotKeyRef.current
         const matchingAvailableSlot = nextSlots.find(
-          (slot) => getSlotKey(slot) === currentFormKey && slot.state === 'available',
+          (slot) => getSlotKey(slot) === currentFormKey && isCreatableSlot(slot, requiresFullLabRef.current),
         )
 
         if (matchingAvailableSlot) {
@@ -633,7 +658,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
 
   const selectedSlotIsValid = Boolean(
     selectedSlot &&
-    isCreatableSlot(selectedSlot) &&
+    isCreatableSlot(selectedSlot, form.requires_full_lab) &&
     !isPastSlotForDate(selectedSlot, form.date, nowReference),
   )
 
@@ -668,7 +693,10 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     if (activePenalty) {
       return `Tu cuenta esta suspendida temporalmente. Motivo: ${activePenalty.reason}`
     }
-    if (!selectedSlot || !isCreatableSlot(selectedSlot)) {
+    if (selectedSlot && selectedSlot.state === 'partial' && form.requires_full_lab) {
+      return 'Ese bloque ya tiene una reserva compartida aprobada; no puedes tomarlo en uso exclusivo. Elige otro horario o marca "Compartir el laboratorio".'
+    }
+    if (!selectedSlot || !isCreatableSlot(selectedSlot, form.requires_full_lab)) {
       return 'Debes seleccionar un bloque horario disponible del laboratorio.'
     }
     if (isPastSlotForDate(selectedSlot, form.date, nowReference)) {
@@ -678,7 +706,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       return `El motivo debe tener al menos ${MIN_PURPOSE_LENGTH} caracteres.`
     }
     return ''
-  }, [activePenalty, form.date, form.purpose, nowReference, selectedLab, selectedLabIsAccessible, selectedSlot])
+  }, [activePenalty, form.date, form.purpose, form.requires_full_lab, nowReference, selectedLab, selectedLabIsAccessible, selectedSlot])
 
   const myReservations = useMemo(
     () =>
@@ -805,8 +833,10 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       return false
     }
 
+    // La reserva puede seguir en su propio bloque, y puede moverse a uno 'partial'
+    // (compartido) solo si ella misma no requiere el laboratorio completo.
     return (
-      slot.state === 'available' ||
+      isCreatableSlot(slot, Boolean(editingReservation?.requires_full_lab)) ||
       (editingReservation && slot.source === 'lab_reservation' && slot.source_id === editingReservation.id)
     )
   }, [editForm.date, editingReservation, nowReference])
@@ -824,6 +854,9 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     }
     if (slot?.source === 'class') {
       return slot.status ? `Bloque ocupado por la clase: ${slot.status}` : 'Bloque ocupado por una clase recurrente.'
+    }
+    if (slot?.state === 'partial') {
+      return 'Este bloque tiene una reserva compartida aprobada; solo puedes usarlo si tu reserva no es de uso exclusivo.'
     }
     if (slot?.state === 'occupied') {
       return 'Este bloque ya esta ocupado.'
@@ -1053,6 +1086,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       end_time: reservation.end_time || '',
       purpose: reservation.purpose || '',
       notes: reservation.notes || '',
+      requires_full_lab: Boolean(reservation.requires_full_lab),
     }))
     setError('')
     setMessage('')
@@ -1536,7 +1570,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
                       const slotKey = getSlotKey(slot)
                       const isSelected = selectedSlotKey === slotKey
                       const isPast = isPastSlotForDate(slot, form.date, nowReference)
-                      const isAvailable = isCreatableSlot(slot) && !isPast
+                      const isAvailable = isCreatableSlot(slot, form.requires_full_lab) && !isPast
                       const isTutorial = slot.source === 'tutorial_session'
                       const isDisabled = Boolean(activePenalty) || !selectedLabIsAccessible || (!isTutorial && !isAvailable)
                       return (
@@ -1588,7 +1622,39 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
           </div>
 
           <div className="reservations-form-section">
-            <span className="reservations-form-section-label">3 - Motivo</span>
+            <span className="reservations-form-section-label">3 - Modalidad de uso</span>
+            <div className="reservation-exclusivity" role="radiogroup" aria-label="Modalidad de uso del laboratorio">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={!form.requires_full_lab}
+                className={`reservation-exclusivity-option${!form.requires_full_lab ? ' is-selected' : ''}`}
+                onClick={() => setForm((prev) => ({ ...prev, requires_full_lab: false }))}
+                disabled={Boolean(activePenalty)}
+              >
+                <strong>Compartir el laboratorio</strong>
+                <span>Pueden aprobarse varias reservas en el mismo horario.</span>
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={form.requires_full_lab}
+                className={`reservation-exclusivity-option${form.requires_full_lab ? ' is-selected' : ''}`}
+                onClick={() => setForm((prev) => ({ ...prev, requires_full_lab: true }))}
+                disabled={Boolean(activePenalty)}
+              >
+                <strong>Uso exclusivo</strong>
+                <span>Necesito todo el laboratorio; bloquea el horario al aprobarse.</span>
+              </button>
+            </div>
+            <p className="reservation-inline-hint">
+              El horario solo se bloquea cuando un administrador aprueba una reserva. Una
+              reserva exclusiva no puede compartir el bloque con otras.
+            </p>
+          </div>
+
+          <div className="reservations-form-section">
+            <span className="reservations-form-section-label">4 - Motivo</span>
             <label>
               <span>Motivo de la reserva</span>
               <textarea
@@ -1608,7 +1674,7 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
 
           {form.laboratory_id && selectedLabIsAccessible ? (
             <div className="reservations-form-section">
-              <span className="reservations-form-section-label">4 - Reactivos (opcional)</span>
+              <span className="reservations-form-section-label">5 - Reactivos (opcional)</span>
               <div className="reservation-materials">
                 <p className="reservation-inline-hint">
                   Solicita reactivos disponibles en {selectedLab?.name || 'el laboratorio'}. Cada material queda pendiente y el encargado descuenta el stock al aprobar.

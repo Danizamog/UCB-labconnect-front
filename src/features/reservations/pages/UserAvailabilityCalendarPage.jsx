@@ -77,6 +77,10 @@ function getSlotTone(slot) {
     return 'blocked-other'
   }
 
+  if (slot.state === 'partial') {
+    return 'shared'
+  }
+
   if (slot.state === 'occupied') {
     return 'busy'
   }
@@ -99,6 +103,10 @@ function getSlotLabel(slot) {
 
   if (slot.state === 'blocked') {
     return 'Bloqueado'
+  }
+
+  if (slot.state === 'partial') {
+    return 'Compartido'
   }
 
   if (slot.state === 'occupied') {
@@ -482,6 +490,9 @@ function UserAvailabilityCalendarPage({ user }) {
                 </span>
                 <span className="cal-legend-item cal-legend--busy">
                   <span className="cal-legend-dot" /> {busyCount} ocupado{busyCount !== 1 ? 's' : ''}
+                </span>
+                <span className="reservation-slot-legend-item shared">
+                  <span className="reservation-slot-legend-dot" /> Compartido
                 </span>
                 <span className="reservation-slot-legend-item class">
                   <span className="reservation-slot-legend-dot" /> Clase

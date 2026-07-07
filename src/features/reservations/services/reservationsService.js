@@ -169,6 +169,7 @@ function mapReservation(record) {
     check_out_time: checkOutTime || '',
     is_walk_in: Boolean(record?.is_walk_in),
     user_modification_count: Number(record?.user_modification_count || 0),
+    requires_full_lab: Boolean(record?.requires_full_lab),
   }
 }
 
@@ -565,6 +566,7 @@ export async function createReservation(payload, user) {
     end_at: `${payload.date}T${payload.end_time}:00`,
     attendees_count: Number(payload.attendees_count || 0) || 0,
     notes: String(payload.notes || ''),
+    requires_full_lab: Boolean(payload.requires_full_lab),
   }
 
   if (!normalized.laboratory_id || !payload.date || !payload.start_time || !payload.end_time) {
@@ -587,6 +589,12 @@ export async function updateReservation(reservationId, payload) {
     start_at: `${payload.date}T${payload.start_time}:00`,
     end_at: `${payload.date}T${payload.end_time}:00`,
     notes: String(payload.notes || ''),
+  }
+
+  // Solo se envia la exclusividad si el formulario la incluye, para no sobreescribir el
+  // valor existente con un default cuando la edicion no toca ese campo.
+  if (payload.requires_full_lab !== undefined) {
+    normalized.requires_full_lab = Boolean(payload.requires_full_lab)
   }
 
   if (!reservationId || !normalized.laboratory_id || !payload.date || !payload.start_time || !payload.end_time) {

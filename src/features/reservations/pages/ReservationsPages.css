@@ -354,6 +354,12 @@
   color: #9a3412;
 }
 
+.reservations-slot.shared {
+  border-left-color: #0891b2;
+  background: rgba(8, 145, 178, 0.07);
+  color: #0e7490;
+}
+
 .reservations-slot.maintenance {
   border-left-color: #2563eb;
   background: rgba(37, 99, 235, 0.06);
@@ -449,6 +455,10 @@
   color: #86198f;
 }
 
+.reservation-slot-legend-item.shared {
+  color: #0e7490;
+}
+
 .reservation-slot-legend-item.past {
   color: #334155;
 }
@@ -476,8 +486,100 @@
   background: #c026d3;
 }
 
+.reservation-slot-legend-item.shared .reservation-slot-legend-dot {
+  background: #0891b2;
+}
+
 .reservation-slot-legend-item.past .reservation-slot-legend-dot {
   background: #475569;
+}
+
+/* Selector de modalidad de uso (compartir vs exclusivo) al crear reserva */
+.reservation-exclusivity {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.reservation-exclusivity-option {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1.5px solid rgba(6, 63, 119, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.reservation-exclusivity-option:hover:not(:disabled) {
+  border-color: rgba(6, 63, 119, 0.32);
+}
+
+.reservation-exclusivity-option strong {
+  font-size: 0.95rem;
+  color: var(--ink-800, #10233d);
+}
+
+.reservation-exclusivity-option span {
+  font-size: 0.82rem;
+  color: #55647a;
+}
+
+.reservation-exclusivity-option.is-selected {
+  border-color: #0891b2;
+  background: rgba(8, 145, 178, 0.08);
+  box-shadow: 0 8px 18px rgba(8, 145, 178, 0.12);
+}
+
+.reservation-exclusivity-option:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Badge de exclusividad en la tabla admin de solicitudes */
+.reservation-exclusivity-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.reservation-exclusivity-badge.is-shared {
+  background: rgba(8, 145, 178, 0.12);
+  color: #0e7490;
+}
+
+.reservation-exclusivity-badge.is-exclusive {
+  background: rgba(234, 88, 12, 0.12);
+  color: #9a3412;
+}
+
+/* Aviso de modalidad en el modal de aprobacion admin */
+.reservation-exclusivity-notice {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-left: 4px solid transparent;
+}
+
+.reservation-exclusivity-notice.is-shared {
+  background: rgba(8, 145, 178, 0.08);
+  border-left-color: #0891b2;
+  color: #0e7490;
+}
+
+.reservation-exclusivity-notice.is-exclusive {
+  background: rgba(234, 88, 12, 0.08);
+  border-left-color: #ea580c;
+  color: #9a3412;
 }
 
 .reservation-slot-grid {
@@ -1624,6 +1726,11 @@
 .reservations-slot.busy {
   background:
     linear-gradient(90deg, rgba(234, 88, 12, 0.12), rgba(234, 88, 12, 0.035));
+}
+
+.reservations-slot.shared {
+  background:
+    linear-gradient(90deg, rgba(8, 145, 178, 0.13), rgba(8, 145, 178, 0.04));
 }
 
 .reservations-slot.blocked-other,

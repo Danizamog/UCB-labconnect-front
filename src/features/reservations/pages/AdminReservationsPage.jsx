@@ -1654,6 +1654,9 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                       <td>
                         <strong>{item.purpose || 'Sin motivo registrado'}</strong>
                         <div>{item.is_walk_in ? 'Ingreso rapido' : 'Reserva programada'}</div>
+                        <span className={`reservation-exclusivity-badge ${item.requires_full_lab ? 'is-exclusive' : 'is-shared'}`}>
+                          {item.requires_full_lab ? 'Uso exclusivo' : 'Compartida'}
+                        </span>
                       </td>
                       <td>{formatDate(item.date)}</td>
                       <td>{item.start_time} - {item.end_time}</td>
@@ -1884,6 +1887,11 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
         primaryActionLabel="Guardar reserva"
         extraActions={editingReservation ? (
           <>
+            <p className={`reservation-exclusivity-notice ${editingReservation.requires_full_lab ? 'is-exclusive' : 'is-shared'}`}>
+              {editingReservation.requires_full_lab
+                ? 'Uso exclusivo: al aprobarla se bloquea todo el horario y se rechazan automaticamente las demas solicitudes pendientes de ese bloque.'
+                : 'Compartida: pueden aprobarse otras reservas compartidas en el mismo horario.'}
+            </p>
             <div className="reservations-panel" style={{ marginBottom: 12 }}>
               <div className="reservations-panel-header">
                 <h4>Reactivos solicitados</h4>
