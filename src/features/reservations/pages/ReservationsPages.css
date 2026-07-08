@@ -3054,3 +3054,108 @@
     justify-self: start;
   }
 }
+
+/* ===== Solicitudes de docentes (aprobacion agrupada) ===== */
+.reservations-panel-header--row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.teacher-approval-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.teacher-approval-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border-radius: var(--radius-md, 16px);
+  border: 1px solid var(--line-300, #d8e2ee);
+  background: var(--surface-100, #ffffff);
+  box-shadow: var(--shadow-subtle, 0 10px 26px rgba(13, 34, 61, 0.08));
+}
+
+.teacher-approval-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.teacher-approval-kicker {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ucb-blue, #063f77);
+}
+
+.teacher-approval-head h4 {
+  margin: 4px 0 2px;
+  font-family: var(--font-display, 'Sora', sans-serif);
+  font-size: 1rem;
+  color: var(--ink-900, #0d223d);
+}
+
+.teacher-approval-context {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ink-700, #3d5676);
+}
+
+.teacher-approval-recurrence {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: var(--surface-200, #f5f8fc);
+  color: var(--ink-700, #3d5676);
+}
+
+.teacher-approval-recurrence.is-weekly {
+  background: color-mix(in srgb, var(--ucb-blue-500, #1260aa) 15%, transparent);
+  color: var(--ucb-blue, #063f77);
+}
+
+.teacher-approval-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.teacher-approval-block h5 {
+  margin: 0 0 6px;
+  font-size: 0.8rem;
+  color: var(--ink-700, #3d5676);
+}
+
+.teacher-approval-block ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.teacher-approval-block li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: var(--ink-900, #0d223d);
+}
+
+.teacher-approval-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: auto;
+}

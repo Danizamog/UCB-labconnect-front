@@ -1,8 +1,9 @@
+import { getAuthToken } from '../../../shared/utils/storage'
+
 const gatewayBase = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
 const apiBase = gatewayBase.endsWith('/v1') ? gatewayBase.slice(0, -3) : gatewayBase
 const profilesBase = `${apiBase}/users`
 
-import { getAuthToken } from '../../../shared/utils/storage'
 const requestCache = new Map()
 const inFlightRequests = new Map()
 

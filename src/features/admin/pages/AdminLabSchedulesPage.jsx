@@ -10,6 +10,7 @@ import {
   updateLabSchedule,
 } from '../services/labSchedulesService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
+import { listUserProfiles } from '../services/profileService'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import './AdminAssetsPage.css'
 import './AdminLabSchedulesPage.css'
@@ -24,6 +25,17 @@ const emptyForm = {
   end_time: '',
   subject: '',
   description: '',
+  teacher_id: '',
+  teacher_name: '',
+}
+
+function isTeacherProfile(profile) {
+  const role = String(profile?.role || profile?.profile_type || '').toLowerCase()
+  return role.includes('docente')
+}
+
+function resolveProfileName(profile) {
+  return profile?.name || profile?.username || profile?.email || 'Docente'
 }
 
 function buildScheduleIndex(schedules) {
@@ -57,6 +69,7 @@ function AdminLabSchedulesPage({ user }) {
   const [message, setMessage] = useState('')
   const [editorState, setEditorState] = useState(null)
   const [confirmModal, setConfirmModal] = useState(null)
+  const [teacherProfiles, setTeacherProfiles] = useState([])
 
   const canManage = hasAnyPermission(user, REQUIRED_PERMISSIONS)
 
@@ -79,6 +92,25 @@ function AdminLabSchedulesPage({ user }) {
     }
     loadLabs()
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    listUserProfiles()
+      .then((profiles) => {
+        if (cancelled) return
+        const list = Array.isArray(profiles) ? profiles : []
+        const docentes = list.filter((profile) => profile?.is_active !== false && isTeacherProfile(profile))
+        // Si por alguna razon ningun perfil declara rol Docente, ofrecemos todos
+        // los perfiles activos para no bloquear la asignacion.
+        setTeacherProfiles(docentes.length > 0 ? docentes : list.filter((profile) => profile?.is_active !== false))
+      })
+      .catch(() => {
+        if (!cancelled) setTeacherProfiles([])
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const loadSchedules = async (labId) => {
@@ -133,7 +165,24 @@ function AdminLabSchedulesPage({ user }) {
         end_time: schedule.end_time,
         subject: schedule.subject,
         description: schedule.description,
+        teacher_id: schedule.teacher_id || '',
+        teacher_name: schedule.teacher_name || '',
       },
+    })
+  }
+
+  const handleTeacherChange = (teacherId) => {
+    const profile = teacherProfiles.find((entry) => String(entry.id) === String(teacherId)) || null
+    setEditorState((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        form: {
+          ...prev.form,
+          teacher_id: teacherId ? String(teacherId) : '',
+          teacher_name: profile ? resolveProfileName(profile) : '',
+        },
+      }
     })
   }
 
@@ -174,6 +223,8 @@ function AdminLabSchedulesPage({ user }) {
           end_time: form.end_time,
           subject: form.subject,
           description: form.description,
+          teacher_id: form.teacher_id,
+          teacher_name: form.teacher_name,
         })
         setMessage('Clase agregada al horario.')
       } else {
@@ -182,6 +233,8 @@ function AdminLabSchedulesPage({ user }) {
           end_time: form.end_time,
           subject: form.subject,
           description: form.description,
+          teacher_id: form.teacher_id,
+          teacher_name: form.teacher_name,
         })
         setMessage('Clase actualizada.')
       }
@@ -323,6 +376,9 @@ function AdminLabSchedulesPage({ user }) {
                               <>
                                 <strong>{matching.subject}</strong>
                                 <small>{matching.start_time} - {matching.end_time}</small>
+                                {matching.teacher_name ? (
+                                  <small className="schedules-cell-teacher">👩‍🏫 {matching.teacher_name}</small>
+                                ) : null}
                               </>
                             ) : (
                               <span className="schedules-cell-cont-dot" aria-hidden="true">.</span>
@@ -405,6 +461,30 @@ function AdminLabSchedulesPage({ user }) {
                 onChange={(event) => handleFormChange('subject', event.target.value)}
                 required
               />
+            </label>
+
+            <label className="schedules-modal-field">
+              <span>Docente responsable (opcional)</span>
+              <select
+                value={editorState.form.teacher_id || ''}
+                onChange={(event) => handleTeacherChange(event.target.value)}
+              >
+                <option value="">Sin docente asignado</option>
+                {editorState.form.teacher_id
+                  && !teacherProfiles.some((profile) => String(profile.id) === String(editorState.form.teacher_id)) ? (
+                    <option value={editorState.form.teacher_id}>
+                      {editorState.form.teacher_name || 'Docente asignado'} (actual)
+                    </option>
+                  ) : null}
+                {teacherProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {resolveProfileName(profile)}{profile.email ? ` — ${profile.email}` : ''}
+                  </option>
+                ))}
+              </select>
+              <small className="schedules-modal-hint">
+                El docente asignado podra pedir materiales y equipos para esta clase desde su portal.
+              </small>
             </label>
 
             <label className="schedules-modal-field">

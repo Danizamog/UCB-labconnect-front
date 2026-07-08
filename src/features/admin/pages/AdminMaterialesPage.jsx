@@ -20,6 +20,7 @@ import {
 } from '../../reservations/services/reservationsService'
 import { hasAnyPermission, isAdminUser } from '../../../shared/lib/permissions'
 import { formatDateTime, movementTypeLabel } from '../../../shared/utils/formatters'
+import { downloadCsv, todayStamp } from '../../../shared/utils/exportCsv'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import './AdminAssetsPage.css'
 
@@ -467,6 +468,39 @@ function AdminMaterialesPage({ user }) {
 
   const usageReportItems = useMemo(() => (Array.isArray(usageReport?.items) ? usageReport.items : []), [usageReport])
 
+  const handleExportStockReport = () => {
+    downloadCsv(
+      `reporte-stock-bajo-${todayStamp()}`,
+      [
+        { label: 'Material', value: (item) => item.name },
+        { label: 'Laboratorio', value: (item) => item.laboratory_name || 'General' },
+        { label: 'Categoria', value: (item) => item.category || '' },
+        { label: 'Cantidad actual', value: (item) => `${item.quantity_available} ${item.unit || ''}`.trim() },
+        { label: 'Umbral minimo', value: (item) => item.minimum_stock },
+        {
+          label: 'Faltante',
+          value: (item) => Number(item.stock_gap ?? Math.max(0, Number(item.minimum_stock || 0) - Number(item.quantity_available || 0))),
+        },
+        { label: 'Estado', value: (item) => reportStatusMeta[item.status]?.label || item.status },
+      ],
+      lowStockReportItems,
+    )
+  }
+
+  const handleExportUsageReport = () => {
+    downloadCsv(
+      `reporte-uso-insumos-${todayStamp()}`,
+      [
+        { label: 'Fecha', value: (item) => (item.loaned_at ? formatDateTime(item.loaned_at) : '') },
+        { label: 'Material', value: (item) => item.asset_name },
+        { label: 'Usuario', value: (item) => item.borrower_name },
+        { label: 'Practica', value: (item) => item.practice || '' },
+        { label: 'Cantidad', value: (item) => item.quantity },
+      ],
+      usageReportItems,
+    )
+  }
+
   const resetMaterialForm = () => {
     setEditingId(null)
     setMaterialForm(defaultMaterialForm)
@@ -905,81 +939,6 @@ function AdminMaterialesPage({ user }) {
               </div>
             ) : null}
           </section>
-
-          {canManageMaterials ? (
-          <section className="infra-card">
-            <div className="infra-section-head">
-              <div>
-                <h3>Materiales y reactivos</h3>
-                <p>Registra cada material con stock disponible y minimo.</p>
-              </div>
-            </div>
-
-            <form className="infra-form" onSubmit={handleMaterialSubmit}>
-              <div className="infra-form-section">
-                <span className="infra-form-section-label">1 — Identificacion</span>
-                <div className="infra-form-grid">
-                  <label>
-                    <span>Nombre del material</span>
-                    <input value={materialForm.name} onChange={(e) => setMaterialForm((prev) => ({ ...prev, name: e.target.value }))} required />
-                  </label>
-                  <label>
-                    <span>Categoria</span>
-                    <select value={materialForm.category} onChange={(e) => setMaterialForm((prev) => ({ ...prev, category: e.target.value }))} required>
-                      <option value="">Selecciona una categoria</option>
-                      {materialForm.category && !MATERIAL_CATEGORIES.includes(materialForm.category) ? (
-                        <option value={materialForm.category}>{materialForm.category} (actual)</option>
-                      ) : null}
-                      {MATERIAL_CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <label>
-                  <span>Descripcion</span>
-                  <textarea rows="3" value={materialForm.description} onChange={(e) => setMaterialForm((prev) => ({ ...prev, description: e.target.value }))} />
-                </label>
-              </div>
-              <div className="infra-form-section">
-                <span className="infra-form-section-label">2 — Stock y asignacion</span>
-                <div className="infra-form-grid">
-                  <label>
-                    <span>Unidad</span>
-                    <input value={materialForm.unit} onChange={(e) => setMaterialForm((prev) => ({ ...prev, unit: e.target.value }))} required />
-                  </label>
-                  <label>
-                    <span>Laboratorio</span>
-                    <select value={materialForm.laboratory_id} onChange={(e) => setMaterialForm((prev) => ({ ...prev, laboratory_id: e.target.value }))}>
-                      <option value="">Disponible para cualquier laboratorio</option>
-                      {visibleLabs.map((lab) => (
-                        <option key={lab.id} value={lab.id}>{lab.name}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    <span>Stock disponible</span>
-                    <input type="number" min="0" value={materialForm.quantity_available} onChange={(e) => setMaterialForm((prev) => ({ ...prev, quantity_available: e.target.value }))} required />
-                  </label>
-                  <label>
-                    <span>Stock minimo</span>
-                    <input type="number" min="0" value={materialForm.minimum_stock} onChange={(e) => setMaterialForm((prev) => ({ ...prev, minimum_stock: e.target.value }))} required />
-                  </label>
-                </div>
-              </div>
-              <div className="infra-actions">
-                <button type="submit" className="infra-primary">
-                  {editingId ? 'Actualizar material' : 'Crear material'}
-                </button>
-                {editingId ? (
-                  <button type="button" className="infra-secondary" onClick={resetMaterialForm}>
-                    Cancelar edicion
-                  </button>
-                ) : null}
-              </div>
-            </form>
-          </section>
-          ) : null}
             </>
           ) : null}
 
@@ -1133,6 +1092,14 @@ function AdminMaterialesPage({ user }) {
                 <h3>Materiales con stock bajo</h3>
                 <p>Solo aparecen materiales cuyo stock actual llego al umbral minimo configurado o esta por debajo.</p>
               </div>
+              <button
+                type="button"
+                className="infra-secondary"
+                onClick={handleExportStockReport}
+                disabled={lowStockReportItems.length === 0}
+              >
+                ⬇ Descargar Excel
+              </button>
             </div>
 
             <form className="infra-form" onSubmit={handleReportSubmit}>
@@ -1265,6 +1232,14 @@ function AdminMaterialesPage({ user }) {
                 <h3>Reporte de uso de insumos</h3>
                 <p>Analiza el consumo de materiales agrupado por prácticas y usuarios.</p>
               </div>
+              <button
+                type="button"
+                className="infra-secondary"
+                onClick={handleExportUsageReport}
+                disabled={usageReportItems.length === 0}
+              >
+                ⬇ Descargar Excel
+              </button>
             </div>
 
             <form className="infra-form" onSubmit={handleUsageReportSubmit}>

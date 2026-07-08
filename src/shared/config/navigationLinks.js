@@ -7,6 +7,7 @@ export const NAVIGATION_LINKS = [
   { id: 'analytics', label: 'Analisis de uso', icon: 'analytics', path: '/app/admin/analisis', requiredAnyPermission: ['*', 'consultar_estadisticas'] },
   { id: 'ia_predicciones', label: 'Predicciones', icon: 'ia_predicciones', path: '/app/admin/predicciones', requiredAnyPermission: ['*', 'consultar_estadisticas'] },
   { id: 'tutorials_manage', label: 'Tutorias docentes', icon: 'tutorials_manage', path: '/app/tutorias/publicar', requiredAnyPermission: ['*', 'gestionar_tutorias'] },
+  { id: 'mis_clases', label: 'Mis clases', icon: 'mis_clases', path: '/app/docente/clases', requiredAnyPermission: ['solicitar_recursos_clase'] },
   { id: 'profiles', label: 'Cuentas de usuarios', icon: 'profiles', path: '/app/admin/perfiles', requiredAnyPermission: ['*', 'gestionar_roles_permisos', 'reactivar_cuentas'] },
   { id: 'roles', label: 'Roles y permisos', icon: 'roles', path: '/app/admin/roles', requiredAnyPermission: ['*', 'gestionar_roles_permisos'] },
   { id: 'penalties', label: 'Sanciones y bloqueos', icon: 'penalties', path: '/app/admin/penalizaciones', requiredAnyPermission: ['*', 'gestionar_penalizaciones'] },

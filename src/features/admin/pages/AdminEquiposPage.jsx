@@ -18,6 +18,7 @@ import {
 import { listUserProfiles } from '../services/profileService'
 import { hasAnyPermission, isAdminUser } from '../../../shared/lib/permissions'
 import { assetStatusBadgeClass, assetStatusLabel, formatDateTime, formatStatus } from '../../../shared/utils/formatters'
+import { downloadCsv, todayStamp } from '../../../shared/utils/exportCsv'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import LoanReturnModal from './LoanReturnModal'
 import './AdminAssetsPage.css'
@@ -597,6 +598,39 @@ function AdminEquiposPage({ user }) {
 
   const handleOpenReturnModal = (loan) => {
     setReturnModalLoan(loan)
+  }
+
+  const handleExportLoans = () => {
+    downloadCsv(
+      `prestamos-activos-${todayStamp()}`,
+      [
+        { label: 'Equipo', value: (loan) => loan.asset_name },
+        { label: 'Serie', value: (loan) => loan.asset_serial_number || '' },
+        { label: 'Laboratorio', value: (loan) => loan.laboratory_name || '' },
+        { label: 'Usuario', value: (loan) => loan.borrower_name || loan.borrower_id },
+        { label: 'Correo', value: (loan) => loan.borrower_email || '' },
+        { label: 'Rol', value: (loan) => loan.borrower_role || '' },
+        { label: 'Motivo', value: (loan) => loan.purpose || '' },
+        { label: 'Fecha de salida', value: (loan) => (loan.loaned_at ? formatDateTime(loan.loaned_at) : '') },
+        { label: 'Registrado por', value: (loan) => loan.loaned_by || '' },
+      ],
+      loanDashboard.active_loans,
+    )
+  }
+
+  const handleExportInventory = () => {
+    downloadCsv(
+      `inventario-equipos-${todayStamp()}`,
+      [
+        { label: 'Equipo', value: (asset) => asset.name },
+        { label: 'Categoria', value: (asset) => asset.category || '' },
+        { label: 'Serie', value: (asset) => asset.serial_number || '' },
+        { label: 'Ubicacion', value: (asset) => asset.location || '' },
+        { label: 'Laboratorio', value: (asset) => (asset.laboratory_id ? labNameById[String(asset.laboratory_id)] || `Lab ${asset.laboratory_id}` : 'General') },
+        { label: 'Estado', value: (asset) => assetStatusLabel(asset.status) },
+      ],
+      filteredAssets,
+    )
   }
 
   const handleOpenManageAsset = (asset) => {
@@ -1419,9 +1453,19 @@ function AdminEquiposPage({ user }) {
                     <h3>Prestamos activos</h3>
                     <p>Devuelve aqui los equipos prestados o revisa quien tiene cada recurso en este momento.</p>
                   </div>
-                  <div className="infra-chip-list">
-                    <span className="infra-chip">Activos {loanDashboard.active_count}</span>
-                    <span className="infra-chip">Historial {loanDashboard.total_records}</span>
+                  <div className="infra-loan-panel-head-actions">
+                    <div className="infra-chip-list">
+                      <span className="infra-chip">Activos {loanDashboard.active_count}</span>
+                      <span className="infra-chip">Historial {loanDashboard.total_records}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="infra-secondary"
+                      onClick={handleExportLoans}
+                      disabled={loanDashboard.active_loans.length === 0}
+                    >
+                      ⬇ Descargar Excel
+                    </button>
                   </div>
                 </div>
 
@@ -1498,6 +1542,14 @@ function AdminEquiposPage({ user }) {
               <div className="infra-equipment-results">
                 <strong>{filteredAssets.length}</strong>
                 <span>{filteredAssets.length === 1 ? 'equipo encontrado' : 'equipos encontrados'}</span>
+                <button
+                  type="button"
+                  className="infra-secondary"
+                  onClick={handleExportInventory}
+                  disabled={filteredAssets.length === 0}
+                >
+                  ⬇ Descargar Excel
+                </button>
               </div>
             </div>
 

@@ -50,6 +50,7 @@ const AdminPenaltiesPage = lazy(() => import('../../reservations/pages/AdminPena
 const AdminReservationsPage = lazy(() => import('../../reservations/pages/AdminReservationsPage'))
 const UserAvailabilityCalendarPage = lazy(() => import('../../reservations/pages/UserAvailabilityCalendarPage'))
 const UserReserveLabPage = lazy(() => import('../../reservations/pages/UserReserveLabPage'))
+const TeacherClassesPage = lazy(() => import('../../reservations/pages/TeacherClassesPage'))
 const StudentTutorialSessionsPage = lazy(() => import('../../tutorials/pages/StudentTutorialSessionsPage'))
 const TutorTutorialSessionsPage = lazy(() => import('../../tutorials/pages/TutorTutorialSessionsPage'))
 const UserHistoryPage = lazy(() => import('../../reservations/pages/UserHistoryPage'))
@@ -170,6 +171,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const canManageEquipos = hasAnyPermission(user, ['gestionar_inventario', 'gestionar_estado_equipos', 'gestionar_mantenimiento'])
   const canManageMateriales = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos', 'gestionar_reservas_materiales'])
   const canManageTutorials = hasAnyPermission(user, ['gestionar_tutorias'])
+  const canRequestClassResources = hasAnyPermission(user, ['solicitar_recursos_clase'])
   const hasManagementModules =
     canManageRoles || canManageProfiles || canManageStructure || canManagePenalties || canManageEquipos || canManageMateriales || canManageTutorials
   const activeSection = getSectionIdFromPath(currentPath) || 'home'
@@ -275,6 +277,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
       (activeSection === 'analytics' && canViewAnalytics) ||
       (activeSection === 'ia_predicciones' && canViewAnalytics) ||
       (activeSection === 'tutorials_manage' && canManageTutorials) ||
+      (activeSection === 'mis_clases' && canRequestClassResources) ||
       (activeSection === 'profiles' && canManageProfiles) ||
       (activeSection === 'roles' && canManageRoles) ||
       (activeSection === 'penalties' && canViewPenalties) ||
@@ -309,6 +312,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     canManageSpaces,
     canManageStructure,
     canManageTutorials,
+    canRequestClassResources,
     canViewAnalytics,
     currentPath,
     isAdmin,
@@ -516,6 +520,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
           {canViewAnalytics && activeSection === 'analytics' ? <AdminLabAnalyticsPage user={user} /> : null}
           {canViewAnalytics && activeSection === 'ia_predicciones' ? <AdminPredictionsPage user={user} /> : null}
           {canManageTutorials && activeSection === 'tutorials_manage' ? <TutorTutorialSessionsPage /> : null}
+          {canRequestClassResources && activeSection === 'mis_clases' ? <TeacherClassesPage user={user} /> : null}
           {canManageSpaces && activeSection === 'areas' ? <AdminAreasPage user={user} /> : null}
           {canManageSpaces && activeSection === 'laboratorios' ? <AdminLaboratoriosPage user={user} /> : null}
           {canManageSpaces && activeSection === 'horarios_laboratorios' ? <AdminLabSchedulesPage user={user} /> : null}

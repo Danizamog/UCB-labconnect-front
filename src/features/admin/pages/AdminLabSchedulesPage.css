@@ -314,3 +314,23 @@
     font-size: 0.75rem;
   }
 }
+
+/* Docente asignado a la clase (celda del horario) */
+.schedules-cell-teacher {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ucb-blue, #063f77);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.schedules-modal-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: var(--ink-700, #3d5676);
+}

@@ -805,6 +805,9 @@ function mapSupplyReservation(record) {
     notes: String(record?.notes || ''),
     tutorial_session_id: String(record?.tutorial_session_id || ''),
     lab_reservation_id: String(record?.lab_reservation_id || ''),
+    recurrence: String(record?.recurrence || ''),
+    recurrence_end_date: String(record?.recurrence_end_date || ''),
+    recurrence_group_id: String(record?.recurrence_group_id || ''),
     created: String(record?.created || ''),
     updated: String(record?.updated || ''),
   }
@@ -834,6 +837,9 @@ export async function createSupplyReservation(payload) {
     laboratory_id: String(payload.laboratory_id || ''),
     tutorial_session_id: String(payload.tutorial_session_id || ''),
     lab_reservation_id: String(payload.lab_reservation_id || ''),
+    recurrence: String(payload.recurrence || ''),
+    recurrence_end_date: String(payload.recurrence_end_date || ''),
+    recurrence_group_id: String(payload.recurrence_group_id || ''),
   }
 
   const record = await request(`${reservationsBase}/supply-reservations`, {

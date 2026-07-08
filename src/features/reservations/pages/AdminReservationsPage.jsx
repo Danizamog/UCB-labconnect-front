@@ -11,7 +11,11 @@ import {
   SearchCheck,
   Users,
 } from 'lucide-react'
-import { listAdminLabs } from '../../admin/services/infrastructureService'
+import {
+  listAdminLabs,
+  listEquipmentRequests,
+  updateEquipmentRequestStatus,
+} from '../../admin/services/infrastructureService'
 import { listUserProfiles } from '../../admin/services/profileService'
 import {
   listPendingTutorialSessions,
@@ -36,6 +40,7 @@ import {
 import ReservationEditModal from './ReservationEditModal'
 import { hasAnyPermission, isAdminUser } from '../../../shared/lib/permissions'
 import { formatDate, formatDateTime } from '../../../shared/utils/formatters'
+import { downloadCsv, todayStamp } from '../../../shared/utils/exportCsv'
 import './ReservationsPages.css'
 
 const STATUS_LABELS = {
@@ -99,6 +104,12 @@ const ADMIN_RESERVATION_SECTIONS = [
     tone: 'requests',
   },
   {
+    id: 'solicitudes-docentes',
+    label: 'Solicitudes de docentes',
+    helper: 'Aprueba en un solo paso los materiales y equipos que piden los docentes para sus clases.',
+    tone: 'requests',
+  },
+  {
     id: 'tutorias-pendientes',
     label: 'Tutorias pendientes',
     helper: 'Aprueba o rechaza tutorias y elige sus materiales solicitados.',
@@ -112,6 +123,7 @@ const SECTION_ICON_MAP = {
   'ingreso-rapido': DoorOpen,
   'control-entradas-salidas': ClipboardList,
   'solicitudes-reserva': SearchCheck,
+  'solicitudes-docentes': BookOpen,
   'tutorias-pendientes': BookOpen,
 }
 
@@ -221,6 +233,10 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   const [tutorialSupplySelection, setTutorialSupplySelection] = useState({})
   const [tutorialRejectionDrafts, setTutorialRejectionDrafts] = useState({})
   const [tutorialActionId, setTutorialActionId] = useState('')
+  const [teacherRequestGroups, setTeacherRequestGroups] = useState([])
+  const [isLoadingTeacherRequests, setIsLoadingTeacherRequests] = useState(false)
+  const [teacherRequestStatusFilter, setTeacherRequestStatusFilter] = useState('pending')
+  const [teacherRequestActionId, setTeacherRequestActionId] = useState('')
   const tableQueryRef = useRef({ ...defaultTableFilters, pageNumber: 0 })
   const realtimeRefreshTimeoutRef = useRef(null)
 
@@ -358,6 +374,118 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     }
   }, [])
 
+  const loadTeacherRequests = useCallback(async () => {
+    setIsLoadingTeacherRequests(true)
+    try {
+      const statusParam = teacherRequestStatusFilter || undefined
+      const [supplies, equipment] = await Promise.all([
+        listSupplyReservations({ status: statusParam, skipCache: true }).catch(() => []),
+        listEquipmentRequests({ status: statusParam, skipCache: true }).catch(() => []),
+      ])
+      // Las solicitudes de docentes son insumos/equipos con recurrence_group_id
+      // y sin tutoria ni reserva de laboratorio asociada.
+      const teacherSupplies = (Array.isArray(supplies) ? supplies : []).filter(
+        (item) => item.recurrence_group_id && !item.tutorial_session_id && !item.lab_reservation_id,
+      )
+      const equip = Array.isArray(equipment) ? equipment : []
+
+      const groups = new Map()
+      const ensure = (groupId) => {
+        if (!groups.has(groupId)) {
+          groups.set(groupId, {
+            id: groupId,
+            supplies: [],
+            equipment: [],
+            requested_by: '',
+            requested_by_name: '',
+            requested_for: '',
+            recurrence: 'once',
+            recurrence_end_date: '',
+            created: '',
+          })
+        }
+        return groups.get(groupId)
+      }
+
+      for (const item of teacherSupplies) {
+        const group = ensure(item.recurrence_group_id)
+        group.supplies.push(item)
+        group.requested_by = group.requested_by || item.requested_by
+        group.requested_for = group.requested_for || item.requested_for
+        if (item.recurrence) group.recurrence = item.recurrence
+        group.recurrence_end_date = group.recurrence_end_date || item.recurrence_end_date
+        group.created = String(item.created) > String(group.created) ? item.created : group.created
+      }
+      for (const item of equip) {
+        const groupId = item.recurrence_group_id || `equipo-${item.id}`
+        const group = ensure(groupId)
+        group.equipment.push(item)
+        group.requested_by = group.requested_by || item.requested_by
+        group.requested_by_name = group.requested_by_name || item.requested_by_name
+        group.requested_for = group.requested_for || item.requested_for || item.purpose
+        if (item.recurrence) group.recurrence = item.recurrence
+        group.recurrence_end_date = group.recurrence_end_date || item.recurrence_end_date
+        const equipCreated = item.created || item.requested_at || ''
+        group.created = String(equipCreated) > String(group.created) ? equipCreated : group.created
+      }
+
+      const list = Array.from(groups.values()).sort((a, b) => String(b.created).localeCompare(String(a.created)))
+      setTeacherRequestGroups(list)
+      setError('')
+    } catch (err) {
+      setError(err.message || 'No se pudieron cargar las solicitudes de docentes.')
+    } finally {
+      setIsLoadingTeacherRequests(false)
+    }
+  }, [teacherRequestStatusFilter])
+
+  const handleApproveTeacherGroup = async (group) => {
+    setTeacherRequestActionId(group.id)
+    setError('')
+    setMessage('')
+    try {
+      const supplyPending = group.supplies.filter((item) => item.status === 'pending')
+      const equipPending = group.equipment.filter((item) => item.status === 'pending')
+      const results = await Promise.allSettled([
+        ...supplyPending.map((item) => updateSupplyReservationStatus(item.id, 'approved')),
+        ...equipPending.map((item) => updateEquipmentRequestStatus(item.id, 'approved')),
+      ])
+      const failed = results.filter((result) => result.status === 'rejected')
+      if (failed.length === 0) {
+        setMessage('Solicitud del docente aprobada. Los materiales de una sola vez descontaron stock y los equipos quedaron asignados.')
+      } else {
+        const detail = failed.map((result) => result.reason?.message || 'error').join(' | ')
+        setError(`Se aprobó parcialmente: ${failed.length} ítem(es) fallaron. ${detail}`)
+      }
+      await loadTeacherRequests()
+    } finally {
+      setTeacherRequestActionId('')
+    }
+  }
+
+  const handleRejectTeacherGroup = async (group) => {
+    setTeacherRequestActionId(group.id)
+    setError('')
+    setMessage('')
+    try {
+      const supplyActive = group.supplies.filter((item) => item.status === 'pending' || item.status === 'approved')
+      const equipActive = group.equipment.filter((item) => item.status === 'pending' || item.status === 'approved')
+      const results = await Promise.allSettled([
+        ...supplyActive.map((item) => updateSupplyReservationStatus(item.id, 'cancelled')),
+        ...equipActive.map((item) => updateEquipmentRequestStatus(item.id, 'rejected')),
+      ])
+      const failed = results.filter((result) => result.status === 'rejected')
+      if (failed.length === 0) {
+        setMessage('Solicitud del docente rechazada.')
+      } else {
+        setError(`No se pudieron rechazar ${failed.length} ítem(es).`)
+      }
+      await loadTeacherRequests()
+    } finally {
+      setTeacherRequestActionId('')
+    }
+  }
+
   const reloadAll = useCallback(async () => {
     await Promise.all([loadOperationalData(), loadTableData(tableQueryRef.current)])
   }, [loadOperationalData, loadTableData])
@@ -426,6 +554,12 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
       loadPendingTutorialsData()
     }
   }, [activeWorkspace, loadPendingTutorialsData])
+
+  useEffect(() => {
+    if (activeWorkspace === 'solicitudes-docentes') {
+      loadTeacherRequests()
+    }
+  }, [activeWorkspace, loadTeacherRequests])
 
   const labNameById = useMemo(
     () => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])),
@@ -994,6 +1128,22 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     ADMIN_RESERVATION_SECTIONS.find((section) => section.id === activeWorkspace) || ADMIN_RESERVATION_SECTIONS[0]
   const ActiveWorkspaceIcon = SECTION_ICON_MAP[activeWorkspaceMeta.id] || LayoutDashboard
 
+  const handleExportReservations = () => {
+    downloadCsv(
+      `reservas-${tableFilters.status || 'todas'}-${todayStamp()}`,
+      [
+        { label: 'Fecha', value: (r) => r.date || '' },
+        { label: 'Horario', value: (r) => `${r.start_time || ''} - ${r.end_time || ''}` },
+        { label: 'Laboratorio', value: (r) => getReservationLabLabel(r) },
+        { label: 'Solicitante', value: (r) => getReservationRequesterName(r) },
+        { label: 'Correo', value: (r) => getReservationRequesterEmail(r) },
+        { label: 'Estado', value: (r) => STATUS_LABELS[r.status] || r.status },
+        { label: 'Motivo', value: (r) => r.purpose || '' },
+      ],
+      sortedTableReservations,
+    )
+  }
+
   return (
     <section className="reservations-page" aria-label="Panel de reservas">
       <header className="reservations-header">
@@ -1454,11 +1604,21 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
 
       {activeWorkspace === 'solicitudes-reserva' ? (
         <section className="reservations-panel reservations-panel-priority">
-          <div className="reservations-panel-header">
-            <h3>Solicitudes de reserva</h3>
-            <p className="reservations-panel-subtitle">
-              Usa esta vista para buscar, filtrar y editar reservas. Los filtros rapidos estan arriba y las opciones avanzadas quedan ocultas hasta que las necesites.
-            </p>
+          <div className="reservations-panel-header reservations-panel-header--row">
+            <div>
+              <h3>Solicitudes de reserva</h3>
+              <p className="reservations-panel-subtitle">
+                Usa esta vista para buscar, filtrar y editar reservas. Los filtros rapidos estan arriba y las opciones avanzadas quedan ocultas hasta que las necesites.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="reservations-secondary"
+              onClick={handleExportReservations}
+              disabled={sortedTableReservations.length === 0}
+            >
+              ⬇ Descargar Excel
+            </button>
           </div>
 
           <div className="reservations-filter-callout">
@@ -1857,6 +2017,120 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                         </button>
                       </div>
                     </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {activeWorkspace === 'solicitudes-docentes' ? (
+        <section className="reservations-panel reservations-panel-priority">
+          <div className="reservations-panel-header reservations-panel-header--row">
+            <div>
+              <h3>Solicitudes de docentes</h3>
+              <p className="reservations-panel-subtitle">
+                Cada tarjeta agrupa los materiales y equipos que un docente pidió para una clase.
+                Al aprobar, se descuenta el stock de lo puntual y se asignan los equipos. Las peticiones
+                semanales quedan autorizadas hasta su fecha límite.
+              </p>
+            </div>
+            <div className="reservations-actions">
+              <select
+                value={teacherRequestStatusFilter}
+                onChange={(event) => setTeacherRequestStatusFilter(event.target.value)}
+                aria-label="Filtrar por estado"
+              >
+                <option value="pending">Pendientes</option>
+                <option value="approved">Aprobadas</option>
+                <option value="">Todas</option>
+              </select>
+              <button
+                type="button"
+                className="reservations-secondary"
+                onClick={() => loadTeacherRequests()}
+                disabled={isLoadingTeacherRequests}
+              >
+                {isLoadingTeacherRequests ? 'Cargando...' : 'Refrescar'}
+              </button>
+            </div>
+          </div>
+
+          {isLoadingTeacherRequests ? (
+            <p className="reservations-empty">Cargando solicitudes de docentes...</p>
+          ) : teacherRequestGroups.length === 0 ? (
+            <p className="reservations-empty">No hay solicitudes de docentes con ese filtro.</p>
+          ) : (
+            <div className="teacher-approval-grid">
+              {teacherRequestGroups.map((group) => {
+                const requesterProfile = profileById[String(group.requested_by)]
+                const requesterName = requesterProfile?.name || requesterProfile?.username || group.requested_by_name || group.requested_by || 'Docente'
+                const isActioning = teacherRequestActionId === group.id
+                const hasPending = group.supplies.some((s) => s.status === 'pending') || group.equipment.some((e) => e.status === 'pending')
+                const isWeekly = group.recurrence === 'weekly'
+                return (
+                  <article key={group.id} className="teacher-approval-card">
+                    <div className="teacher-approval-head">
+                      <div>
+                        <span className="teacher-approval-kicker">Solicitud de docente</span>
+                        <h4>{requesterName}</h4>
+                        <p className="teacher-approval-context">{group.requested_for || 'Clase sin detalle'}</p>
+                      </div>
+                      <span className={`teacher-approval-recurrence${isWeekly ? ' is-weekly' : ''}`}>
+                        {isWeekly ? `Semanal${group.recurrence_end_date ? ` · hasta ${group.recurrence_end_date}` : ''}` : 'Una vez'}
+                      </span>
+                    </div>
+
+                    <div className="teacher-approval-items">
+                      {group.supplies.length > 0 ? (
+                        <div className="teacher-approval-block">
+                          <h5>Materiales ({group.supplies.length})</h5>
+                          <ul>
+                            {group.supplies.map((item) => (
+                              <li key={item.id}>
+                                <span>{item.stock_item_name || item.stock_item_id} · {item.quantity} u.</span>
+                                <span className={`reservations-status ${item.status}`}>{STATUS_LABELS[item.status] || item.status}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {group.equipment.length > 0 ? (
+                        <div className="teacher-approval-block">
+                          <h5>Equipos ({group.equipment.length})</h5>
+                          <ul>
+                            {group.equipment.map((item) => (
+                              <li key={item.id}>
+                                <span>{item.asset_name || item.asset_id}{item.asset_serial_number ? ` · Serie ${item.asset_serial_number}` : ''}</span>
+                                <span className={`reservations-status ${item.status}`}>{STATUS_LABELS[item.status] || item.status}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {canManage ? (
+                      <div className="teacher-approval-actions">
+                        <button
+                          type="button"
+                          className="reservations-primary"
+                          disabled={isActioning || !hasPending}
+                          onClick={() => handleApproveTeacherGroup(group)}
+                        >
+                          {isActioning ? 'Procesando...' : 'Aprobar solicitud'}
+                        </button>
+                        <button
+                          type="button"
+                          className="reservations-danger"
+                          disabled={isActioning}
+                          onClick={() => handleRejectTeacherGroup(group)}
+                        >
+                          Rechazar
+                        </button>
+                      </div>
+                    ) : null}
                   </article>
                 )
               })}

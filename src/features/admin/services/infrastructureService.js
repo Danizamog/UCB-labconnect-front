@@ -1,9 +1,10 @@
+import { getAuthToken } from '../../../shared/utils/storage'
+
 const gatewayBase = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
 const apiBase = gatewayBase.endsWith('/v1') ? gatewayBase.slice(0, -3) : gatewayBase
 const reservationsBase = `${apiBase}/v1`
 const inventoryBase = `${apiBase}/inventory`
 
-import { getAuthToken } from '../../../shared/utils/storage'
 const requestCache = new Map()
 const inFlightRequests = new Map()
 
@@ -183,6 +184,49 @@ export function deleteLab(labId) {
 
 export function listAssets() {
   return request(`${inventoryBase}/assets`, { cacheTtlMs: 5000 })
+}
+
+// Catalogo de equipos de solo lectura (para el portal docente): no exige
+// permisos de gestion, solo autenticacion.
+export function listAssetsCatalog({ availableOnly = false, laboratoryId = '' } = {}) {
+  const query = buildQuery({
+    available_only: availableOnly ? 'true' : undefined,
+    laboratory_id: laboratoryId || undefined,
+  })
+  return request(`${inventoryBase}/assets/catalog${query}`, { cacheTtlMs: 4000 })
+}
+
+// --- Solicitudes de prestamo de equipo (docentes / clases) ---
+export function listEquipmentRequests(filters = {}) {
+  const query = buildQuery({
+    status: filters.status || undefined,
+    recurrence_group_id: filters.recurrence_group_id || undefined,
+    lab_reservation_id: filters.lab_reservation_id || undefined,
+  })
+  return request(`${inventoryBase}/equipment-requests${query}`, {
+    cacheTtlMs: filters.skipCache ? 0 : 2000,
+    skipCache: Boolean(filters.skipCache),
+  }).then((data) => (Array.isArray(data) ? data : []))
+}
+
+export function createEquipmentRequest(payload) {
+  return request(`${inventoryBase}/equipment-requests`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
+  })
+}
+
+export function updateEquipmentRequestStatus(requestId, status, notes) {
+  return request(`${inventoryBase}/equipment-requests/${requestId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status, notes: notes === undefined ? null : notes }),
+  }).then((data) => {
+    clearInfrastructureCache()
+    return data
+  })
 }
 
 export function createAsset(payload) {

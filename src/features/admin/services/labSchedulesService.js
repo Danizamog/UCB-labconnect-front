@@ -73,19 +73,28 @@ function mapSchedule(record) {
     subject: record?.subject || '',
     description: record?.description || '',
     is_active: record?.is_active !== false,
+    teacher_id: record?.teacher_id || '',
+    teacher_name: record?.teacher_name || '',
     created: record?.created || '',
     updated: record?.updated || '',
   }
 }
 
-export async function listLabSchedules({ laboratory_id, weekday } = {}) {
+export async function listLabSchedules({ laboratory_id, weekday, teacher_id } = {}) {
   const params = new URLSearchParams()
   if (laboratory_id) params.set('laboratory_id', laboratory_id)
+  if (teacher_id) params.set('teacher_id', teacher_id)
   if (weekday !== undefined && weekday !== null && weekday !== '') {
     params.set('weekday', String(weekday))
   }
   const query = params.toString() ? `?${params.toString()}` : ''
   const data = await request(`${reservationsBase}/lab-schedules${query}`)
+  return Array.isArray(data) ? data.map(mapSchedule) : []
+}
+
+// Clases asignadas al docente autenticado (para el portal docente).
+export async function listMyTeacherClasses() {
+  const data = await request(`${reservationsBase}/lab-schedules?teacher_id=me`)
   return Array.isArray(data) ? data.map(mapSchedule) : []
 }
 
@@ -99,6 +108,8 @@ export async function createLabSchedule(payload) {
       end_time: String(payload.end_time || ''),
       subject: String(payload.subject || '').trim(),
       description: String(payload.description || '').trim(),
+      teacher_id: String(payload.teacher_id || ''),
+      teacher_name: String(payload.teacher_name || '').trim(),
       is_active: payload.is_active !== false,
     }),
   })
@@ -113,6 +124,8 @@ export async function updateLabSchedule(scheduleId, payload) {
   if (payload.end_time !== undefined) body.end_time = String(payload.end_time)
   if (payload.subject !== undefined) body.subject = String(payload.subject).trim()
   if (payload.description !== undefined) body.description = String(payload.description).trim()
+  if (payload.teacher_id !== undefined) body.teacher_id = String(payload.teacher_id || '')
+  if (payload.teacher_name !== undefined) body.teacher_name = String(payload.teacher_name || '').trim()
   if (payload.is_active !== undefined) body.is_active = Boolean(payload.is_active)
 
   const data = await request(`${reservationsBase}/lab-schedules/${scheduleId}`, {

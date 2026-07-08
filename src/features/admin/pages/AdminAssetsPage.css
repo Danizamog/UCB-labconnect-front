@@ -1847,3 +1847,11 @@
 .infra-autocomplete-item:hover {
   background: rgba(6,77,144,0.06);
 }
+
+/* Encabezado de prestamos activos con acciones (exportar) */
+.infra-loan-panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
