@@ -60,6 +60,13 @@ function ReservationDetailModal({
 
             <div className="reservation-focus-copy">
               <p><strong>Motivo:</strong> {reservation.purpose || 'Sin motivo registrado'}</p>
+              <p><strong>Modalidad:</strong> {reservation.requires_full_lab ? 'Uso exclusivo (todo el laboratorio)' : 'Compartida'}</p>
+              {reservation.responsible_teacher_name ? (
+                <p><strong>Docente responsable:</strong> {reservation.responsible_teacher_name}</p>
+              ) : null}
+              {reservation.project_description ? (
+                <p><strong>Descripcion del proyecto:</strong> {reservation.project_description}</p>
+              ) : null}
               {reservation.notes ? <p><strong>Notas:</strong> {reservation.notes}</p> : null}
               {reservation.cancel_reason ? <p><strong>Motivo de rechazo:</strong> {reservation.cancel_reason}</p> : null}
             </div>

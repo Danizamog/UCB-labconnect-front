@@ -9,6 +9,8 @@ import {
   listMaterialMovements,
   listMaterials,
   updateMaterial,
+  MATERIAL_CATEGORIES,
+  normalizeCategory,
 } from '../services/infrastructureService'
 import { listUserProfiles } from '../services/profileService'
 import {
@@ -30,7 +32,7 @@ const SUPPLY_STATUS_LABELS = {
 
 const defaultMaterialForm = { name: '', category: '', unit: 'unidad', quantity_available: 0, minimum_stock: 0, laboratory_id: '', description: '', limite_reserva_usuario: '' }
 const defaultMovementForm = { stock_item_id: '', movement_type: 'entry', quantity: 1, notes: '' }
-const defaultReportFilters = { laboratory_id: '', status_filter: '', search: '', only_low_or_out: true, include_general: true }
+const defaultReportFilters = { laboratory_id: '', status_filter: '', category_filter: '', search: '', only_low_or_out: true, include_general: true }
 const defaultUsageReportFilters = { borrower_id: '', practice: '', date_from: '', date_to: '' }
 
 const reportStatusMeta = {
@@ -393,6 +395,11 @@ function AdminMaterialesPage({ user }) {
         return false
       }
 
+      const selectedCategory = String(reportFilters.category_filter || '').trim()
+      if (selectedCategory && normalizeCategory(item.category) !== selectedCategory) {
+        return false
+      }
+
       if (normalizedSearch) {
         const searchableValues = [
           String(item.name || ''),
@@ -626,13 +633,20 @@ function AdminMaterialesPage({ user }) {
                     </label>
                     <label>
                       <span>Categoria</span>
-                      <input
+                      <select
                         value={materialForm.category}
                         onChange={(e) => setMaterialForm((prev) => ({ ...prev, category: e.target.value }))}
-                        placeholder="Reactivo, electronica, redes, limpieza"
                         required
                         disabled={!canManageMaterials}
-                      />
+                      >
+                        <option value="">Selecciona una categoria</option>
+                        {materialForm.category && !MATERIAL_CATEGORIES.includes(materialForm.category) ? (
+                          <option value={materialForm.category}>{materialForm.category} (actual)</option>
+                        ) : null}
+                        {MATERIAL_CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
                     </label>
                   </div>
                   <label>
@@ -911,7 +925,15 @@ function AdminMaterialesPage({ user }) {
                   </label>
                   <label>
                     <span>Categoria</span>
-                    <input value={materialForm.category} onChange={(e) => setMaterialForm((prev) => ({ ...prev, category: e.target.value }))} required />
+                    <select value={materialForm.category} onChange={(e) => setMaterialForm((prev) => ({ ...prev, category: e.target.value }))} required>
+                      <option value="">Selecciona una categoria</option>
+                      {materialForm.category && !MATERIAL_CATEGORIES.includes(materialForm.category) ? (
+                        <option value={materialForm.category}>{materialForm.category} (actual)</option>
+                      ) : null}
+                      {MATERIAL_CATEGORIES.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
                   </label>
                 </div>
                 <label>
@@ -1138,6 +1160,19 @@ function AdminMaterialesPage({ user }) {
                     <option value="">Todas las alertas</option>
                     <option value="out_of_stock">Sin stock</option>
                     <option value="low_stock">Stock bajo</option>
+                  </select>
+                </label>
+
+                <label>
+                  <span>Categoria</span>
+                  <select
+                    value={reportFilters.category_filter}
+                    onChange={(e) => handleReportFilterChange('category_filter', e.target.value)}
+                  >
+                    <option value="">Todas</option>
+                    {MATERIAL_CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
                   </select>
                 </label>
 

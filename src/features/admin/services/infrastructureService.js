@@ -302,9 +302,42 @@ export function listMaterials(laboratoryId = '') {
   const normalized = String(laboratoryId || '').trim()
   const query = normalized ? `?laboratory_id=${encodeURIComponent(normalized)}` : ''
   return request(`${inventoryBase}/stock-items${query}`, { cacheTtlMs: 5000 }).then(data => {
-    console.log("[DEBUG FRONTEND] listMaterials received:", data);
     return data;
   });
+}
+
+// Lista fija de categorias de material (debe coincidir con MATERIAL_CATEGORIES del backend).
+export const MATERIAL_CATEGORIES = [
+  'Reactivos',
+  'Cristalería',
+  'Electrónica',
+  'Redes',
+  'Seguridad',
+  'Herramientas',
+  'Mobiliario',
+  'Consumibles',
+  'Otros',
+]
+
+// Normaliza cualquier categoria (incluidas las viejas de texto libre) a una de la lista fija.
+export function normalizeCategory(category) {
+  const value = String(category || '').trim()
+  if (!value) return 'Otros'
+  const match = MATERIAL_CATEGORIES.find(
+    (cat) => cat.toLocaleLowerCase('es') === value.toLocaleLowerCase('es'),
+  )
+  return match || 'Otros'
+}
+
+// Catalogo GLOBAL de materiales para reservar: busqueda + filtro por categoria + paginacion
+// server-side. Devuelve { items, page, perPage, totalItems, totalPages }.
+export function listGlobalMaterials({ search = '', category = '', page = 1, perPage = 24 } = {}) {
+  const params = new URLSearchParams()
+  if (search) params.set('search', String(search))
+  if (category) params.set('category', String(category))
+  params.set('page', String(page))
+  params.set('perPage', String(perPage))
+  return request(`${inventoryBase}/stock-items/catalog?${params.toString()}`, { cacheTtlMs: 3000 })
 }
 
 export function getStockItemsReport({

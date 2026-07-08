@@ -130,6 +130,7 @@ function createDefaultForm(overrides = {}) {
     start_time: '',
     end_time: '',
     max_students: 8,
+    requires_full_lab: true,
     requested_materials: [],
     ...overrides,
   }
@@ -210,6 +211,10 @@ function getSlotTone(slot, dateValue, referenceNow) {
     return 'blocked-other'
   }
 
+  if (slot.state === 'partial') {
+    return 'shared'
+  }
+
   if (slot.state === 'occupied') {
     return 'busy'
   }
@@ -236,6 +241,10 @@ function getSlotLabel(slot, dateValue, referenceNow) {
 
   if (slot.state === 'blocked') {
     return 'Bloqueado'
+  }
+
+  if (slot.state === 'partial') {
+    return 'Compartido'
   }
 
   if (slot.state === 'occupied') {
@@ -596,6 +605,7 @@ function TutorTutorialSessionsPage() {
       start_time: session.start_time,
       end_time: session.end_time,
       max_students: session.max_students,
+      requires_full_lab: session.requires_full_lab !== false,
     }))
     setSelectedSlotKey(`${session.start_time}-${session.end_time}`)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -1060,6 +1070,21 @@ function TutorTutorialSessionsPage() {
               />
             </label>
           </div>
+
+          <label className="tutorial-fulllab-toggle">
+            <input
+              type="checkbox"
+              checked={form.requires_full_lab !== false}
+              onChange={(event) => setForm((prev) => ({ ...prev, requires_full_lab: event.target.checked }))}
+            />
+            <span>
+              <strong>Usar todo el laboratorio</strong>
+              <small>
+                Si esta activo, la tutoria bloquea el horario en exclusiva. Si lo desactivas,
+                pueden coexistir otras reservas compartidas en el mismo bloque.
+              </small>
+            </span>
+          </label>
 
           {selectedLab ? (
             <div className="tutorial-slot-panel">

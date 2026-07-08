@@ -139,6 +139,7 @@ function mapTutorialSession(record) {
     end_at: record?.end_at || '',
     max_students: Number(record?.max_students || 0),
     is_published: record?.is_published !== false,
+    requires_full_lab: record?.requires_full_lab !== false,
     approval_status: String(record?.approval_status || 'pending'),
     approval_reason: String(record?.approval_reason || ''),
     tutor_observation: record?.tutor_observation || '',
@@ -221,6 +222,7 @@ export async function createTutorialSession(payload) {
       start_time: String(payload.start_time || ''),
       end_time: String(payload.end_time || ''),
       max_students: Number(payload.max_students || 0),
+      requires_full_lab: Boolean(payload.requires_full_lab),
       ...(payload.tutor_name ? { tutor_name: String(payload.tutor_name).trim() } : {}),
     }),
   })
@@ -244,6 +246,7 @@ export async function updateTutorialSession(sessionId, payload) {
       start_time: String(payload.start_time || ''),
       end_time: String(payload.end_time || ''),
       max_students: Number(payload.max_students || 0),
+      requires_full_lab: Boolean(payload.requires_full_lab),
       ...(payload.tutor_name ? { tutor_name: String(payload.tutor_name).trim() } : {}),
       ...(payload.tutor_email ? { tutor_email: String(payload.tutor_email).trim() } : {}),
     }),

@@ -1739,6 +1739,9 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                           Tutor: <strong>{session.tutor_name || 'Sin asignar'}</strong>
                           {session.tutor_email ? ` (${session.tutor_email})` : ''}
                         </p>
+                        <span className={`reservation-exclusivity-badge ${session.requires_full_lab !== false ? 'is-exclusive' : 'is-shared'}`}>
+                          {session.requires_full_lab !== false ? 'Todo el laboratorio' : 'Comparte laboratorio'}
+                        </span>
                       </div>
                       <div className="tutorial-approval-capacity">
                         <strong>{session.max_students}</strong>
@@ -1892,6 +1895,16 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                 ? 'Uso exclusivo: al aprobarla se bloquea todo el horario y se rechazan automaticamente las demas solicitudes pendientes de ese bloque.'
                 : 'Compartida: pueden aprobarse otras reservas compartidas en el mismo horario.'}
             </p>
+            <dl className="reservation-detail-grid">
+              <div>
+                <dt>Docente responsable</dt>
+                <dd>{editingReservation.responsible_teacher_name || 'No especificado'}</dd>
+              </div>
+              <div className="reservation-detail-wide">
+                <dt>Descripcion del proyecto</dt>
+                <dd>{editingReservation.project_description || 'Sin descripcion'}</dd>
+              </div>
+            </dl>
             <div className="reservations-panel" style={{ marginBottom: 12 }}>
               <div className="reservations-panel-header">
                 <h4>Reactivos solicitados</h4>

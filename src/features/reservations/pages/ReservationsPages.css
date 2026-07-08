@@ -538,6 +538,120 @@
   cursor: not-allowed;
 }
 
+/* Indicador de pasos del wizard de reserva */
+.reservation-steps {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reservation-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(6, 63, 119, 0.05);
+  border: 1.5px solid transparent;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #55647a;
+}
+
+.reservation-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(6, 63, 119, 0.14);
+  color: #10233d;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.reservation-step.is-done {
+  background: rgba(8, 145, 178, 0.1);
+  border-color: rgba(8, 145, 178, 0.4);
+  color: #0e7490;
+}
+
+.reservation-step.is-done .reservation-step-num {
+  background: #0891b2;
+  color: #fff;
+}
+
+.reservation-step.is-optional {
+  border-style: dashed;
+}
+
+/* Campo de docente responsable */
+.reservations-form-inline-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink-800, #10233d);
+  margin-bottom: 6px;
+}
+
+.reservation-teacher-field {
+  margin-top: 12px;
+}
+
+.reservation-teacher-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reservation-teacher-value {
+  flex: 1;
+  min-width: 160px;
+  padding: 9px 12px;
+  border: 1.5px solid rgba(6, 63, 119, 0.16);
+  border-radius: 12px;
+  font-size: 0.9rem;
+  color: #8794a6;
+  background: rgba(6, 63, 119, 0.03);
+}
+
+.reservation-teacher-value.has-value {
+  color: #10233d;
+  font-weight: 600;
+  border-color: rgba(8, 145, 178, 0.45);
+  background: rgba(8, 145, 178, 0.06);
+}
+
+/* Boton para abrir el selector de materiales/reactivos */
+.reservation-open-picker-btn {
+  margin-top: 8px;
+  width: 100%;
+  border: 1.5px dashed rgba(8, 145, 178, 0.5);
+  background: rgba(8, 145, 178, 0.04);
+  color: #0e7490;
+  border-radius: 12px;
+  padding: 11px 14px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.reservation-open-picker-btn:hover:not(:disabled) {
+  background: rgba(8, 145, 178, 0.1);
+  border-color: #0891b2;
+}
+
+.reservation-open-picker-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Badge de exclusividad en la tabla admin de solicitudes */
 .reservation-exclusivity-badge {
   display: inline-flex;
@@ -580,6 +694,38 @@
   background: rgba(234, 88, 12, 0.08);
   border-left-color: #ea580c;
   color: #9a3412;
+}
+
+/* Grilla de detalle (docente responsable / descripcion del proyecto) en el modal admin */
+.reservation-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px 16px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(6, 63, 119, 0.1);
+  border-radius: 12px;
+  background: rgba(6, 63, 119, 0.03);
+}
+
+.reservation-detail-grid .reservation-detail-wide {
+  grid-column: 1 / -1;
+}
+
+.reservation-detail-grid dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8794a6;
+  margin-bottom: 2px;
+}
+
+.reservation-detail-grid dd {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #10233d;
+  white-space: pre-wrap;
 }
 
 .reservation-slot-grid {

@@ -24,7 +24,9 @@ import {
   applyRealtimeRecordPatch,
   mapReservationRecord,
 } from '../services/reservationsService'
-import { listMaterials } from '../../admin/services/infrastructureService'
+import { normalizeCategory } from '../../admin/services/infrastructureService'
+import TeacherPickerModal from './TeacherPickerModal'
+import MaterialPickerModal from './MaterialPickerModal'
 import './ReservationsPages.css'
 
 const MIN_PURPOSE_LENGTH = 5
@@ -46,6 +48,9 @@ function createDefaultForm(overrides = {}) {
     start_time: '',
     end_time: '',
     purpose: '',
+    project_description: '',
+    responsible_teacher: '',
+    responsible_teacher_name: '',
     requires_full_lab: false,
     requested_materials: [],
     ...overrides,
@@ -312,8 +317,62 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
   const [focusedTutorial, setFocusedTutorial] = useState(null)
   const [upcomingPage, setUpcomingPage] = useState(0)
   const [historyPage, setHistoryPage] = useState(0)
-  const [materialsCatalog, setMaterialsCatalog] = useState([])
-  const [isLoadingMaterials, setIsLoadingMaterials] = useState(false)
+  const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false)
+  const [materialPicker, setMaterialPicker] = useState(null) // null | 'reactivos' | 'materiales'
+
+  const setRequestedMaterials = useCallback((next) => {
+    setForm((prev) => ({ ...prev, requested_materials: typeof next === 'function' ? next(prev.requested_materials) : next }))
+  }, [])
+
+  const updateMaterialQuantity = useCallback((stockItemId, value) => {
+    setForm((prev) => ({
+      ...prev,
+      requested_materials: prev.requested_materials.map((entry) =>
+        String(entry.stock_item_id) === String(stockItemId) ? { ...entry, quantity: value } : entry,
+      ),
+    }))
+  }, [])
+
+  const removeSelectedMaterial = useCallback((stockItemId) => {
+    setForm((prev) => ({
+      ...prev,
+      requested_materials: prev.requested_materials.filter((entry) => String(entry.stock_item_id) !== String(stockItemId)),
+    }))
+  }, [])
+
+  const renderSelectedMaterials = (entries) => (
+    <ul className="reservation-materials-list">
+      {entries.map((entry) => {
+        const stock = Number(entry.quantity_available || 0)
+        const limit = Number(entry.limite_reserva_usuario || 0)
+        const effectiveMax = limit > 0 ? Math.min(stock, limit) : stock
+        return (
+          <li key={entry.stock_item_id} className="reservation-material-row">
+            <div className="reservation-material-row-info">
+              <strong>{entry.name || entry.stock_item_id}</strong>
+              <span>
+                {stock} {entry.unit || ''} disp.{limit > 0 ? ` (máx ${limit})` : ''}
+              </span>
+            </div>
+            <input
+              type="number"
+              min="1"
+              max={Math.max(effectiveMax, 1)}
+              value={entry.quantity}
+              onChange={(event) => {
+                let value = Math.max(1, Number(event.target.value) || 1)
+                if (effectiveMax > 0) value = Math.min(value, effectiveMax)
+                updateMaterialQuantity(entry.stock_item_id, value)
+              }}
+            />
+            <button type="button" className="reservations-secondary" onClick={() => removeSelectedMaterial(entry.stock_item_id)}>
+              Quitar
+            </button>
+          </li>
+        )
+      })}
+    </ul>
+  )
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const todayIso = todayLocalDateString()
@@ -584,51 +643,8 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
     return () => window.clearTimeout(timer)
   }, [form.date, form.laboratory_id, selectedLabIsAccessible])
 
-  useEffect(() => {
-    let cancelled = false
-    const labId = String(form.laboratory_id || '').trim()
-
-    if (!labId) {
-      setMaterialsCatalog([])
-      setForm((previous) => (
-        previous.requested_materials.length === 0
-          ? previous
-          : { ...previous, requested_materials: [] }
-      ))
-      return () => {
-        cancelled = true
-      }
-    }
-
-    setIsLoadingMaterials(true)
-    listMaterials(labId)
-      .then((data) => {
-        if (cancelled) return
-        const items = Array.isArray(data) ? data : []
-        setMaterialsCatalog(items)
-        setForm((previous) => {
-          const allowedIds = new Set(items.map((item) => String(item.id)))
-          const filtered = previous.requested_materials.filter((entry) => allowedIds.has(String(entry.stock_item_id)))
-          if (filtered.length === previous.requested_materials.length) {
-            return previous
-          }
-          return { ...previous, requested_materials: filtered }
-        })
-      })
-      .catch(() => {
-        if (cancelled) return
-        setMaterialsCatalog([])
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoadingMaterials(false)
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [form.laboratory_id])
+  // Los materiales ahora son globales (catalogo compartido): se eligen desde
+  // MaterialPickerModal, ya no dependen del laboratorio seleccionado.
 
   const labNameById = useMemo(
     () => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])),
@@ -1087,6 +1103,9 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
       purpose: reservation.purpose || '',
       notes: reservation.notes || '',
       requires_full_lab: Boolean(reservation.requires_full_lab),
+      project_description: reservation.project_description || '',
+      responsible_teacher: reservation.responsible_teacher || '',
+      responsible_teacher_name: reservation.responsible_teacher_name || '',
     }))
     setError('')
     setMessage('')
@@ -1467,6 +1486,29 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
 
       <section className="reservations-panel">
         <form className="reservations-form" onSubmit={handleSubmit}>
+          {(() => {
+            const reactivosCount = form.requested_materials.filter((m) => normalizeCategory(m.category) === 'Reactivos').length
+            const materialesCount = form.requested_materials.filter((m) => normalizeCategory(m.category) !== 'Reactivos').length
+            const steps = [
+              { n: 1, label: 'Laboratorio', done: Boolean(form.laboratory_id) },
+              { n: 2, label: 'Horario', done: Boolean(form.start_time && form.end_time) },
+              { n: 3, label: 'Modalidad', done: true },
+              { n: 4, label: 'Detalles', done: form.purpose.trim().length >= MIN_PURPOSE_LENGTH },
+              { n: 5, label: 'Reactivos', optional: true, done: reactivosCount > 0 },
+              { n: 6, label: 'Materiales', optional: true, done: materialesCount > 0 },
+            ]
+            return (
+              <ol className="reservation-steps" aria-label="Pasos de la reserva">
+                {steps.map((step) => (
+                  <li key={step.n} className={`reservation-step${step.done ? ' is-done' : ''}${step.optional ? ' is-optional' : ''}`}>
+                    <span className="reservation-step-num">{step.n}</span>
+                    <span className="reservation-step-label">{step.label}{step.optional ? ' (opcional)' : ''}</span>
+                  </li>
+                ))}
+              </ol>
+            )
+          })()}
+
           <div className="reservations-form-section">
             <span className="reservations-form-section-label">1 - Laboratorio</span>
             <LabPicker
@@ -1654,11 +1696,11 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
           </div>
 
           <div className="reservations-form-section">
-            <span className="reservations-form-section-label">4 - Motivo</span>
+            <span className="reservations-form-section-label">4 - Detalles</span>
             <label>
               <span>Motivo de la reserva</span>
               <textarea
-                rows="4"
+                rows="3"
                 value={form.purpose}
                 maxLength={250}
                 onChange={(event) => setForm((prev) => ({ ...prev, purpose: event.target.value }))}
@@ -1670,123 +1712,102 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
             <p className="reservation-inline-hint">
               Usa un motivo claro y academico. Minimo {MIN_PURPOSE_LENGTH} caracteres, maximo 250.
             </p>
+
+            <label>
+              <span>Descripcion del proyecto (opcional)</span>
+              <textarea
+                rows="3"
+                value={form.project_description}
+                maxLength={600}
+                onChange={(event) => setForm((prev) => ({ ...prev, project_description: event.target.value }))}
+                placeholder="Describe brevemente el proyecto o practica. Si no tienes docente asignado, aclara aqui quien es tu responsable o por que no tienes uno."
+                disabled={Boolean(activePenalty)}
+              />
+            </label>
+
+            <div className="reservation-teacher-field">
+              <span className="reservations-form-inline-label">Docente responsable (opcional)</span>
+              <div className="reservation-teacher-row">
+                <div className={`reservation-teacher-value${form.responsible_teacher_name ? ' has-value' : ''}`}>
+                  {form.responsible_teacher_name || 'Sin docente seleccionado'}
+                </div>
+                <button
+                  type="button"
+                  className="reservations-secondary"
+                  onClick={() => setIsTeacherModalOpen(true)}
+                  disabled={Boolean(activePenalty)}
+                >
+                  {form.responsible_teacher_name ? 'Cambiar' : 'Buscar docente'}
+                </button>
+                {form.responsible_teacher_name ? (
+                  <button
+                    type="button"
+                    className="reservations-secondary"
+                    onClick={() => setForm((prev) => ({ ...prev, responsible_teacher: '', responsible_teacher_name: '' }))}
+                  >
+                    Quitar
+                  </button>
+                ) : null}
+              </div>
+              <p className="reservation-inline-hint">
+                Elige a tu docente responsable de la lista. Si no tienes uno, dejalo vacio y explicalo en la descripcion del proyecto.
+              </p>
+            </div>
           </div>
 
-          {form.laboratory_id && selectedLabIsAccessible ? (
-            <div className="reservations-form-section">
-              <span className="reservations-form-section-label">5 - Reactivos (opcional)</span>
-              <div className="reservation-materials">
-                <p className="reservation-inline-hint">
-                  Solicita reactivos disponibles en {selectedLab?.name || 'el laboratorio'}. Cada material queda pendiente y el encargado descuenta el stock al aprobar.
-                </p>
-
-                {isLoadingMaterials ? (
-                  <p className="reservations-empty">Cargando catalogo del laboratorio...</p>
-                ) : materialsCatalog.length === 0 ? (
-                  <p className="reservations-empty">Este laboratorio no tiene reactivos registrados.</p>
-                ) : (
+          <div className="reservations-form-section">
+            <span className="reservations-form-section-label">5 - Reactivos (opcional)</span>
+            <div className="reservation-materials">
+              <p className="reservation-inline-hint">
+                Reactivos quimicos del catalogo compartido. Cada material queda pendiente y el encargado descuenta el stock al aprobar.
+              </p>
+              {(() => {
+                const reactivos = form.requested_materials.filter((m) => normalizeCategory(m.category) === 'Reactivos')
+                return (
                   <>
-                    {form.requested_materials.length > 0 ? (
-                      <ul className="reservation-materials-list">
-                        {form.requested_materials.map((entry, index) => {
-                          const material = materialsCatalog.find((item) => String(item.id) === String(entry.stock_item_id))
-                          const stock = Number(material?.quantity_available || 0)
-                          const limit = Number(material?.limite_reserva_usuario || 0)
-                          const isOutOfStock = stock <= 0
-                          const effectiveMax = limit > 0 ? Math.min(stock, limit) : stock
-
-                          return (
-                            <li key={`${entry.stock_item_id}-${index}`} className={`reservation-material-row${isOutOfStock ? ' out-of-stock' : ''}`}>
-                              <div className="reservation-material-row-info">
-                                <strong>{material?.name || entry.stock_item_id}</strong>
-                                <span>
-                                  {isOutOfStock
-                                    ? <span className="material-badge agotado">Agotado</span>
-                                    : (
-                                      <>
-                                        {stock} {material?.unit || ''} disponibles
-                                        {limit > 0 && (
-                                          <span className="material-limit-hint"> (Máx: {limit} por reserva)</span>
-                                        )}
-                                      </>
-                                    )}
-                                </span>
-                              </div>
-                              <input
-                                type="number"
-                                min="1"
-                                max={Math.max(effectiveMax, 1)}
-                                value={entry.quantity}
-                                disabled={isOutOfStock}
-                                onChange={(event) => {
-                                  let value = Math.max(1, Number(event.target.value) || 1)
-                                  if (effectiveMax > 0) {
-                                    value = Math.min(value, effectiveMax)
-                                  }
-                                  setForm((previous) => {
-                                    const next = previous.requested_materials.slice()
-                                    next[index] = { ...next[index], quantity: value }
-                                    return { ...previous, requested_materials: next }
-                                  })
-                                }}
-                              />
-                              <button
-                                type="button"
-                                className="reservations-secondary"
-                                onClick={() => {
-                                  setForm((previous) => ({
-                                    ...previous,
-                                    requested_materials: previous.requested_materials.filter((_, i) => i !== index),
-                                  }))
-                                }}
-                              >
-                                Quitar
-                              </button>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    ) : null}
-
-                    <select
-                      value=""
-                      onChange={(event) => {
-                        const stockItemId = event.target.value
-                        if (!stockItemId) return
-                        setForm((previous) => {
-                          if (previous.requested_materials.some((entry) => String(entry.stock_item_id) === String(stockItemId))) {
-                            return previous
-                          }
-                          return {
-                            ...previous,
-                            requested_materials: [
-                              ...previous.requested_materials,
-                              { stock_item_id: String(stockItemId), quantity: 1 },
-                            ],
-                          }
-                        })
-                      }}
+                    {reactivos.length > 0 ? renderSelectedMaterials(reactivos) : (
+                      <p className="reservations-empty">Aun no seleccionaste reactivos.</p>
+                    )}
+                    <button
+                      type="button"
+                      className="reservation-open-picker-btn"
+                      onClick={() => setMaterialPicker('reactivos')}
+                      disabled={Boolean(activePenalty)}
                     >
-                      <option value="">Agregar reactivo...</option>
-                      {materialsCatalog
-                        .filter((material) => !form.requested_materials.some((entry) => String(entry.stock_item_id) === String(material.id)))
-                        .map((material) => {
-                          const stock = Number(material.quantity_available || 0)
-                          const limit = Number(material.limite_reserva_usuario || 0)
-                          const out = stock <= 0
-                          const limitText = limit > 0 ? ` (Máx: ${limit})` : ''
-                          return (
-                            <option key={material.id} value={material.id} disabled={out}>
-                              {material.name}{out ? ' (Agotado)' : ` - ${stock} ${material.unit || ''}${limitText}`}
-                            </option>
-                          )
-                        })}
-                    </select>
+                      Seleccionar reactivos
+                    </button>
                   </>
-                )}
-              </div>
+                )
+              })()}
             </div>
-          ) : null}
+          </div>
+
+          <div className="reservations-form-section">
+            <span className="reservations-form-section-label">6 - Materiales (opcional)</span>
+            <div className="reservation-materials">
+              <p className="reservation-inline-hint">
+                Materiales y equipos del catalogo compartido por todos los laboratorios.
+              </p>
+              {(() => {
+                const materiales = form.requested_materials.filter((m) => normalizeCategory(m.category) !== 'Reactivos')
+                return (
+                  <>
+                    {materiales.length > 0 ? renderSelectedMaterials(materiales) : (
+                      <p className="reservations-empty">Aun no seleccionaste materiales.</p>
+                    )}
+                    <button
+                      type="button"
+                      className="reservation-open-picker-btn"
+                      onClick={() => setMaterialPicker('materiales')}
+                      disabled={Boolean(activePenalty)}
+                    >
+                      Seleccionar materiales
+                    </button>
+                  </>
+                )
+              })()}
+            </div>
+          </div>
 
           <div className="reservations-actions">
             <button
@@ -2093,6 +2114,29 @@ function UserReserveLabPage({ user, notifications = [], onMarkNotificationAsRead
           onCancel={isCancelling ? undefined : () => setReservationToCancel(null)}
         />
       ) : null}
+
+      <TeacherPickerModal
+        open={isTeacherModalOpen}
+        onClose={() => setIsTeacherModalOpen(false)}
+        selectedTeacherId={form.responsible_teacher}
+        onSelect={(teacher) =>
+          setForm((prev) => ({
+            ...prev,
+            responsible_teacher: teacher ? teacher.id : '',
+            responsible_teacher_name: teacher ? teacher.name : '',
+          }))
+        }
+      />
+
+      <MaterialPickerModal
+        open={materialPicker !== null}
+        onClose={() => setMaterialPicker(null)}
+        kicker={materialPicker === 'reactivos' ? 'Reactivos' : 'Materiales'}
+        title={materialPicker === 'reactivos' ? 'Seleccionar reactivos' : 'Seleccionar materiales'}
+        initialCategory={materialPicker === 'reactivos' ? 'Reactivos' : ''}
+        selected={form.requested_materials}
+        onChange={setRequestedMaterials}
+      />
     </section>
   )
 }

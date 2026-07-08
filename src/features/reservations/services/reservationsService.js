@@ -170,6 +170,9 @@ function mapReservation(record) {
     is_walk_in: Boolean(record?.is_walk_in),
     user_modification_count: Number(record?.user_modification_count || 0),
     requires_full_lab: Boolean(record?.requires_full_lab),
+    responsible_teacher: record?.responsible_teacher || '',
+    responsible_teacher_name: record?.responsible_teacher_name || '',
+    project_description: record?.project_description || '',
   }
 }
 
@@ -567,6 +570,9 @@ export async function createReservation(payload, user) {
     attendees_count: Number(payload.attendees_count || 0) || 0,
     notes: String(payload.notes || ''),
     requires_full_lab: Boolean(payload.requires_full_lab),
+    responsible_teacher: String(payload.responsible_teacher || ''),
+    responsible_teacher_name: String(payload.responsible_teacher_name || ''),
+    project_description: String(payload.project_description || '').trim(),
   }
 
   if (!normalized.laboratory_id || !payload.date || !payload.start_time || !payload.end_time) {
@@ -595,6 +601,13 @@ export async function updateReservation(reservationId, payload) {
   // valor existente con un default cuando la edicion no toca ese campo.
   if (payload.requires_full_lab !== undefined) {
     normalized.requires_full_lab = Boolean(payload.requires_full_lab)
+  }
+  if (payload.responsible_teacher !== undefined) {
+    normalized.responsible_teacher = String(payload.responsible_teacher || '')
+    normalized.responsible_teacher_name = String(payload.responsible_teacher_name || '')
+  }
+  if (payload.project_description !== undefined) {
+    normalized.project_description = String(payload.project_description || '').trim()
   }
 
   if (!reservationId || !normalized.laboratory_id || !payload.date || !payload.start_time || !payload.end_time) {
