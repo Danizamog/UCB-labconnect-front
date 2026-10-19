@@ -71,9 +71,16 @@ function AppRoutes({ isAuthenticated, user, onLogin, onInstitutionalLogin, onRef
     if (isAuthenticated && (currentPath === '/' || currentPath === LOGIN_PATH)) {
       updateBrowserPath(APP_ROOT_PATH, { replace: true })
     }
-  }, [currentPath, isAuthenticated])
+    if (isAuthenticated && user?.must_change_password && currentPath !== '/app/mi-cuenta') {
+      updateBrowserPath('/app/mi-cuenta', { replace: true })
+    }
+  }, [currentPath, isAuthenticated, user?.must_change_password])
 
   const handleNavigate = (nextPath, options = {}) => {
+    if (user?.must_change_password && splitRoute(nextPath).path !== '/app/mi-cuenta') {
+      updateBrowserPath('/app/mi-cuenta', { replace: true })
+      return
+    }
     updateBrowserPath(nextPath, options)
   }
 

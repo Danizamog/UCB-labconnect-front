@@ -407,7 +407,6 @@ function StudentTutorialSessionsPage({ user }) {
 
     const writeLine = (label, value, options = {}) => {
       const { muted = false, multiline = false } = options
-      const text = `${label}: ${value || '-'}`
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(11)
       doc.setTextColor(19, 33, 68)

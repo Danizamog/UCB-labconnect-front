@@ -240,8 +240,21 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   const tableQueryRef = useRef({ ...defaultTableFilters, pageNumber: 0 })
   const realtimeRefreshTimeoutRef = useRef(null)
 
-  const canManage = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio', 'gestionar_tutorias'])
+  const canManage = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio', 'aprobar_tutorias'])
+  const canApproveTutorials = hasAnyPermission(user, ['aprobar_tutorias'])
+  const canManageTeacherRequests = hasAnyPermission(user, ['gestionar_reservas_materiales', 'gestionar_stock', 'gestionar_inventario'])
   const isAdmin = isAdminUser(user)
+  const availableSections = useMemo(() => ADMIN_RESERVATION_SECTIONS.filter((section) => {
+    if (section.id === 'tutorias-pendientes') return canApproveTutorials
+    if (section.id === 'solicitudes-docentes') return canManageTeacherRequests
+    return true
+  }), [canApproveTutorials, canManageTeacherRequests])
+
+  useEffect(() => {
+    if (!availableSections.some((section) => section.id === activeWorkspace)) {
+      setActiveWorkspace('dashboard-acceso')
+    }
+  }, [activeWorkspace, availableSections])
 
   const loadReferenceData = useCallback(async () => {
     try {
@@ -1125,7 +1138,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     : Math.min((tableMeta.pageNumber + 1) * tableMeta.pageSize, tableMeta.totalElements)
   const isDateSortActive = tableFilters.sortBy === 'start_at'
   const activeWorkspaceMeta =
-    ADMIN_RESERVATION_SECTIONS.find((section) => section.id === activeWorkspace) || ADMIN_RESERVATION_SECTIONS[0]
+    availableSections.find((section) => section.id === activeWorkspace) || availableSections[0]
   const ActiveWorkspaceIcon = SECTION_ICON_MAP[activeWorkspaceMeta.id] || LayoutDashboard
 
   const handleExportReservations = () => {
@@ -1196,7 +1209,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
         </div>
 
         <div className="reservations-workspace-nav">
-          {ADMIN_RESERVATION_SECTIONS.map((section) => {
+          {availableSections.map((section) => {
             const Icon = SECTION_ICON_MAP[section.id] || LayoutDashboard
             return (
               <button
@@ -1275,7 +1288,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
           </div>
 
           <div className="reservations-step-grid">
-            {ADMIN_RESERVATION_SECTIONS.map((section, index) => (
+            {availableSections.map((section, index) => (
               <article key={section.id} className="reservations-step-card">
                 <strong>{index + 1}</strong>
                 <span><b>{section.label}.</b> {section.helper}</span>

@@ -101,7 +101,7 @@ function UserTutorialAttendanceHistoryPage({ user }) {
   const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0])
-  const canManageTutorials = hasAnyPermission(user, ['gestionar_tutorias'])
+  const canManageTutorials = hasAnyPermission(user, ['gestionar_tutorias_propias'])
 
   const loadSessions = useCallback(async () => {
     setIsLoading(true)

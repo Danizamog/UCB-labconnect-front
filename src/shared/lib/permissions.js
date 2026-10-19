@@ -7,7 +7,7 @@ export function getUserPermissions(user) {
 
 export function isAdminUser(user) {
   const role = String(user?.role || '').toLowerCase().trim()
-  return role === 'admin' || role === 'administrador'
+  return role === 'admin' || role === 'administrador' || role === 'administrador de accesos'
 }
 
 export function hasAnyPermission(user, requiredPermissions = []) {
@@ -15,12 +15,14 @@ export function hasAnyPermission(user, requiredPermissions = []) {
     return true
   }
   const permissions = getUserPermissions(user)
-  if (isAdminUser(user) || permissions.includes('*')) {
-    return true
-  }
   return requiredPermissions.some((permission) => permissions.includes(permission))
 }
 
 export function hasPermission(user, permission) {
   return hasAnyPermission(user, [permission])
+}
+
+export function hasRole(user, allowedRoles = []) {
+  const role = String(user?.role || '').trim().toLowerCase()
+  return allowedRoles.some((allowed) => String(allowed).trim().toLowerCase() === role)
 }

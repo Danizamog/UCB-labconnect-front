@@ -23,7 +23,7 @@ import {
   getSectionIdFromPath,
   normalizePath,
 } from '../../../shared/config/navigationLinks'
-import { hasAnyPermission, isAdminUser } from '../../../shared/lib/permissions'
+import { hasAnyPermission, hasRole } from '../../../shared/lib/permissions'
 import {
   getOccupancyDashboard,
   getMyAgendaSummary,
@@ -55,6 +55,8 @@ const StudentTutorialSessionsPage = lazy(() => import('../../tutorials/pages/Stu
 const TutorTutorialSessionsPage = lazy(() => import('../../tutorials/pages/TutorTutorialSessionsPage'))
 const UserHistoryPage = lazy(() => import('../../reservations/pages/UserHistoryPage'))
 const UserTutorialAttendanceHistoryPage = lazy(() => import('../../tutorials/pages/UserTutorialAttendanceHistoryPage'))
+const MyAccountPage = lazy(() => import('../../account/pages/MyAccountPage'))
+const SecurityAuditPage = lazy(() => import('../../security/pages/SecurityAuditPage'))
 
 const FOCUSED_RESERVATION_KEY = 'labconnect.focus_reservation_id'
 const OPEN_RESERVATION_EVENT = 'labconnect:open-reservation-details'
@@ -160,23 +162,26 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     active_sessions: [],
     lab_breakdown: [],
   })
-  const isAdmin = isAdminUser(user)
-  const canManageRoles = hasAnyPermission(user, ['gestionar_roles_permisos'])
-  const canManageProfiles = hasAnyPermission(user, ['gestionar_roles_permisos', 'reactivar_cuentas'])
+  const canManageRoles = hasAnyPermission(user, ['consultar_roles', 'gestionar_roles', 'asignar_roles'])
+  const canManageProfiles = hasAnyPermission(user, ['consultar_usuarios', 'gestionar_usuarios', 'gestionar_estado_cuentas'])
   const canManageStructure = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
   const canViewAnalytics = hasAnyPermission(user, ['consultar_estadisticas'])
-  const canManageSpaces = hasAnyPermission(user, ['gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
+  const canManageSpaces = hasAnyPermission(user, ['gestionar_estructura_laboratorios', 'gestionar_horarios_laboratorio'])
   const canManagePenalties = hasAnyPermission(user, ['gestionar_penalizaciones'])
   const canViewPenalties = canManagePenalties
-  const canManageEquipos = hasAnyPermission(user, ['gestionar_inventario', 'gestionar_estado_equipos', 'gestionar_mantenimiento'])
+  const canManageEquipos = hasAnyPermission(user, ['gestionar_inventario', 'gestionar_estado_equipos', 'gestionar_mantenimiento', 'gestionar_prestamos', 'registrar_tickets_equipo'])
   const canManageMateriales = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos', 'gestionar_reservas_materiales'])
-  const canManageTutorials = hasAnyPermission(user, ['gestionar_tutorias'])
+  const canManageTutorials = hasAnyPermission(user, ['gestionar_tutorias_propias'])
+  const canAuditSecurity = hasAnyPermission(user, ['consultar_auditoria_seguridad', 'revisar_accesos_rbac'])
+  const canUseReservations = hasRole(user, ['Estudiante', 'Docente', 'Encargado de Laboratorio'])
+  const canUseTutorials = hasRole(user, ['Estudiante'])
   const canRequestClassResources = hasAnyPermission(user, ['solicitar_recursos_clase'])
   const hasManagementModules =
     canManageRoles || canManageProfiles || canManageStructure || canManagePenalties || canManageEquipos || canManageMateriales || canManageTutorials
+  const canOperateLabs = canManageStructure || canManagePenalties || canManageEquipos || canManageMateriales || canManageTutorials
   const activeSection = getSectionIdFromPath(currentPath) || 'home'
   const showScrollToTopButton = SCROLL_TO_TOP_SECTIONS.has(activeSection)
-  const shouldTrackAgenda = !isAdmin && activeSection === 'home'
+  const shouldTrackAgenda = canUseReservations && activeSection === 'home'
   const shouldTrackOperationsSnapshot = canManageStructure && activeSection === 'home'
   const unreadNotificationsCount = notifications.filter((notification) => !notification.is_read).length
   const agendaItems = buildAgendaItems(agendaSummary).slice(0, 6)
@@ -200,13 +205,17 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const hasMoreHomeLabs = filteredHomeLabs.length > visibleHomeLabs.length
 
   const loadNotifications = useCallback(async (options = {}) => {
+    if (!canOperateLabs && !canUseReservations) {
+      setNotifications([])
+      return
+    }
     try {
       const notificationsData = await listReservationNotifications(options)
       setNotifications(notificationsData)
     } catch {
       setNotifications([])
     }
-  }, [])
+  }, [canOperateLabs, canUseReservations])
 
   const loadOperationsSnapshot = useCallback(async () => {
     if (!shouldTrackOperationsSnapshot) {
@@ -227,7 +236,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   }, [shouldTrackOperationsSnapshot])
 
   const loadHomeLabs = useCallback(async () => {
-    if (activeSection !== 'home') {
+    if (activeSection !== 'home' || (!canManageSpaces && !canUseReservations)) {
       setHomeLabs([])
       setHomeLabsError('')
       setHomeLabsLoading(false)
@@ -245,7 +254,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     } finally {
       setHomeLabsLoading(false)
     }
-  }, [activeSection, canManageSpaces, user])
+  }, [activeSection, canManageSpaces, canUseReservations, user])
 
   const loadAgendaSummary = useCallback(async (options = {}) => {
     if (!shouldTrackAgenda) {
@@ -273,6 +282,8 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     const matchedSection = getSectionIdFromPath(normalizedPath)
     const canAccessCurrentSection =
       activeSection === 'home' ||
+      activeSection === 'account' ||
+      (activeSection === 'security' && canAuditSecurity) ||
       (activeSection === 'admin_reservas' && canManageStructure) ||
       (activeSection === 'analytics' && canViewAnalytics) ||
       (activeSection === 'ia_predicciones' && canViewAnalytics) ||
@@ -286,11 +297,11 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
       (activeSection === 'horarios_laboratorios' && canManageSpaces) ||
       (activeSection === 'equipos' && canManageEquipos) ||
       (activeSection === 'materiales' && canManageMateriales) ||
-      (!isAdmin && activeSection === 'calendar') ||
-      (!isAdmin && activeSection === 'tutorials_public') ||
-      (!isAdmin && activeSection === 'tutorials_history') ||
-      (!isAdmin && activeSection === 'history') ||
-      (!isAdmin && activeSection === 'reserve')
+      (canUseReservations && activeSection === 'calendar') ||
+      (canUseTutorials && activeSection === 'tutorials_public') ||
+      (canUseTutorials && activeSection === 'tutorials_history') ||
+      (canUseReservations && activeSection === 'history') ||
+      (canUseReservations && activeSection === 'reserve')
 
     const isUnknownApplicationRoute =
       normalizedPath !== APP_ROOT_PATH &&
@@ -302,7 +313,6 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     }
   }, [
     activeSection,
-    isAdmin,
     canManageEquipos,
     canManageMateriales,
     canManagePenalties,
@@ -314,8 +324,10 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     canManageTutorials,
     canRequestClassResources,
     canViewAnalytics,
+    canAuditSecurity,
+    canUseReservations,
+    canUseTutorials,
     currentPath,
-    isAdmin,
     onNavigate,
   ])
 
@@ -511,6 +523,8 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
         </header>
         <section ref={contentWindowRef} className="content-window" aria-label="Ventana principal">
           <Suspense fallback={<div className="module-loading">Cargando modulo...</div>}>
+          {activeSection === 'account' ? <MyAccountPage onLogout={onLogout} /> : null}
+          {canAuditSecurity && activeSection === 'security' ? <SecurityAuditPage /> : null}
           {canManageProfiles && activeSection === 'profiles' ? <AdminProfilesPage user={user} /> : null}
           {canManageRoles && activeSection === 'roles' ? <AdminRolesPage user={user} onSessionRefresh={onRefreshSession} /> : null}
           {canViewPenalties && activeSection === 'penalties' ? <AdminPenaltiesPage user={user} /> : null}
@@ -526,11 +540,11 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
           {canManageSpaces && activeSection === 'horarios_laboratorios' ? <AdminLabSchedulesPage user={user} /> : null}
           {canManageEquipos && activeSection === 'equipos' ? <AdminEquiposPage user={user} /> : null}
           {canManageMateriales && activeSection === 'materiales' ? <AdminMaterialesPage user={user} /> : null}
-          {!isAdmin && activeSection === 'calendar' ? <UserAvailabilityCalendarPage user={user} /> : null}
-          {!isAdmin && activeSection === 'tutorials_public' ? <StudentTutorialSessionsPage user={user} /> : null}
-          {!isAdmin && activeSection === 'tutorials_history' ? <UserTutorialAttendanceHistoryPage user={user} /> : null}
-          {!isAdmin && activeSection === 'history' ? <UserHistoryPage user={user} /> : null}
-          {!isAdmin && activeSection === 'reserve' ? (
+          {canUseReservations && activeSection === 'calendar' ? <UserAvailabilityCalendarPage user={user} /> : null}
+          {canUseTutorials && activeSection === 'tutorials_public' ? <StudentTutorialSessionsPage user={user} /> : null}
+          {canUseTutorials && activeSection === 'tutorials_history' ? <UserTutorialAttendanceHistoryPage user={user} /> : null}
+          {canUseReservations && activeSection === 'history' ? <UserHistoryPage user={user} /> : null}
+          {canUseReservations && activeSection === 'reserve' ? (
             <UserReserveLabPage
               user={user}
               notifications={notifications}
@@ -541,7 +555,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
           {activeSection === 'home' ? (
             <section className="home-dashboard" aria-label="Panel de inicio">
               <div className="home-showcase">
-                {!isAdmin ? (
+                {canUseReservations ? (
                   <section className="home-agenda-panel" aria-label="Resumen de agenda">
                     <div className="home-agenda-head">
                       <div className="home-agenda-copy">
@@ -627,37 +641,41 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
                         <strong>LabConnect</strong>
                       </div>
                     </div>
-                    <p className="home-modern-kicker">{isAdmin ? 'Panel operativo' : 'Portal academico'}</p>
-                    <h1>{isAdmin ? 'Opera laboratorios con una ruta clara.' : 'Reserva tu laboratorio en pocos pasos.'}</h1>
+                    <p className="home-modern-kicker">{canOperateLabs ? 'Panel operativo' : canAuditSecurity ? 'Control de seguridad' : canUseReservations ? 'Portal academico' : 'Cuenta institucional'}</p>
+                    <h1>{canOperateLabs ? 'Opera laboratorios con una ruta clara.' : canAuditSecurity ? 'Audita accesos sin modificar la operacion.' : canUseReservations ? 'Reserva tu laboratorio en pocos pasos.' : 'Consulta los datos de tu cuenta.'}</h1>
                     <p className="home-modern-tagline">
-                      {isAdmin
+                      {canOperateLabs
                         ? 'Tus tareas principales aparecen primero: ocupacion, solicitudes, inventario y usuarios.'
-                        : 'Consulta disponibilidad, crea una reserva y revisa alertas desde una pantalla clara.'}
+                        : canAuditSecurity ? 'Revisa eventos, sesiones, incidentes y la matriz RBAC desde el modulo OSI.'
+                        : canUseReservations ? 'Consulta disponibilidad, crea una reserva y revisa alertas desde una pantalla clara.'
+                        : 'Este rol no tiene acceso a reservas ni tutorias.'}
                     </p>
+                    {canOperateLabs || canUseReservations ? (
                     <div className="home-modern-actions">
                       <button
                         type="button"
                         className="home-modern-primary"
-                        onClick={() => onNavigate?.(isAdmin ? '/app/admin/reservas' : '/app/reservas/nueva')}
+                        onClick={() => onNavigate?.(canOperateLabs ? '/app/admin/reservas' : '/app/reservas/nueva')}
                       >
-                        {isAdmin ? 'Abrir reservas' : 'Nueva reserva'} <ArrowRight size={18} />
+                        {canOperateLabs ? 'Abrir reservas' : 'Nueva reserva'} <ArrowRight size={18} />
                       </button>
                       <button
                         type="button"
                         className="home-modern-secondary"
-                        onClick={() => onNavigate?.(isAdmin ? '/app/admin/equipos' : '/app/reservas/calendario')}
+                        onClick={() => onNavigate?.(canOperateLabs ? '/app/admin/equipos' : '/app/reservas/calendario')}
                       >
-                        {isAdmin ? 'Ver inventario' : 'Ver calendario'}
+                        {canOperateLabs ? 'Ver inventario' : 'Ver calendario'}
                       </button>
                     </div>
+                    ) : null}
                   </div>
 
-                  <div className="home-modern-hero-panel" aria-label="Resumen rapido">
+                  {canOperateLabs || canUseReservations ? <div className="home-modern-hero-panel" aria-label="Resumen rapido">
                     <article>
                       <CalendarDays size={24} />
-                      <span>{isAdmin ? 'Usuarios dentro' : 'Reservas próximas'}</span>
-                      <strong>{isAdmin ? operationsSnapshot.current_occupancy : agendaSummary.reservation_count}</strong>
-                      <p>{isAdmin ? 'Ocupacion actual de laboratorios.' : 'Reservas activas en tu agenda.'}</p>
+                      <span>{canOperateLabs ? 'Usuarios dentro' : 'Reservas próximas'}</span>
+                      <strong>{canOperateLabs ? operationsSnapshot.current_occupancy : agendaSummary.reservation_count}</strong>
+                      <p>{canOperateLabs ? 'Ocupacion actual de laboratorios.' : 'Reservas activas en tu agenda.'}</p>
                     </article>
                     <article>
                       <ShieldCheck size={24} />
@@ -667,14 +685,14 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
                     </article>
                     <article>
                       <BookOpen size={24} />
-                      <span>{isAdmin ? 'Sesiones' : 'Tutorías próximas'}</span>
-                      <strong>{isAdmin ? operationsSnapshot.active_sessions.length : agendaSummary.tutorial_count}</strong>
-                      <p>{isAdmin ? 'Actividades en curso.' : 'Sesiones vigentes para ti.'}</p>
+                      <span>{canOperateLabs ? 'Sesiones' : 'Tutorías próximas'}</span>
+                      <strong>{canOperateLabs ? operationsSnapshot.active_sessions.length : agendaSummary.tutorial_count}</strong>
+                      <p>{canOperateLabs ? 'Actividades en curso.' : 'Sesiones vigentes para ti.'}</p>
                     </article>
-                  </div>
+                  </div> : null}
                 </section>
 
-                <section className="home-modern-section home-lab-search-section" aria-label="Buscar laboratorios">
+                {canManageSpaces || canUseReservations ? <section className="home-modern-section home-lab-search-section" aria-label="Buscar laboratorios">
                   <div className="home-modern-section-head home-lab-search-head">
                     <div>
                       <p className="home-modern-kicker">Laboratorios</p>
@@ -706,7 +724,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
                             key={lab.id}
                             type="button"
                             className="home-lab-result-card"
-                            onClick={() => onNavigate?.(isAdmin ? '/app/admin/laboratorios' : '/app/reservas/nueva')}
+                            onClick={() => onNavigate?.(canOperateLabs ? '/app/admin/laboratorios' : '/app/reservas/nueva')}
                           >
                             <span className="home-lab-result-icon">
                               <FlaskConical size={20} aria-hidden="true" />
@@ -731,15 +749,15 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
                       ) : null}
                     </>
                   )}
-                </section>
+                </section> : null}
 
                 <section className="home-modern-section">
                   <div className="home-modern-section-head">
                     <p className="home-modern-kicker">Empieza aqui</p>
-                    <h2>{isAdmin ? 'Acciones frecuentes para operar el laboratorio.' : 'Tres opciones claras para avanzar.'}</h2>
+                    <h2>{hasManagementModules ? 'Acciones frecuentes para operar el laboratorio.' : canUseReservations ? 'Tres opciones claras para avanzar.' : 'Accesos disponibles para tu rol.'}</h2>
                   </div>
                   <div className="home-action-grid">
-                    {(isAdmin ? adminActionCards : studentActionCards).map((action) => {
+                    {(hasManagementModules ? adminActionCards : canUseReservations ? studentActionCards : []).map((action) => {
                       const Icon = action.icon
                       return (
                         <button

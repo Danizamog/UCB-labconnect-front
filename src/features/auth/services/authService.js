@@ -6,6 +6,7 @@ const AUTH_LOGIN_ENDPOINT = `${apiBase}/auth/login`
 const AUTH_INSTITUTIONAL_ENDPOINT = `${apiBase}/auth/institutional`
 const AUTH_INSTITUTIONAL_CONFIG_ENDPOINT = `${apiBase}/auth/institutional/config`
 const AUTH_VALIDATE_ENDPOINT = `${apiBase}/auth/validate`
+const AUTH_LOGOUT_ENDPOINT = `${apiBase}/auth/logout`
 
 const FRONTEND_GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim()
 const SESSION_VALIDATE_CACHE_TTL_MS = 1000
@@ -53,11 +54,13 @@ function persistAuthResponse(data) {
         picture: payload.picture,
         auth_provider: payload.auth_provider,
         permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
+        must_change_password: Boolean(payload.must_change_password),
+        password_expires_at: payload.password_expires_at || null,
       }
     : null
 
   localStorage.setItem('token', token)
-  localStorage.setItem('access_token', token)
+  localStorage.removeItem('access_token')
   if (user) {
     localStorage.setItem('user', JSON.stringify(user))
   }
@@ -79,6 +82,8 @@ function buildUserFromPayload(payload) {
     picture: payload.picture,
     auth_provider: payload.auth_provider,
     permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
+    must_change_password: Boolean(payload.must_change_password),
+    password_expires_at: payload.password_expires_at || null,
   }
 }
 
@@ -289,6 +294,16 @@ export async function validateSession() {
     }
   } finally {
     validateSessionInFlight = null
+  }
+}
+
+export async function revokeSession() {
+  const token = getAuthToken()
+  if (!token) return
+  try {
+    await fetch(AUTH_LOGOUT_ENDPOINT, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+  } catch {
+    // El cierre local siempre debe completarse aunque el servidor no responda.
   }
 }
 

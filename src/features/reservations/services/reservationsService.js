@@ -39,11 +39,6 @@ function buildRequestCacheKey(url, options = {}, token = '') {
   return `${method}:${url}:${token}`
 }
 
-function clearReservationsCache() {
-  requestCache.clear()
-  inFlightRequests.clear()
-}
-
 // Prefijos de URL para invalidacion granular del cache. La idea es que una
 // mutacion solo borre los listados/recursos que realmente puede afectar, en
 // vez de tirar todo el cache (con eso una mutacion en /reservations forzaba
@@ -212,10 +207,6 @@ export function isLabAccessibleToUser(lab, user) {
   }
 
   const permissions = Array.isArray(user?.permissions) ? user.permissions : []
-  const role = String(user?.role || '').toLowerCase().trim()
-  if (role === 'admin' || role === 'administrador' || permissions.includes('*')) {
-    return true
-  }
 
   const allowedRoles = normalizeStringArray(lab?.allowed_roles)
   if (allowedRoles.length > 0 && !allowedRoles.includes(String(user?.role || '').trim())) {

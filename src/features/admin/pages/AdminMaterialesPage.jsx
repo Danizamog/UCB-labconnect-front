@@ -32,7 +32,7 @@ const SUPPLY_STATUS_LABELS = {
 }
 
 const defaultMaterialForm = { name: '', category: '', unit: 'unidad', quantity_available: 0, minimum_stock: 0, laboratory_id: '', description: '', limite_reserva_usuario: '' }
-const defaultMovementForm = { stock_item_id: '', movement_type: 'entry', quantity: 1, notes: '' }
+const defaultMovementForm = { stock_item_id: '', movement_type: 'consumption', quantity: 1, notes: '' }
 const defaultReportFilters = { laboratory_id: '', status_filter: '', category_filter: '', search: '', only_low_or_out: true, include_general: true }
 const defaultUsageReportFilters = { borrower_id: '', practice: '', date_from: '', date_to: '' }
 
@@ -85,11 +85,14 @@ function AdminMaterialesPage({ user }) {
   const [confirmModal, setConfirmModal] = useState(null)
 
   const canManageMaterials = hasAnyPermission(user, ['gestionar_reactivos_quimicos'])
-  const canMoveStock = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos'])
+  const canMoveStock = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos', 'gestionar_reservas_materiales'])
+  const canRegisterNewStock = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos'])
+  const canViewReports = hasAnyPermission(user, ['generar_reportes', 'consultar_estadisticas', 'gestionar_stock', 'gestionar_reactivos_quimicos'])
   const canManage = canManageMaterials || canMoveStock
   const isAdmin = isAdminUser(user)
 
   const fetchReportData = async () => {
+    if (!canViewReports) return null
     setReportLoading(true)
     try {
       const reportData = await getStockItemsReport({ onlyLowOrOut: true })
@@ -106,6 +109,7 @@ function AdminMaterialesPage({ user }) {
   }
 
   const fetchUsageReportData = async (filters = usageReportFilters) => {
+    if (!canViewReports) return null
     setUsageReportLoading(true)
     try {
       const reportData = await getUsageReport({
@@ -265,13 +269,7 @@ function AdminMaterialesPage({ user }) {
   }, [labs, managedLabIds, restrictToManagedLabs])
   const visibleMaterials = useMemo(() => {
     if (isAdmin) return materials
-    if (managedLabIds.length === 0) {
-      return materials.filter((material) => !String(material.laboratory_id || ''))
-    }
-    return materials.filter((material) => {
-      const labId = String(material.laboratory_id || '')
-      return !labId || managedLabIds.includes(labId)
-    })
+    return materials.filter((material) => managedLabIds.includes(String(material.laboratory_id || '')))
   }, [isAdmin, managedLabIds, materials])
   const labNameById = useMemo(
     () => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])),
@@ -595,6 +593,7 @@ function AdminMaterialesPage({ user }) {
   const handleMovementSubmit = async (event) => {
     event.preventDefault()
     if (!canMoveStock) return
+    if (!canRegisterNewStock && movementForm.movement_type === 'entry') return
     setError('')
     setMessage('')
     if (!movementForm.stock_item_id) {
@@ -779,9 +778,9 @@ function AdminMaterialesPage({ user }) {
                     <label>
                       <span>Tipo de movimiento</span>
                       <select value={movementForm.movement_type} onChange={(e) => setMovementForm((prev) => ({ ...prev, movement_type: e.target.value }))} disabled={!canMoveStock}>
-                        <option value="entry">Ingreso / compra</option>
-                        <option value="return">Devolucion</option>
-                        <option value="consumption">Consumo / merma</option>
+                        {canRegisterNewStock ? <option value="entry">Ingreso / compra</option> : null}
+                        <option value="return">Recepción / devolución</option>
+                        <option value="consumption">Salida / préstamo</option>
                       </select>
                     </label>
                   </div>
@@ -815,6 +814,7 @@ function AdminMaterialesPage({ user }) {
                       onChange={(e) => setMovementForm((prev) => ({ ...prev, notes: e.target.value }))}
                       placeholder="Ej. consumo en practica de quimica, compra semestral o devolucion del grupo 2"
                       disabled={!canMoveStock}
+                      required={!canRegisterNewStock}
                     />
                   </label>
                 </div>
@@ -870,7 +870,7 @@ function AdminMaterialesPage({ user }) {
           <span>Movimientos de stock</span>
           <span className="infra-tab-count">{materialMovements.length}</span>
         </button>
-        <button
+        {canViewReports ? <button
           type="button"
           role="tab"
           aria-selected={activeTab === 'reports'}
@@ -879,7 +879,7 @@ function AdminMaterialesPage({ user }) {
         >
           <span>Reportes</span>
           <span className="infra-tab-count">{stockAlertsCount}</span>
-        </button>
+        </button> : null}
         <button
           type="button"
           role="tab"
@@ -970,9 +970,9 @@ function AdminMaterialesPage({ user }) {
                       <label>
                         <span>Tipo de movimiento</span>
                         <select value={movementForm.movement_type} onChange={(e) => setMovementForm((prev) => ({ ...prev, movement_type: e.target.value }))}>
-                          <option value="entry">Ingreso / compra</option>
-                          <option value="return">Devolucion</option>
-                          <option value="consumption">Consumo / merma</option>
+                          {canRegisterNewStock ? <option value="entry">Ingreso / compra</option> : null}
+                          <option value="return">Recepción / devolución</option>
+                          <option value="consumption">Salida / préstamo</option>
                         </select>
                       </label>
                     </div>
@@ -998,7 +998,7 @@ function AdminMaterialesPage({ user }) {
                     </div>
                     <label>
                       <span>Motivo u observaciones</span>
-                      <textarea rows="3" value={movementForm.notes} onChange={(e) => setMovementForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="Ej. consumo en practica de quimica, compra semestral o devolucion del grupo 2" />
+                      <textarea rows="3" value={movementForm.notes} onChange={(e) => setMovementForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="Indica a quien se presto o quien devuelve el material" required={!canRegisterNewStock} />
                     </label>
                   </div>
                   {movementWillExceedStock ? (

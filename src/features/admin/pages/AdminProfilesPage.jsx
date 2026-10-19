@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Clock3, Search, ShieldAlert, ShieldCheck, UserRoundCheck } from 'lucide-react'
-import { deleteUserProfile, listUserProfiles, updateUserProfile } from '../services/profileService'
+import { AlertTriangle, CheckCircle2, Clock3, Copy, KeyRound, Plus, Search, ShieldAlert, ShieldCheck, Unlock, UserRoundCheck, UserX } from 'lucide-react'
+import { createUserProfile, deactivateUserProfile, listUserProfiles, resetUserPassword, unlockUserProfile, updateUserProfile } from '../services/profileService'
 import { listAssetResponsibilityFlags } from '../services/infrastructureService'
 import { assignUserRole, listRoles } from '../services/rolesService'
 import {
@@ -14,8 +14,9 @@ import './AdminProfilesPage.css'
 
 const defaultForm = {
   name: '',
+  username: '',
+  profile_type: 'student',
   roleId: '',
-  password: '',
   is_active: true,
 }
 
@@ -23,6 +24,8 @@ const defaultReactivationForm = {
   lift_reason: 'Situacion regularizada y bloqueo levantado por administracion.',
   resolution_notes: '',
 }
+
+const defaultCreateForm = { username: '', name: '', password: '', profile_type: 'student', roleId: '' }
 
 const USER_PAGE_SIZE_OPTIONS = [8, 12, 20, 40]
 
@@ -89,6 +92,9 @@ function formatDateTime(value) {
 }
 
 function getProfileState(profile, penalty) {
+  if (profile?.security_locked) {
+    return { key: 'blocked', label: 'Bloqueado', description: 'Bloqueado automáticamente por tres intentos fallidos.' }
+  }
   if (penalty?.is_active) {
     return {
       key: 'blocked',
@@ -116,8 +122,9 @@ function mapProfileForm(profile, roles) {
   const matchedRole = roles.find((role) => role.nombre === profile.role)
   return {
     name: profile.name || '',
+    username: profile.username || '',
+    profile_type: profile.profile_type || 'student',
     roleId: matchedRole?.id || '',
-    password: '',
     is_active: profile.is_active !== false,
   }
 }
@@ -141,9 +148,19 @@ function AdminProfilesPage({ user }) {
   const [reactivationForm, setReactivationForm] = useState(defaultReactivationForm)
   const [isLoadingContext, setIsLoadingContext] = useState(false)
   const [isReactivating, setIsReactivating] = useState(false)
+  const [showCreate, setShowCreate] = useState(false)
+  const [createForm, setCreateForm] = useState(defaultCreateForm)
+  const [temporaryPassword, setTemporaryPassword] = useState('')
+  const [securityActionPending, setSecurityActionPending] = useState(false)
 
-  const canManage = hasAnyPermission(user, ['gestionar_roles_permisos'])
-  const canReactivate = hasAnyPermission(user, ['reactivar_cuentas', 'gestionar_penalizaciones'])
+  const canCreate = hasAnyPermission(user, ['crear_usuarios'])
+  const canModify = hasAnyPermission(user, ['modificar_usuarios'])
+  const canAssign = hasAnyPermission(user, ['asignar_roles'])
+  const canManage = canModify || canAssign
+  const canUnlockSecurity = hasAnyPermission(user, ['desbloquear_usuarios'])
+  const canManagePenalties = hasAnyPermission(user, ['gestionar_penalizaciones'])
+  const canResetPassword = hasAnyPermission(user, ['reiniciar_credenciales'])
+  const canDeactivate = hasAnyPermission(user, ['dar_baja_usuarios'])
 
   const resetFeedback = () => {
     setError('')
@@ -224,6 +241,7 @@ function AdminProfilesPage({ user }) {
       const haystack = [
         getProfileDisplayName(profile),
         profile.username,
+        profile.user_code,
         profile.role,
         activePenaltyByUserId[profile.id]?.reason,
       ]
@@ -272,7 +290,7 @@ function AdminProfilesPage({ user }) {
   const selectedProfileState = editingUser ? getProfileState(editingUser, selectedPenalty) : null
 
   const loadReactivationContext = async (userId, { silent = false } = {}) => {
-    if (!userId || !canReactivate) {
+    if (!userId || !canManagePenalties) {
       setReactivationContext(null)
       return
     }
@@ -311,6 +329,7 @@ function AdminProfilesPage({ user }) {
     setForm(defaultForm)
     setReactivationContext(null)
     setReactivationForm(defaultReactivationForm)
+    setTemporaryPassword('')
     resetFeedback()
   }
 
@@ -319,32 +338,12 @@ function AdminProfilesPage({ user }) {
     setEditingUser(profile)
     setForm(mapProfileForm(profile, roles))
     setReactivationForm(defaultReactivationForm)
-    if (canReactivate) {
+    setTemporaryPassword('')
+    if (canManagePenalties) {
       loadReactivationContext(profile.id)
     } else {
       setReactivationContext(null)
     }
-  }
-
-  const handleDelete = (profile) => {
-    setConfirmModal({
-      title: 'Eliminar cuenta',
-      message: `Se eliminara la cuenta de ${profile.name || profile.username}. Esta accion no se puede deshacer.`,
-      onConfirm: async () => {
-        setConfirmModal(null)
-        resetFeedback()
-        try {
-          await deleteUserProfile(profile.id)
-          setMessage('Usuario eliminado correctamente.')
-          if (editingUser?.id === profile.id) {
-            cancelEdit()
-          }
-          await loadData()
-        } catch (err) {
-          setError(err.message || 'No se pudo eliminar el usuario')
-        }
-      },
-    })
   }
 
   const handleSubmit = async (event) => {
@@ -361,21 +360,24 @@ function AdminProfilesPage({ user }) {
       const nextName = String(form.name || '').trim()
       const currentIsActive = editingUser.is_active !== false
 
-      if (canManage && nextName && nextName !== currentName) {
+      if (canModify && nextName && nextName !== currentName) {
         payload.name = nextName
       }
-      if (canReactivate && form.is_active !== currentIsActive) {
+      if (canModify && normalizeEmail(form.username) !== normalizeEmail(editingUser.username)) {
+        payload.username = normalizeEmail(form.username)
+      }
+      if (canModify && form.profile_type !== (editingUser.profile_type || 'student')) {
+        payload.profile_type = form.profile_type
+      }
+      if ((canUnlockSecurity || canDeactivate) && form.is_active !== currentIsActive) {
         payload.is_active = form.is_active
       }
-      if (canManage && form.password.trim()) {
-        payload.password = form.password.trim()
-      }
-
       if (Object.keys(payload).length > 0) {
         await updateUserProfile(editingUser.id, payload)
       }
 
-      if (canManage && form.roleId) {
+      const currentRoleId = roles.find((role) => role.nombre === editingUser.role)?.id || ''
+      if (canAssign && form.roleId && form.roleId !== currentRoleId) {
         await assignUserRole(editingUser.id, form.roleId)
       }
 
@@ -383,10 +385,10 @@ function AdminProfilesPage({ user }) {
       if (data) {
         syncSelectedProfile(data.profiles, data.roles, editingUser.id)
       }
-      if (canReactivate) {
+      if (canManagePenalties) {
         await loadReactivationContext(editingUser.id, { silent: true })
       }
-      setMessage(Object.keys(payload).length > 0 || form.roleId ? 'Perfil actualizado correctamente.' : 'No habia cambios pendientes para guardar.')
+      setMessage(Object.keys(payload).length > 0 || (form.roleId && form.roleId !== currentRoleId) ? 'Perfil actualizado correctamente.' : 'No habia cambios pendientes para guardar.')
     } catch (err) {
       setError(err.message || 'No se pudo guardar el perfil')
     }
@@ -424,6 +426,85 @@ function AdminProfilesPage({ user }) {
     }
   }
 
+  const handleCreate = async (event) => {
+    event.preventDefault()
+    resetFeedback()
+    setSecurityActionPending(true)
+    try {
+      const created = await createUserProfile({
+        username: createForm.username.trim().toLowerCase(),
+        name: createForm.name.trim(),
+        password: createForm.password,
+        profile_type: createForm.profile_type,
+        is_active: true,
+      })
+      if (createForm.roleId) await assignUserRole(created.id, createForm.roleId)
+      setCreateForm(defaultCreateForm)
+      setShowCreate(false)
+      setMessage(`Usuario creado con código ${created.user_code || 'institucional'}.`)
+      await loadData()
+    } catch (err) {
+      setError(err.message || 'No se pudo crear el usuario.')
+    } finally {
+      setSecurityActionPending(false)
+    }
+  }
+
+  const handleResetPassword = async () => {
+    if (!editingUser) return
+    resetFeedback()
+    setSecurityActionPending(true)
+    try {
+      const result = await resetUserPassword(editingUser.id)
+      setTemporaryPassword(result.temporary_password)
+      setMessage('Contraseña temporal generada. Se mostrará únicamente en esta pantalla.')
+      const data = await loadData()
+      if (data) syncSelectedProfile(data.profiles, data.roles, editingUser.id)
+    } catch (err) {
+      setError(err.message || 'No se pudo reiniciar la contraseña.')
+    } finally {
+      setSecurityActionPending(false)
+    }
+  }
+
+  const handleUnlock = async () => {
+    if (!editingUser) return
+    resetFeedback()
+    setSecurityActionPending(true)
+    try {
+      await unlockUserProfile(editingUser.id)
+      setMessage('Cuenta desbloqueada y contador de intentos reiniciado.')
+      const data = await loadData()
+      if (data) syncSelectedProfile(data.profiles, data.roles, editingUser.id)
+    } catch (err) {
+      setError(err.message || 'No se pudo desbloquear la cuenta.')
+    } finally {
+      setSecurityActionPending(false)
+    }
+  }
+
+  const handleDeactivate = () => {
+    if (!editingUser) return
+    setConfirmModal({
+      title: 'Dar de baja usuario',
+      message: `Se desactivará ${editingUser.username} y se cerrarán sus sesiones. El historial no se elimina.`,
+      onConfirm: async () => {
+        setConfirmModal(null)
+        setSecurityActionPending(true)
+        try {
+          await deactivateUserProfile(editingUser.id)
+          setMessage('Usuario dado de baja correctamente.')
+          cancelEdit()
+          await loadData()
+        } catch (err) {
+          setError(err.message || 'No se pudo dar de baja el usuario.')
+        } finally {
+          setSecurityActionPending(false)
+        }
+      },
+    })
+  }
+
   return (
     <section className="profiles-page" aria-label="Gestion de perfiles y reactivacion de cuentas">
       {confirmModal ? (
@@ -450,10 +531,28 @@ function AdminProfilesPage({ user }) {
           <div><span>Bloqueados</span><strong>{summary.blocked}</strong></div>
           <div><span>Danos abiertos</span><strong>{summary.flagged}</strong></div>
         </div>
+        {canCreate ? <button type="button" className="profiles-primary" onClick={() => setShowCreate((value) => !value)}><Plus size={16} /> {showCreate ? 'Cancelar alta' : 'Alta de usuario'}</button> : null}
       </header>
 
       {message ? <p className="profiles-alert success">{message}</p> : null}
       {error ? <p className="profiles-alert error">{error}</p> : null}
+
+      {showCreate ? (
+        <section className="profiles-card profiles-form" aria-label="Alta de usuario">
+          <div className="profiles-section-head"><div><h3>Alta de usuario local</h3><p>El User ID se genera automáticamente con el formato UCB-AÑO-CÓDIGO.</p></div></div>
+          <form onSubmit={handleCreate}>
+            <div className="profiles-form-grid">
+              <label><span>Correo institucional</span><input type="email" value={createForm.username} onChange={(event) => setCreateForm((value) => ({ ...value, username: event.target.value }))} placeholder="usuario@ucb.edu.bo" required /></label>
+              <label><span>Nombre completo</span><input value={createForm.name} onChange={(event) => setCreateForm((value) => ({ ...value, name: event.target.value }))} required /></label>
+              <label><span>Contraseña inicial</span><input type="password" autoComplete="new-password" minLength="12" value={createForm.password} onChange={(event) => setCreateForm((value) => ({ ...value, password: event.target.value }))} required /></label>
+              <label><span>Tipo de perfil</span><select value={createForm.profile_type} onChange={(event) => setCreateForm((value) => ({ ...value, profile_type: event.target.value }))}><option value="student">Estudiante</option><option value="teacher">Docente</option><option value="staff">Personal</option><option value="guest">Invitado</option><option value="lab_manager">Encargado</option></select></label>
+              {canAssign ? <label><span>Rol inicial</span><select value={createForm.roleId} onChange={(event) => setCreateForm((value) => ({ ...value, roleId: event.target.value }))}><option value="">Sin rol</option>{roles.filter((role) => !['Administrador', 'Administrador de Accesos', 'OSI - Auditor de Seguridad'].includes(role.nombre)).map((role) => <option key={role.id} value={role.id}>{role.nombre}</option>)}</select></label> : null}
+            </div>
+            <p className="profiles-inline-hint">Mínimo 12 caracteres, con mayúscula, minúscula, número y símbolo. Resguárdala únicamente en el gestor institucional de contraseñas.</p>
+            <div className="profiles-actions"><button type="submit" className="profiles-primary" disabled={securityActionPending}>{securityActionPending ? 'Creando...' : 'Crear usuario'}</button></div>
+          </form>
+        </section>
+      ) : null}
 
       <div className="profiles-grid">
         <section className="profiles-card profiles-directory-card">
@@ -547,19 +646,11 @@ function AdminProfilesPage({ user }) {
                       <button type="button" className="profiles-secondary" onClick={() => handleEdit(profile)}>
                         Ver expediente
                       </button>
-                      {activePenalty && canReactivate ? (
+                      {activePenalty && canManagePenalties ? (
                         <button type="button" className="profiles-primary" onClick={() => handleEdit(profile)}>
                           Reactivar cuenta
                         </button>
                       ) : null}
-                      <button
-                        type="button"
-                        className="profiles-danger"
-                        onClick={() => handleDelete(profile)}
-                        disabled={!canManage}
-                      >
-                        Eliminar
-                      </button>
                     </div>
                   </article>
                 )
@@ -585,6 +676,7 @@ function AdminProfilesPage({ user }) {
                   <p className="profiles-kicker">Expediente del usuario</p>
                   <h3>{editingUser.name || editingUser.username}</h3>
                   <p>{editingUser.username}</p>
+                  <p>User ID: <strong>{editingUser.user_code || 'Pendiente de normalización'}</strong></p>
                 </div>
                 <span className={`profiles-badge ${selectedProfileState?.key || 'active'}`}>
                   {selectedProfileState?.label || 'Activo'}
@@ -638,19 +730,23 @@ function AdminProfilesPage({ user }) {
                         value={form.name}
                         onChange={(event) => setForm((previous) => ({ ...previous, name: event.target.value }))}
                         required
-                        disabled={!canManage}
+                        disabled={!canModify}
                       />
                     </label>
+
+                    <label><span>Correo institucional</span><input type="email" value={form.username} onChange={(event) => setForm((previous) => ({ ...previous, username: event.target.value }))} disabled={!canModify} required /></label>
+
+                    <label><span>Tipo de perfil</span><select value={form.profile_type} onChange={(event) => setForm((previous) => ({ ...previous, profile_type: event.target.value }))} disabled={!canModify}><option value="student">Estudiante</option><option value="teacher">Docente</option><option value="staff">Personal</option><option value="guest">Invitado</option><option value="lab_manager">Encargado</option></select></label>
 
                     <label>
                       <span>Rol</span>
                       <select
                         value={form.roleId}
                         onChange={(event) => setForm((previous) => ({ ...previous, roleId: event.target.value }))}
-                        disabled={!canManage}
+                        disabled={!canAssign}
                       >
                         <option value="">Sin rol asignado</option>
-                        {roles.map((role) => (
+                        {roles.filter((role) => !['Administrador', 'Administrador de Accesos', 'OSI - Auditor de Seguridad'].includes(role.nombre) || role.nombre === editingUser.role).map((role) => (
                           <option key={role.id} value={role.id}>{role.nombre}</option>
                         ))}
                       </select>
@@ -661,23 +757,12 @@ function AdminProfilesPage({ user }) {
                 <div className="profiles-form-section">
                   <span className="profiles-form-section-label">Seguridad y acceso</span>
                   <div className="profiles-form-grid">
-                    <label>
-                      <span>Nueva contrasena</span>
-                      <input
-                        type="password"
-                        value={form.password}
-                        onChange={(event) => setForm((previous) => ({ ...previous, password: event.target.value }))}
-                        placeholder="Solo si deseas cambiarla"
-                        disabled={!canManage}
-                      />
-                    </label>
-
                     <label className="profiles-checkbox">
                       <input
                         type="checkbox"
                         checked={form.is_active}
                         onChange={(event) => setForm((previous) => ({ ...previous, is_active: event.target.checked }))}
-                        disabled={!canReactivate}
+                        disabled={!canUnlockSecurity && !canDeactivate}
                       />
                       <span>Cuenta activa</span>
                     </label>
@@ -685,7 +770,7 @@ function AdminProfilesPage({ user }) {
                 </div>
 
                 <div className="profiles-actions">
-                  <button type="submit" className="profiles-secondary" disabled={!canManage && !canReactivate}>
+                  <button type="submit" className="profiles-secondary" disabled={!canManage && !canUnlockSecurity && !canDeactivate}>
                     Guardar cambios
                   </button>
                   <button type="button" className="profiles-ghost" onClick={cancelEdit}>
@@ -694,7 +779,23 @@ function AdminProfilesPage({ user }) {
                 </div>
               </form>
 
-              {canReactivate ? (
+              {(canResetPassword || canDeactivate || canUnlockSecurity) ? (
+                <section className="profiles-reactivation-card">
+                  <div className="profiles-section-head"><div><h4>Credenciales y bloqueo</h4><p>Acciones independientes, auditadas y limitadas por permisos RBAC.</p></div></div>
+                  <div className="profiles-validation-grid">
+                    <article className={`profiles-validation-card ${editingUser.security_locked ? 'blocked' : 'success'}`}><span>Bloqueo de seguridad</span><strong>{editingUser.security_locked ? 'Bloqueado' : 'Sin bloqueo'}</strong><p>{editingUser.failed_login_attempts || 0} de 3 intentos fallidos.</p></article>
+                    <article className="profiles-validation-card"><span>Contraseña</span><strong>{editingUser.auth_provider === 'google' ? 'Google SSO' : editingUser.must_change_password ? 'Cambio obligatorio' : 'Vigente'}</strong><p>Vence: {formatDateTime(editingUser.password_expires_at)}</p></article>
+                  </div>
+                  <div className="profiles-actions">
+                    {canResetPassword && editingUser.auth_provider !== 'google' ? <button type="button" className="profiles-secondary" onClick={handleResetPassword} disabled={securityActionPending}><KeyRound size={16} /> Reiniciar contraseña</button> : null}
+                    {canUnlockSecurity && editingUser.security_locked ? <button type="button" className="profiles-secondary" onClick={handleUnlock} disabled={securityActionPending}><Unlock size={16} /> Desbloquear acceso</button> : null}
+                    {canDeactivate && editingUser.is_active !== false ? <button type="button" className="profiles-danger" onClick={handleDeactivate} disabled={securityActionPending}><UserX size={16} /> Dar de baja</button> : null}
+                  </div>
+                  {temporaryPassword ? <div className="profiles-inline-banner warning"><KeyRound size={16} /><div><strong>Contraseña temporal — copia única</strong><p><code>{temporaryPassword}</code></p><button type="button" className="profiles-secondary" onClick={() => navigator.clipboard.writeText(temporaryPassword)}><Copy size={15} /> Copiar</button><p>Guárdala en el gestor institucional y cierra esta vista. El usuario deberá cambiarla.</p></div></div> : null}
+                </section>
+              ) : null}
+
+              {canManagePenalties ? (
                 <section className="profiles-reactivation-card">
                   <div className="profiles-section-head">
                     <div>

@@ -14,13 +14,14 @@ import {
   MonitorCog,
   Package,
   Search,
+  ShieldCheck,
   Sparkles,
   UserRound,
   Users,
   X,
 } from 'lucide-react'
 import { NAVIGATION_LINKS } from '../../config/navigationLinks'
-import { hasAnyPermission, isAdminUser } from '../../lib/permissions'
+import { hasAnyPermission, hasRole, isAdminUser } from '../../lib/permissions'
 import ucbShieldLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
 import './navbar.css'
 
@@ -43,6 +44,8 @@ const iconMap = {
   tutorials_public: BookOpenCheck,
   history: History,
   reserve: FlaskConical,
+  account: UserRound,
+  security: ShieldCheck,
   logout: LogOut,
 }
 
@@ -68,6 +71,8 @@ const NAV_META = {
   tutorials_history: { group: 'Reservas', aliases: ['historial tutorias', 'tutorias atendidas', 'sesiones atendidas'], hint: 'Sesiones finalizadas' },
   history: { group: 'Reservas', aliases: ['historial', 'pasadas', 'actividad'], hint: 'Reservas pasadas' },
   reserve: { group: 'Reservas', aliases: ['reservar', 'laboratorio', 'nueva reserva'], hint: 'Crear solicitud' },
+  account: { group: 'Personas', aliases: ['cuenta', 'perfil', 'contrasena'], hint: 'Datos y seguridad' },
+  security: { group: 'Personas', aliases: ['seguridad', 'auditoria', 'rbac'], hint: 'Consulta OSI' },
 }
 
 function normalizeSearchText(value) {
@@ -102,11 +107,13 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
     penalties: 10,
     profiles: 11,
     roles: 12,
+    account: 13,
+    security: 14,
   }
 
   const visibleLinks = NAVIGATION_LINKS.filter((link) => {
     if (link.requiredAnyPermission) return hasAnyPermission(user, link.requiredAnyPermission)
-    if (link.userOnly) return !isAdmin
+    if (link.allowedRoles) return hasRole(user, link.allowedRoles)
     return true
   })
 
@@ -252,7 +259,7 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
 
         <div className="sidebar-footer">
           {user ? (
-            <div className="sidebar-user">
+            <button type="button" className="sidebar-user" onClick={() => handleNavigate('/app/mi-cuenta')}>
               <div className="sidebar-user-avatar">
                 {(user.name || user.username || '?')[0].toUpperCase()}
               </div>
@@ -260,7 +267,7 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
                 <span className="sidebar-user-name">{user.name || user.username}</span>
                 <span className="sidebar-user-role">{user.role || 'Usuario'}</span>
               </div>
-            </div>
+            </button>
           ) : null}
           {logoutLink ? (
             <button type="button" className="sidebar-logout" onClick={handleLogout}>

@@ -123,7 +123,7 @@ function UserHistoryPage({ user }) {
     }
   }, [reservationPage, reservationPageSize])
 
-  const canManageTutorials = hasAnyPermission(user, ['gestionar_tutorias'])
+  const canManageTutorials = hasAnyPermission(user, ['gestionar_tutorias_propias'])
 
   const loadTutorialsOnly = useCallback(async () => {
     try {

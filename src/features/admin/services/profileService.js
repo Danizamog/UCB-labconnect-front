@@ -113,11 +113,21 @@ export function updateUserProfile(userId, payload) {
   })
 }
 
-export function deleteUserProfile(userId) {
-  return request(`${profilesBase}/${userId}`, {
-    method: 'DELETE',
-  }).then((data) => {
+export function deactivateUserProfile(userId) {
+  return request(`${profilesBase}/${userId}`, { method: 'DELETE' }).then(() => clearProfilesCache())
+}
+
+export function unlockUserProfile(userId) {
+  return request(`${profilesBase}/${userId}/unlock`, { method: 'POST' }).then((data) => {
     clearProfilesCache()
     return data
   })
+}
+
+export function resetUserPassword(userId) {
+  return request(`${profilesBase}/${userId}/reset-password`, { method: 'POST' })
+}
+
+export function getPasswordPolicy() {
+  return request(`${profilesBase}/policy/password`, { cacheTtlMs: 300000 })
 }

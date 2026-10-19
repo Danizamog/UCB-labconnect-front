@@ -9,7 +9,6 @@ function ScrollToTopButton({ scrollContainerRef, threshold = DEFAULT_SCROLL_THRE
 
   useEffect(() => {
     if (!enabled) {
-      setIsVisible(false)
       return undefined
     }
 
@@ -21,11 +20,12 @@ function ScrollToTopButton({ scrollContainerRef, threshold = DEFAULT_SCROLL_THRE
       setIsVisible(Math.max(containerScrollTop, pageScrollTop) > threshold)
     }
 
-    handleScroll()
+    const animationFrame = window.requestAnimationFrame(handleScroll)
     container?.addEventListener('scroll', handleScroll, { passive: true })
     window.addEventListener('scroll', handleScroll, { passive: true })
 
     return () => {
+      window.cancelAnimationFrame(animationFrame)
       container?.removeEventListener('scroll', handleScroll)
       window.removeEventListener('scroll', handleScroll)
     }

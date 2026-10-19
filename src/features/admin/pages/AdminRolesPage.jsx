@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   assignUserRole,
   createRole,
@@ -8,6 +8,7 @@ import {
   listUsersWithRoles,
   updateRole,
 } from '../services/rolesService'
+import { hasAnyPermission } from '../../../shared/lib/permissions'
 import './AdminRolesPage.css'
 
 const TABS = {
@@ -15,37 +16,42 @@ const TABS = {
   USERS: 'users',
 }
 
-const ASSIGNABLE_ROLE_NAMES = [
-  'Administrador',
-  'Estudiante',
-  'Docente',
-  'Encargado de Laboratorio',
-  'Invitado',
-]
+const PRIVILEGED_ROLE_NAMES = new Set(['Administrador', 'Administrador de Accesos', 'OSI - Auditor de Seguridad'])
+const SYSTEM_ROLE_NAMES = new Set([...PRIVILEGED_ROLE_NAMES, 'Estudiante', 'Docente', 'Encargado de Laboratorio', 'Invitado'])
+const PRIVILEGED_PERMISSION_NAMES = new Set([
+  'crear_usuarios', 'modificar_usuarios', 'dar_baja_usuarios', 'desbloquear_usuarios', 'reiniciar_credenciales',
+  'gestionar_roles', 'asignar_roles', 'consultar_auditoria_seguridad', 'consultar_eventos_autenticacion',
+  'consultar_sesiones_usuarios', 'consultar_incidentes_seguridad', 'revisar_accesos_rbac', 'exportar_reportes_seguridad',
+])
+
+const PERMISSION_ICONS = {
+  crear_usuarios: '➕', modificar_usuarios: '✏️', dar_baja_usuarios: '⛔', desbloquear_usuarios: '🔓', reiniciar_credenciales: '🗝️',
+  consultar_usuarios: '👥', gestionar_usuarios: '🧑‍💼', gestionar_estado_cuentas: '🔐', consultar_directorio_operativo: '📇',
+  consultar_roles: '🪪', gestionar_roles: '🛡️', asignar_roles: '🔑', iniciar_restablecimiento_credencial: '🔄',
+  gestionar_reservas: '📅', gestionar_reservas_materiales: '📦', gestionar_reglas_reserva: '📋',
+  gestionar_estructura_laboratorios: '🏢', gestionar_horarios_laboratorio: '🕒', gestionar_accesos_laboratorio: '🚪',
+  gestionar_penalizaciones: '⚠️', gestionar_inventario: '🧰', gestionar_stock: '📊', gestionar_estado_equipos: '🖥️',
+  gestionar_mantenimiento: '🛠️', gestionar_prestamos: '🤝', gestionar_reactivos_quimicos: '🧪',
+  registrar_tickets_equipo: '🎫',
+  gestionar_tutorias_propias: '🎓', aprobar_tutorias: '✅', gestionar_asistencia_tutorias: '📝',
+  gestionar_observaciones_tutorias: '💬', solicitar_recursos_clase: '📨', generar_reportes: '📄', consultar_estadisticas: '📈',
+  consultar_auditoria_seguridad: '🔎', consultar_eventos_autenticacion: '🔓', consultar_sesiones_usuarios: '💻',
+  consultar_incidentes_seguridad: '🚨', revisar_accesos_rbac: '🧭', exportar_reportes_seguridad: '📤',
+}
 
 const FALLBACK_PERMISSION_OPTIONS = [
-  { value: 'gestionar_roles_permisos', label: 'Gestionar roles y permisos', description: 'Crear, editar y eliminar roles. Asignar permisos a usuarios.', icon: '🛡️' },
-  { value: 'reactivar_cuentas', label: 'Reactivar cuentas', description: 'Reactivar cuentas de usuario desactivadas.', icon: '🔄' },
-  { value: 'gestionar_reservas', label: 'Gestionar reservas', description: 'Crear, editar, consultar y cancelar reservas de laboratorio.', icon: '📅' },
-  { value: 'gestionar_reservas_materiales', label: 'Gestionar materiales en reservas', description: 'Agregar, modificar y remover materiales de las reservas.', icon: '🧪' },
-  { value: 'gestionar_reglas_reserva', label: 'Gestionar reglas de reserva', description: 'Establecer las políticas y reglas de las reservas.', icon: '⚙️' },
-  { value: 'gestionar_inventario', label: 'Gestionar inventario', description: 'Crear, actualizar y eliminar equipos del inventario.', icon: '📦' },
-  { value: 'gestionar_stock', label: 'Gestionar stock', description: 'Administrar niveles de stock y disponibilidad de materiales.', icon: '📊' },
-  { value: 'gestionar_estado_equipos', label: 'Gestionar estado de equipos', description: 'Cambiar estado de equipos (disponible, mantenimiento, dañado, etc).', icon: '🧰' },
-  { value: 'gestionar_mantenimiento', label: 'Gestionar mantenimiento', description: 'Registrar y seguimiento del mantenimiento de equipos.', icon: '🛠️' },
-  { value: 'gestionar_prestamos', label: 'Gestionar préstamos', description: 'Autorizar, registrar y devolver préstamos de materiales.', icon: '🤝' },
-  { value: 'adjuntar_evidencia_inventario', label: 'Adjuntar evidencia de inventario', description: 'Subir documentos y fotos como evidencia de inventario.', icon: '📎' },
-  { value: 'gestionar_accesos_laboratorio', label: 'Gestionar accesos al laboratorio', description: 'Habilitar y deshabilitar acceso a espacios del laboratorio.', icon: '🚪' },
-  { value: 'gestionar_penalizaciones', label: 'Gestionar penalizaciones', description: 'Aplicar sanciones por incumplimiento de normas.', icon: '⚠️' },
-  { value: 'gestionar_tutorias', label: 'Gestionar tutorías', description: 'Crear y editar sesiones de tutorías académicas.', icon: '🎓' },
-  { value: 'gestionar_inscripciones_tutorias', label: 'Gestionar inscripciones de tutorías', description: 'Registrar estudiantes en sesiones de tutoría.', icon: '📝' },
-  { value: 'gestionar_asistencia_tutorias', label: 'Gestionar asistencia a tutorías', description: 'Registrar y consultar asistencia de tutorías.', icon: '✅' },
-  { value: 'gestionar_observaciones_tutorias', label: 'Gestionar observaciones de tutorías', description: 'Agregar notas y observaciones sobre el desempeño en tutorías.', icon: '📋' },
-  { value: 'gestionar_notificaciones', label: 'Gestionar notificaciones', description: 'Crear y enviar notificaciones a usuarios.', icon: '🔔' },
-  { value: 'generar_reportes', label: 'Generar reportes', description: 'Crear reportes detallados sobre operaciones del sistema.', icon: '📈' },
-  { value: 'consultar_estadisticas', label: 'Consultar estadísticas', description: 'Ver dashboards y estadísticas del sistema.', icon: '📉' },
-  { value: 'gestionar_reactivos_quimicos', label: 'Gestionar reactivos químicos', description: 'Controlar stock y uso de químicos en el laboratorio.', icon: '⚗️' },
-]
+  'consultar_usuarios', 'consultar_directorio_operativo',
+  'crear_usuarios', 'modificar_usuarios', 'dar_baja_usuarios', 'desbloquear_usuarios', 'reiniciar_credenciales',
+  'consultar_roles', 'gestionar_roles', 'asignar_roles',
+  'gestionar_reservas', 'gestionar_reservas_materiales', 'gestionar_reglas_reserva',
+  'gestionar_estructura_laboratorios', 'gestionar_horarios_laboratorio', 'gestionar_accesos_laboratorio',
+  'gestionar_penalizaciones', 'gestionar_inventario', 'gestionar_stock', 'gestionar_estado_equipos',
+  'gestionar_mantenimiento', 'registrar_tickets_equipo', 'gestionar_prestamos', 'gestionar_reactivos_quimicos',
+  'gestionar_tutorias_propias', 'aprobar_tutorias', 'gestionar_asistencia_tutorias',
+  'gestionar_observaciones_tutorias', 'solicitar_recursos_clase', 'generar_reportes', 'consultar_estadisticas',
+  'consultar_auditoria_seguridad', 'consultar_eventos_autenticacion', 'consultar_sesiones_usuarios',
+  'consultar_incidentes_seguridad', 'revisar_accesos_rbac', 'exportar_reportes_seguridad',
+].map((value) => ({ value, label: value.replaceAll('_', ' '), description: 'Permiso RBAC de LabConnect.', icon: PERMISSION_ICONS[value] || '•' }))
 
 function parsePermisos(permisosText) {
   const trimmed = permisosText.trim()
@@ -61,6 +67,9 @@ function parsePermisos(permisosText) {
 }
 
 function AdminRolesPage({ user, onSessionRefresh }) {
+  const canEditRoles = hasAnyPermission(user, ['gestionar_roles'])
+  const canAssignRoles = hasAnyPermission(user, ['asignar_roles'])
+  const canViewAssignments = canAssignRoles || hasAnyPermission(user, ['revisar_accesos_rbac'])
   const [activeTab, setActiveTab] = useState(TABS.ROLES)
   const [roles, setRoles] = useState([])
   const [users, setUsers] = useState([])
@@ -79,25 +88,28 @@ function AdminRolesPage({ user, onSessionRefresh }) {
   const [confirmDeleteRoleId, setConfirmDeleteRoleId] = useState(null)
 
   const roleOptions = useMemo(
-    () =>
-      ASSIGNABLE_ROLE_NAMES
-        .map((roleName) => roles.find((role) => role.nombre === roleName))
-        .filter(Boolean)
-        .map((role) => ({ id: role.id, nombre: role.nombre })),
+    () => roles.map((role) => ({ id: role.id, nombre: role.nombre })),
     [roles],
   )
+  const currentRoleName = String(user?.role || '')
+  const currentUsername = String(user?.username || '').toLowerCase()
+  const assignableRoleOptions = useMemo(() => roleOptions.filter((role) => (
+    !PRIVILEGED_ROLE_NAMES.has(role.nombre)
+    || (currentRoleName === 'Administrador' && role.nombre === 'Administrador de Accesos')
+    || (currentRoleName === 'Administrador de Accesos' && role.nombre === 'OSI - Auditor de Seguridad')
+  )), [currentRoleName, roleOptions])
   const currentPermissionOptions = permissionOptions.length ? permissionOptions : FALLBACK_PERMISSION_OPTIONS
 
   const selectedPermissions = useMemo(() => parsePermisos(roleDraft.permisosText), [roleDraft.permisosText])
   const selectedPermissionsSet = useMemo(() => new Set(selectedPermissions), [selectedPermissions])
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       setErrorMessage('')
       const [rolesResponse, usersResponse, permissionsResponse] = await Promise.all([
         listRoles(),
-        listUsersWithRoles(),
+        canViewAssignments ? listUsersWithRoles() : Promise.resolve([]),
         listPermissionsCatalog().catch(() => FALLBACK_PERMISSION_OPTIONS),
       ])
 
@@ -111,11 +123,11 @@ function AdminRolesPage({ user, onSessionRefresh }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [canViewAssignments])
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [loadData])
 
   const resetDraft = () => {
     setRoleDraft({ nombre: '', descripcion: '', permisosText: '' })
@@ -297,7 +309,7 @@ function AdminRolesPage({ user, onSessionRefresh }) {
         >
           Administrar roles
         </button>
-        <button
+        {canViewAssignments ? <button
           type="button"
           role="tab"
           aria-selected={activeTab === TABS.USERS}
@@ -305,7 +317,7 @@ function AdminRolesPage({ user, onSessionRefresh }) {
           onClick={() => setActiveTab(TABS.USERS)}
         >
           Asignar roles a usuarios
-        </button>
+        </button> : null}
       </div>
 
       {errorMessage ? <p className="roles-error">{errorMessage}</p> : null}
@@ -314,7 +326,7 @@ function AdminRolesPage({ user, onSessionRefresh }) {
 
       {!loading && activeTab === TABS.ROLES ? (
         <>
-          <details className="ux-extra-toggle" open={Boolean(editingRoleId)}>
+          {canEditRoles ? <details className="ux-extra-toggle" open={Boolean(editingRoleId)}>
             <summary>{editingRoleId ? 'Editar rol seleccionado' : 'Crear nuevo rol'}</summary>
             <div className="ux-extra-toggle-content">
               <div className="roles-form-card">
@@ -348,7 +360,7 @@ function AdminRolesPage({ user, onSessionRefresh }) {
 
                             return (
                               <div key={permission} className="roles-chip" title={option?.label || permission}>
-                                <span className="roles-chip-icon">{option?.icon || '•'}</span>
+                                <span className="roles-chip-icon">{option?.icon || PERMISSION_ICONS[permission] || '•'}</span>
                                 <span className="roles-chip-label">{option?.label || permission}</span>
                                 <button
                                   type="button"
@@ -397,7 +409,7 @@ function AdminRolesPage({ user, onSessionRefresh }) {
                 </div>
               </div>
             </div>
-          </details>
+          </details> : null}
 
           {isPermissionsModalOpen ? (
             <div className="roles-modal-backdrop" role="dialog" aria-modal="true" aria-label="Seleccionar permisos">
@@ -414,7 +426,7 @@ function AdminRolesPage({ user, onSessionRefresh }) {
                 </div>
 
                 <div className="roles-permissions-grid">
-                  {currentPermissionOptions.map((permission) => {
+                  {currentPermissionOptions.filter((permission) => !PRIVILEGED_PERMISSION_NAMES.has(permission.value)).map((permission) => {
                     const isSelected = selectedPermissionsSet.has(permission.value)
 
                     return (
@@ -425,7 +437,7 @@ function AdminRolesPage({ user, onSessionRefresh }) {
                         onClick={() => handleTogglePermission(permission.value)}
                       >
                         <span className="roles-permission-icon" aria-hidden="true">
-                          {permission.icon}
+                          {permission.icon || PERMISSION_ICONS[permission.value] || '•'}
                         </span>
                         <span className="roles-permission-texts">
                           <strong>{permission.label}</strong>
@@ -496,17 +508,17 @@ function AdminRolesPage({ user, onSessionRefresh }) {
                         </div>
                       </td>
                       <td className="roles-actions-cell">
-                        <button type="button" className="roles-action-button roles-action-edit" onClick={() => handleEditRole(role)}>
+                        {canEditRoles && !PRIVILEGED_ROLE_NAMES.has(role.nombre) ? <button type="button" className="roles-action-button roles-action-edit" onClick={() => handleEditRole(role)}>
                           ✎ Editar
-                        </button>
-                        <button
+                        </button> : null}
+                        {canEditRoles && !SYSTEM_ROLE_NAMES.has(role.nombre) ? <button
                           type="button"
                           className="roles-action-button roles-action-delete"
                           onClick={() => handleConfirmDelete(role.id)}
                           disabled={roleDeletingId === role.id}
                         >
                           🗑 Eliminar
-                        </button>
+                        </button> : null}
                       </td>
                     </tr>
                   )
@@ -520,7 +532,7 @@ function AdminRolesPage({ user, onSessionRefresh }) {
       {!loading && activeTab === TABS.USERS ? (
         <div className="roles-table-wrap">
           <p className="roles-counter">
-            La asignacion RBAC institucional se limita a cinco roles base: <strong>Administrador</strong>, <strong>Estudiante</strong>, <strong>Docente</strong>, <strong>Encargado de Laboratorio</strong> e <strong>Invitado</strong>.
+            La asignación RBAC se limita a los roles institucionales definidos. {canAssignRoles ? 'Puedes asignarlos desde esta tabla.' : 'Esta consulta es de solo lectura.'}
           </p>
           <table className="roles-table">
             <thead>
@@ -559,19 +571,22 @@ function AdminRolesPage({ user, onSessionRefresh }) {
                     </div>
                   </td>
                   <td>
-                    <select
+                    {canAssignRoles && (
+                      !PRIVILEGED_ROLE_NAMES.has(user.role?.nombre)
+                      || (currentRoleName === 'Administrador' && user.role?.nombre === 'Administrador' && String(user.email || '').toLowerCase() !== currentUsername)
+                    ) ? <select
                       className="roles-select"
                       value={roleOptions.some((role) => role.id === user.roleId) ? user.roleId : ''}
                       disabled={userUpdatingId === user.id}
                       onChange={(event) => handleAssignUserRole(user.id, event.target.value)}
                     >
                       <option value="">Sin rol</option>
-                      {roleOptions.map((role) => (
+                      {assignableRoleOptions.map((role) => (
                         <option key={role.id} value={role.id}>
                           {role.nombre}
                         </option>
                       ))}
-                    </select>
+                    </select> : <span>{user.role?.nombre || 'Sin rol'}</span>}
                   </td>
                 </tr>
               ))}

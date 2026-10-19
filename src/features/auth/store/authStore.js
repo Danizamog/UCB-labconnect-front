@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { clearStoredSession, signIn, signInWithInstitutionalSSO, validateSession } from '../services/authService'
+import { clearStoredSession, revokeSession, signIn, signInWithInstitutionalSSO, validateSession } from '../services/authService'
 
 const SESSION_REFRESH_COOLDOWN_MS = 15000
 
@@ -113,7 +113,8 @@ export function useAuthStore() {
     }
   }, [refreshSession])
 
-  const logout = () => {
+  const logout = async () => {
+    await revokeSession()
     clearSession()
   }
 

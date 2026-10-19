@@ -36,11 +36,6 @@ function buildRequestCacheKey(url, method, token) {
   return `${method}:${url}:${token || ''}`
 }
 
-function clearTutorialSessionsCache() {
-  requestCache.clear()
-  inFlightRequests.clear()
-}
-
 // Prefijos de URL para invalidacion granular. Mutaciones de tutorias no deberian
 // tirar todo el cache (afectaba listados publicos / mine / my-enrollments por
 // cada accion del tutor o estudiante).

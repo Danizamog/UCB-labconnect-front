@@ -126,6 +126,7 @@ function AdminEquiposPage({ user }) {
 
   const canManage = hasAnyPermission(user, ['gestionar_inventario'])
   const canManageStatus = hasAnyPermission(user, ['gestionar_estado_equipos', 'gestionar_mantenimiento'])
+  const canCreateTickets = canManageStatus || hasAnyPermission(user, ['registrar_tickets_equipo'])
   const canManageLoans = hasAnyPermission(user, ['gestionar_prestamos', 'gestionar_inventario', 'gestionar_estado_equipos'])
 
   const loadData = useCallback(async () => {
@@ -134,13 +135,13 @@ function AdminEquiposPage({ user }) {
       const [labsResult, assetsResult, ticketsResult, loansResult, profilesResult] = await Promise.allSettled([
         listAdminLabs(),
         listAssets(),
-        listAssetMaintenanceTickets({ status: 'open' }),
+        canCreateTickets ? listAssetMaintenanceTickets({ status: 'open' }) : Promise.resolve([]),
         listLoansDashboard({ page: 1, perPage: LOAN_PAGE_SIZE }),
         canManageLoans ? listUserProfiles() : Promise.resolve([]),
       ])
 
-      if (labsResult.status !== 'fulfilled' || assetsResult.status !== 'fulfilled' || ticketsResult.status !== 'fulfilled' || loansResult.status !== 'fulfilled') {
-        throw new Error('No se pudieron cargar los equipos')
+      if (labsResult.status !== 'fulfilled' || assetsResult.status !== 'fulfilled' || loansResult.status !== 'fulfilled') {
+        throw new Error([labsResult, assetsResult, loansResult].filter((result) => result.status === 'rejected').map((result) => result.reason?.message).join(' | ') || 'No se pudieron cargar los equipos')
       }
 
       const nextAssets = assetsResult.value
@@ -159,7 +160,7 @@ function AdminEquiposPage({ user }) {
           })
       setLabs(nextLabs)
       setAssets(nextAssets)
-      setActiveTickets(ticketsResult.value)
+      setActiveTickets(ticketsResult.status === 'fulfilled' ? ticketsResult.value : [])
       setLoanDashboard(loansResult.value)
       setLoanPage(1)
       setLoanForm((previous) => ({
@@ -181,7 +182,7 @@ function AdminEquiposPage({ user }) {
     } finally {
       setLoading(false)
     }
-  }, [canManageLoans, user])
+  }, [canCreateTickets, canManageLoans, user])
 
   useEffect(() => {
     loadData()
@@ -210,20 +211,14 @@ function AdminEquiposPage({ user }) {
       .filter((lab) => String(lab?.manager || '') === currentUserId)
       .map((lab) => String(lab.id))
   }, [labs, user?.user_id])
-  const restrictToManagedLabs = !isAdmin && managedLabIds.length > 0
+  const restrictToManagedLabs = !isAdmin
   const visibleLabs = useMemo(() => {
     if (!restrictToManagedLabs) return labs
     return labs.filter((lab) => managedLabIds.includes(String(lab.id)))
   }, [labs, managedLabIds, restrictToManagedLabs])
   const visibleAssets = useMemo(() => {
     if (isAdmin) return assets
-    if (managedLabIds.length === 0) {
-      return assets.filter((asset) => !String(asset.laboratory_id || ''))
-    }
-    return assets.filter((asset) => {
-      const labId = String(asset.laboratory_id || '')
-      return !labId || managedLabIds.includes(labId)
-    })
+    return assets.filter((asset) => managedLabIds.includes(String(asset.laboratory_id || '')))
   }, [assets, isAdmin, managedLabIds])
   const labNameById = useMemo(() => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])), [labs])
   const assetNameById = useMemo(() => Object.fromEntries(assets.map((asset) => [String(asset.id), asset.name])), [assets])
@@ -283,8 +278,8 @@ function AdminEquiposPage({ user }) {
     const hasAsset = String(ticketForm.asset_id || '').trim().length > 0
     const titleOk = String(ticketForm.title || '').trim().length >= 5
     const descriptionOk = String(ticketForm.description || '').trim().length >= 10
-    return canManageStatus && hasAsset && titleOk && descriptionOk && !savingTicket
-  }, [canManageStatus, savingTicket, ticketForm.asset_id, ticketForm.description, ticketForm.title])
+    return canCreateTickets && hasAsset && titleOk && descriptionOk && !savingTicket
+  }, [canCreateTickets, savingTicket, ticketForm.asset_id, ticketForm.description, ticketForm.title])
 
   const resetForm = () => {
     setEditingId(null)
@@ -344,7 +339,7 @@ function AdminEquiposPage({ user }) {
 
   const handleCreateTicket = async (event) => {
     event.preventDefault()
-    if (!canManageStatus) return
+    if (!canCreateTickets) return
     setError('')
     setMessage('')
     if (!ticketForm.asset_id) {
@@ -826,7 +821,7 @@ function AdminEquiposPage({ user }) {
                       <span>Asigna este equipo a un usuario del directorio institucional.</span>
                     </button>
                   ) : null}
-                  {canManageStatus ? (
+                  {canCreateTickets ? (
                     <button type="button" className="infra-manage-card" onClick={() => {
                       if (!selectedManagedAsset) return
                       handleOpenTicketForAsset(selectedManagedAsset.id)
@@ -1207,7 +1202,7 @@ function AdminEquiposPage({ user }) {
                   <small>Registra nombre, serie, ubicacion y laboratorio.</small>
                 </button>
               ) : null}
-              {canManageStatus ? (
+              {canCreateTickets ? (
                 <button type="button" className="infra-action-card" onClick={() => { resetTicketForm(); setActiveModal('ticket') }}>
                   <span>2</span>
                   <strong>Ticket tecnico</strong>
@@ -1352,7 +1347,7 @@ function AdminEquiposPage({ user }) {
             <div className="infra-section-head">
               <div>
                 <h3>Tickets activos</h3>
-                <p>Cierra cada ticket con su resolucion para devolver el equipo a disponible.</p>
+                <p>{canManageStatus ? 'Cierra cada ticket con su resolución para devolver el equipo a disponible.' : 'Registra fallas y consulta los tickets de tu laboratorio. El administrador realiza el cierre.'}</p>
               </div>
             </div>
 
@@ -1379,15 +1374,17 @@ function AdminEquiposPage({ user }) {
                       <span><strong>Abierto:</strong> {formatDateTime(ticket.reported_at)} por {ticket.reported_by || 'Sin registro'}{ticket.reported_by_email ? ` (${ticket.reported_by_email})` : ''}</span>
                       {ticket.is_responsibility_flagged ? <span className="infra-negative">Responsable asociado: {ticket.responsible_borrower_name || ticket.responsible_borrower_email || 'Prestamo previo'}</span> : null}
                     </div>
-                    <label className="infra-ticket-resolution">
-                      <span>Resolucion para cierre</span>
-                      <textarea rows="3" value={resolutionDrafts[ticket.id] || ''} onChange={(event) => setResolutionDrafts((previous) => ({ ...previous, [ticket.id]: event.target.value }))} placeholder="Describe la reparacion realizada y el resultado." />
-                    </label>
-                    <div className="infra-actions infra-actions-start">
-                      <button type="button" className="infra-primary" disabled={closingTicketId === ticket.id || !canManageStatus} onClick={() => handleCloseTicket(ticket.id)}>
-                        {closingTicketId === ticket.id ? 'Cerrando...' : 'Cerrar ticket'}
-                      </button>
-                    </div>
+                    {canManageStatus ? <>
+                      <label className="infra-ticket-resolution">
+                        <span>Resolucion para cierre</span>
+                        <textarea rows="3" value={resolutionDrafts[ticket.id] || ''} onChange={(event) => setResolutionDrafts((previous) => ({ ...previous, [ticket.id]: event.target.value }))} placeholder="Describe la reparacion realizada y el resultado." />
+                      </label>
+                      <div className="infra-actions infra-actions-start">
+                        <button type="button" className="infra-primary" disabled={closingTicketId === ticket.id} onClick={() => handleCloseTicket(ticket.id)}>
+                          {closingTicketId === ticket.id ? 'Cerrando...' : 'Cerrar ticket'}
+                        </button>
+                      </div>
+                    </> : null}
                   </article>
                 ))}
               </div>
