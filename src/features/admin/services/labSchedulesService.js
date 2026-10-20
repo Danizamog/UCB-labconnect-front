@@ -75,6 +75,8 @@ function mapSchedule(record) {
     is_active: record?.is_active !== false,
     teacher_id: record?.teacher_id || '',
     teacher_name: record?.teacher_name || '',
+    approval_status: record?.approval_status || 'approved',
+    approval_reason: record?.approval_reason || '',
     created: record?.created || '',
     updated: record?.updated || '',
   }
@@ -140,4 +142,15 @@ export async function deleteLabSchedule(scheduleId) {
     method: 'DELETE',
   })
   return true
+}
+
+export async function listPendingClasses() {
+  const data = await request(`${reservationsBase}/lab-schedules/pending`)
+  return Array.isArray(data) ? data.map(mapSchedule) : []
+}
+
+export async function updateClassApproval(scheduleId, status, reason = '') {
+  return request(`${reservationsBase}/lab-schedules/${scheduleId}/approval`, {
+    method: 'PATCH', body: JSON.stringify({ status, reason }),
+  })
 }

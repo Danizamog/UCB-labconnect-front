@@ -361,6 +361,11 @@
   color: var(--ink-700, #3d5676);
 }
 
+.teacher-class-form { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
+.teacher-class-form label { display:grid; gap:7px; font-weight:600; }
+.teacher-class-form input,.teacher-class-form select,.teacher-class-form textarea { width:100%; box-sizing:border-box; padding:11px; border:1px solid var(--line-300,#d8e2ee); border-radius:9px; color:var(--text-h); background:var(--bg); }
+.teacher-class-form .reservations-actions { grid-column:1/-1; }
+
 .teacher-builder-foot-actions {
   display: flex;
   gap: 10px;

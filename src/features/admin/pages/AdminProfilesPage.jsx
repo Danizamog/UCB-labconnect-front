@@ -25,7 +25,7 @@ const defaultReactivationForm = {
   resolution_notes: '',
 }
 
-const defaultCreateForm = { username: '', name: '', password: '', profile_type: 'student', roleId: '' }
+const defaultCreateForm = { username: '', name: '', profile_type: 'student', roleId: '' }
 
 const USER_PAGE_SIZE_OPTIONS = [8, 12, 20, 40]
 
@@ -149,6 +149,7 @@ function AdminProfilesPage({ user }) {
   const [isLoadingContext, setIsLoadingContext] = useState(false)
   const [isReactivating, setIsReactivating] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const [createdCredential, setCreatedCredential] = useState(null)
   const [createForm, setCreateForm] = useState(defaultCreateForm)
   const [temporaryPassword, setTemporaryPassword] = useState('')
   const [securityActionPending, setSecurityActionPending] = useState(false)
@@ -434,14 +435,17 @@ function AdminProfilesPage({ user }) {
       const created = await createUserProfile({
         username: createForm.username.trim().toLowerCase(),
         name: createForm.name.trim(),
-        password: createForm.password,
         profile_type: createForm.profile_type,
         is_active: true,
       })
-      if (createForm.roleId) await assignUserRole(created.id, createForm.roleId)
+      setCreatedCredential({ username: created.username, password: created.temporary_password, userCode: created.user_code })
       setCreateForm(defaultCreateForm)
       setShowCreate(false)
       setMessage(`Usuario creado con código ${created.user_code || 'institucional'}.`)
+      if (createForm.roleId) {
+        try { await assignUserRole(created.id, createForm.roleId) }
+        catch (err) { setError(`La cuenta fue creada, pero no se pudo asignar el rol: ${err.message}`) }
+      }
       await loadData()
     } catch (err) {
       setError(err.message || 'No se pudo crear el usuario.')
@@ -531,24 +535,34 @@ function AdminProfilesPage({ user }) {
           <div><span>Bloqueados</span><strong>{summary.blocked}</strong></div>
           <div><span>Danos abiertos</span><strong>{summary.flagged}</strong></div>
         </div>
-        {canCreate ? <button type="button" className="profiles-primary" onClick={() => setShowCreate((value) => !value)}><Plus size={16} /> {showCreate ? 'Cancelar alta' : 'Alta de usuario'}</button> : null}
+        {canCreate ? <button type="button" className="profiles-primary" onClick={() => setShowCreate((value) => !value)}><Plus size={16} /> {showCreate ? 'Cancelar' : 'Crear Usuario'}</button> : null}
       </header>
 
       {message ? <p className="profiles-alert success">{message}</p> : null}
       {error ? <p className="profiles-alert error">{error}</p> : null}
 
+      {createdCredential ? <section className="profiles-card profiles-form" aria-label="Credencial inicial generada">
+        <div className="profiles-section-head"><div><h3><KeyRound size={18} /> Cuenta local creada</h3><p>{createdCredential.username} · {createdCredential.userCode}</p></div></div>
+        <p>Contraseña temporal generada de forma segura. Se muestra únicamente ahora; al cerrar esta tarjeta no podrás recuperarla.</p>
+        <p><code>{createdCredential.password}</code></p>
+        <div className="profiles-actions"><button type="button" className="profiles-secondary" onClick={async () => {
+          try { await navigator.clipboard.writeText(createdCredential.password); setMessage('Contraseña temporal copiada.') }
+          catch { setError('No se pudo copiar. Puedes seleccionar la contraseña visible y copiarla manualmente.') }
+        }}><Copy size={15} /> Copiar contraseña</button><button type="button" className="profiles-primary" onClick={() => setCreatedCredential(null)}>Ya la resguardé · Cerrar</button></div>
+        <p className="profiles-inline-hint">Entrégala por el canal institucional. En su primer ingreso a LabConnect, el usuario deberá sustituirla antes de continuar. Esta cuenta no crea un buzón de correo.</p>
+      </section> : null}
+
       {showCreate ? (
-        <section className="profiles-card profiles-form" aria-label="Alta de usuario">
-          <div className="profiles-section-head"><div><h3>Alta de usuario local</h3><p>El User ID se genera automáticamente con el formato UCB-AÑO-CÓDIGO.</p></div></div>
+        <section className="profiles-card profiles-form" aria-label="Crear Usuario">
+          <div className="profiles-section-head"><div><h3><Plus size={18} /> Crear Usuario</h3><p>El User ID se genera automáticamente con el formato UCB-AÑO-CÓDIGO.</p></div></div>
           <form onSubmit={handleCreate}>
             <div className="profiles-form-grid">
-              <label><span>Correo institucional</span><input type="email" value={createForm.username} onChange={(event) => setCreateForm((value) => ({ ...value, username: event.target.value }))} placeholder="usuario@ucb.edu.bo" required /></label>
+              <label><span>Correo institucional</span><input type="email" pattern="[^@\s]+@ucb\.edu\.bo" title="Utiliza un correo con dominio @ucb.edu.bo" value={createForm.username} onChange={(event) => setCreateForm((value) => ({ ...value, username: event.target.value }))} placeholder="usuario@ucb.edu.bo" required /></label>
               <label><span>Nombre completo</span><input value={createForm.name} onChange={(event) => setCreateForm((value) => ({ ...value, name: event.target.value }))} required /></label>
-              <label><span>Contraseña inicial</span><input type="password" autoComplete="new-password" minLength="12" value={createForm.password} onChange={(event) => setCreateForm((value) => ({ ...value, password: event.target.value }))} required /></label>
               <label><span>Tipo de perfil</span><select value={createForm.profile_type} onChange={(event) => setCreateForm((value) => ({ ...value, profile_type: event.target.value }))}><option value="student">Estudiante</option><option value="teacher">Docente</option><option value="staff">Personal</option><option value="guest">Invitado</option><option value="lab_manager">Encargado</option></select></label>
               {canAssign ? <label><span>Rol inicial</span><select value={createForm.roleId} onChange={(event) => setCreateForm((value) => ({ ...value, roleId: event.target.value }))}><option value="">Sin rol</option>{roles.filter((role) => !['Administrador', 'Administrador de Accesos', 'OSI - Auditor de Seguridad'].includes(role.nombre)).map((role) => <option key={role.id} value={role.id}>{role.nombre}</option>)}</select></label> : null}
             </div>
-            <p className="profiles-inline-hint">Mínimo 12 caracteres, con mayúscula, minúscula, número y símbolo. Resguárdala únicamente en el gestor institucional de contraseñas.</p>
+            <p className="profiles-inline-hint">El sistema generará una contraseña temporal segura y la mostrará una sola vez. El usuario deberá cambiarla al iniciar sesión por primera vez. Acceso exclusivo a LabConnect con dominio @ucb.edu.bo.</p>
             <div className="profiles-actions"><button type="submit" className="profiles-primary" disabled={securityActionPending}>{securityActionPending ? 'Creando...' : 'Crear usuario'}</button></div>
           </form>
         </section>

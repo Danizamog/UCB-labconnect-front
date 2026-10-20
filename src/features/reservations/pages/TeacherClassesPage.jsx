@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { BookOpen, FlaskConical, Cpu, CalendarDays, Clock3, MapPin, RotateCw } from 'lucide-react'
-import { WEEKDAYS, listMyTeacherClasses } from '../../admin/services/labSchedulesService'
+import { ACADEMIC_BLOCKS, WEEKDAYS, createLabSchedule, updateLabSchedule, listMyTeacherClasses } from '../../admin/services/labSchedulesService'
+import { hasPermission } from '../../../shared/lib/permissions'
 import {
   createEquipmentRequest,
   listEquipmentRequests,
@@ -53,6 +54,9 @@ const emptyBuilder = {
 }
 
 function TeacherClassesPage({ user }) {
+  const [classForm, setClassForm] = useState(null)
+  const [savingClass, setSavingClass] = useState(false)
+  const canManageClasses = hasPermission(user, 'gestionar_clases_propias')
   const [classes, setClasses] = useState([])
   const [labs, setLabs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -67,6 +71,20 @@ function TeacherClassesPage({ user }) {
   const [equipmentRequests, setEquipmentRequests] = useState([])
 
   const userId = String(user?.user_id || '')
+
+  const saveClass = async (event) => {
+    event.preventDefault()
+    if (savingClass) return
+    setSavingClass(true); setError(''); setMessage('')
+    try {
+      if (classForm.id) await updateLabSchedule(classForm.id, classForm)
+      else await createLabSchedule(classForm)
+      setClassForm(null)
+      setMessage('Clase enviada. Queda pendiente de aprobación del Administrador y todavía no ocupa el laboratorio.')
+      await loadClasses()
+    } catch (err) { setError(err.message || 'No se pudo enviar la clase.') }
+    finally { setSavingClass(false) }
+  }
 
   const labNameById = useMemo(
     () => Object.fromEntries(labs.map((lab) => [String(lab.id), lab.name])),
@@ -264,7 +282,8 @@ function TeacherClassesPage({ user }) {
         <div className="reservations-header-copy">
           <p className="reservations-kicker">Portal docente</p>
           <h2>Mis clases</h2>
-          <p>Consulta las clases que tienes asignadas y solicita los materiales o equipos que necesitas para cada una.</p>
+          <p>Crea tus clases y envíalas al Administrador para su aprobación. Después podrás solicitar sus materiales y equipos.</p>
+          {canManageClasses ? <button type="button" className="reservations-primary" onClick={() => setClassForm({ subject: '', laboratory_id: labs[0]?.id || '', weekday: 0, start_time: '07:15', end_time: '08:00', description: '' })}>Crear clase</button> : null}
         </div>
         <div className="reservations-summary">
           <div className="reservations-summary-card tone-overview">
@@ -285,9 +304,22 @@ function TeacherClassesPage({ user }) {
       {message ? <p className="reservations-message success">{message}</p> : null}
       {error ? <p className="reservations-message error">{error}</p> : null}
 
+      {classForm ? <section className="reservations-panel">
+        <div className="reservations-panel-header"><h3>{classForm.id ? 'Modificar clase' : 'Nueva clase'}</h3><p>Las clases nuevas o modificadas requieren aprobación del Administrador.</p></div>
+        <form className="teacher-class-form" onSubmit={saveClass}>
+          <label>Materia<input required maxLength={200} value={classForm.subject} onChange={(event) => setClassForm((value) => ({ ...value, subject: event.target.value }))} /></label>
+          <label>Laboratorio<select required value={classForm.laboratory_id} onChange={(event) => setClassForm((value) => ({ ...value, laboratory_id: event.target.value }))}><option value="">Selecciona un laboratorio</option>{labs.map((lab) => <option key={lab.id} value={lab.id}>{lab.name}</option>)}</select></label>
+          <label>Día de la semana<select value={classForm.weekday} onChange={(event) => setClassForm((value) => ({ ...value, weekday: Number(event.target.value) }))}>{WEEKDAYS.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}</select></label>
+          <label>Hora de inicio<select value={classForm.start_time} onChange={(event) => setClassForm((value) => ({ ...value, start_time: event.target.value, end_time: value.end_time > event.target.value ? value.end_time : ACADEMIC_BLOCKS.find((block) => block.start_time === event.target.value).end_time }))}>{ACADEMIC_BLOCKS.map((block) => <option key={block.start_time}>{block.start_time}</option>)}</select></label>
+          <label>Hora de fin<select value={classForm.end_time} onChange={(event) => setClassForm((value) => ({ ...value, end_time: event.target.value }))}>{ACADEMIC_BLOCKS.filter((block) => block.end_time > classForm.start_time).map((block) => <option key={block.end_time}>{block.end_time}</option>)}</select></label>
+          <label>Descripción<textarea maxLength={2000} value={classForm.description} onChange={(event) => setClassForm((value) => ({ ...value, description: event.target.value }))} /></label>
+          <div className="reservations-actions"><button className="reservations-primary" type="submit" disabled={savingClass || classForm.end_time <= classForm.start_time}>{savingClass ? 'Enviando...' : 'Enviar para aprobación'}</button><button className="reservations-secondary" type="button" onClick={() => setClassForm(null)} disabled={savingClass}>Cancelar</button></div>
+        </form>
+      </section> : null}
+
       <section className="reservations-panel">
         <div className="reservations-panel-header">
-          <h3>Clases asignadas</h3>
+          <h3>Mis clases y solicitudes</h3>
           <p className="reservations-panel-subtitle">Elige una clase para ver su información y pedir recursos.</p>
         </div>
 
@@ -295,8 +327,7 @@ function TeacherClassesPage({ user }) {
           <p className="reservations-empty">Cargando tus clases...</p>
         ) : classes.length === 0 ? (
           <p className="reservations-empty">
-            Aún no tienes clases asignadas. Pídele al encargado de laboratorio que te asigne una clase desde
-            “Horarios de laboratorios”.
+            Aún no tienes clases. Usa “Crear clase” para enviarla a aprobación del Administrador.
           </p>
         ) : (
           <div className="teacher-class-grid">
@@ -309,12 +340,15 @@ function TeacherClassesPage({ user }) {
                     <span className="teacher-class-time">{klass.start_time} - {klass.end_time}</span>
                   </div>
                   <h4>{klass.subject}</h4>
+                  <span className={`reservations-status ${klass.approval_status}`}>{STATUS_LABELS[klass.approval_status] || klass.approval_status}</span>
+                  {klass.approval_reason ? <p className="teacher-class-desc">Motivo: {klass.approval_reason}</p> : null}
                   <div className="teacher-class-meta">
                     <span><MapPin size={14} aria-hidden="true" /> {labName}</span>
                     <span><CalendarDays size={14} aria-hidden="true" /> {weekdayLabel(klass.weekday)}</span>
                   </div>
                   {klass.description ? <p className="teacher-class-desc">{klass.description}</p> : null}
-                  <button type="button" className="reservations-primary" onClick={() => openClass(klass)}>
+                  {canManageClasses ? <button type="button" className="reservations-secondary" onClick={() => setClassForm({ ...klass })}>Modificar clase</button> : null}
+                  <button type="button" className="reservations-primary" disabled={klass.approval_status !== 'approved' || !klass.is_active} onClick={() => openClass(klass)}>
                     Ver clase y pedir recursos
                   </button>
                 </article>

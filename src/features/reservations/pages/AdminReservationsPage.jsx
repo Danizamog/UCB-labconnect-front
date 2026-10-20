@@ -38,6 +38,7 @@ import {
   mapReservationRecord,
 } from '../services/reservationsService'
 import ReservationEditModal from './ReservationEditModal'
+import PendingClassesPanel from './PendingClassesPanel'
 import { hasAnyPermission, isAdminUser } from '../../../shared/lib/permissions'
 import { formatDate, formatDateTime } from '../../../shared/utils/formatters'
 import { downloadCsv, todayStamp } from '../../../shared/utils/exportCsv'
@@ -73,6 +74,7 @@ const WHERE_EXAMPLES = [
 ]
 
 const ADMIN_RESERVATION_SECTIONS = [
+  { id: 'clases-pendientes', label: 'Clases pendientes', helper: 'Aprueba o rechaza los horarios enviados por docentes.', tone: 'requests' },
   {
     id: 'dashboard-acceso',
     label: 'Resumen',
@@ -118,6 +120,7 @@ const ADMIN_RESERVATION_SECTIONS = [
 ]
 
 const SECTION_ICON_MAP = {
+  'clases-pendientes': BookOpen,
   'dashboard-acceso': LayoutDashboard,
   'ocupacion-actual': Activity,
   'ingreso-rapido': DoorOpen,
@@ -242,13 +245,15 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
 
   const canManage = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio', 'aprobar_tutorias'])
   const canApproveTutorials = hasAnyPermission(user, ['aprobar_tutorias'])
+  const canApproveClasses = hasAnyPermission(user, ['aprobar_clases'])
   const canManageTeacherRequests = hasAnyPermission(user, ['gestionar_reservas_materiales', 'gestionar_stock', 'gestionar_inventario'])
   const isAdmin = isAdminUser(user)
   const availableSections = useMemo(() => ADMIN_RESERVATION_SECTIONS.filter((section) => {
+    if (section.id === 'clases-pendientes') return canApproveClasses
     if (section.id === 'tutorias-pendientes') return canApproveTutorials
     if (section.id === 'solicitudes-docentes') return canManageTeacherRequests
     return true
-  }), [canApproveTutorials, canManageTeacherRequests])
+  }), [canApproveTutorials, canManageTeacherRequests, canApproveClasses])
 
   useEffect(() => {
     if (!availableSections.some((section) => section.id === activeWorkspace)) {
@@ -1874,7 +1879,9 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
         </section>
       ) : null}
 
-      {activeWorkspace === 'tutorias-pendientes' ? (
+      {activeWorkspace === 'clases-pendientes' && canApproveClasses ? <PendingClassesPanel labNameById={labNameById} /> : null}
+
+      {activeWorkspace === 'tutorias-pendientes' && canApproveTutorials ? (
         <section className="reservations-panel reservations-panel-priority">
           <div className="reservations-panel-header">
             <h3>Tutorias pendientes de aprobacion</h3>

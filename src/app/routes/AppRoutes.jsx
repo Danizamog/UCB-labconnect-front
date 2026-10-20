@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import LoginView from '../../features/auth/pages/LoginView'
 import HomeView from '../../features/home/pages/HomeView'
+const MyAccountPage = lazy(() => import('../../features/account/pages/MyAccountPage'))
 import { APP_ROOT_PATH, LOGIN_PATH, normalizePath } from '../../shared/config/navigationLinks'
 
 function getCurrentPath() {
@@ -90,6 +91,10 @@ function AppRoutes({ isAuthenticated, user, onLogin, onInstitutionalLogin, onRef
 
   if (!isAuthenticated) {
     return <LoginView onLogin={onLogin} onInstitutionalLogin={onInstitutionalLogin} />
+  }
+
+  if (user?.must_change_password) {
+    return <Suspense fallback={<p>Cargando cambio de contraseña...</p>}><MyAccountPage onLogout={handleLogout} requiredChange /></Suspense>
   }
 
   return (

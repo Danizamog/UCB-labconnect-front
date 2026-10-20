@@ -164,7 +164,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   })
   const canManageRoles = hasAnyPermission(user, ['consultar_roles', 'gestionar_roles', 'asignar_roles'])
   const canManageProfiles = hasAnyPermission(user, ['consultar_usuarios', 'gestionar_usuarios', 'gestionar_estado_cuentas'])
-  const canManageStructure = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
+  const canManageStructure = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio', 'aprobar_clases', 'aprobar_tutorias'])
   const canViewAnalytics = hasAnyPermission(user, ['consultar_estadisticas'])
   const canManageSpaces = hasAnyPermission(user, ['gestionar_estructura_laboratorios', 'gestionar_horarios_laboratorio'])
   const canManagePenalties = hasAnyPermission(user, ['gestionar_penalizaciones'])
@@ -175,7 +175,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const canAuditSecurity = hasAnyPermission(user, ['consultar_auditoria_seguridad', 'revisar_accesos_rbac'])
   const canUseReservations = hasRole(user, ['Estudiante', 'Docente', 'Encargado de Laboratorio'])
   const canUseTutorials = hasRole(user, ['Estudiante'])
-  const canRequestClassResources = hasAnyPermission(user, ['solicitar_recursos_clase'])
+  const canRequestClassResources = hasAnyPermission(user, ['solicitar_recursos_clase', 'gestionar_clases_propias'])
   const hasManagementModules =
     canManageRoles || canManageProfiles || canManageStructure || canManagePenalties || canManageEquipos || canManageMateriales || canManageTutorials
   const canOperateLabs = canManageStructure || canManagePenalties || canManageEquipos || canManageMateriales || canManageTutorials
