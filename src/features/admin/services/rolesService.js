@@ -147,7 +147,7 @@ function mapUserRecord(record, allRoles = []) {
   return {
     id: record.id,
     name: record.name ?? '',
-    email: record.email ?? '',
+    email: record.email ?? record.username ?? '',
     roleId: roleObj?.id || null,
     role: roleObj,
     created: record.created,

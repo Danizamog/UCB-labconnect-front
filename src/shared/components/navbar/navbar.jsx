@@ -1,10 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertOctagon,
   BarChart3,
   BookOpenCheck,
   CalendarClock,
+  CalendarDays,
   CalendarPlus,
+  ChevronRight,
+  ClipboardCheck,
   FlaskConical,
   House,
   History,
@@ -21,24 +24,24 @@ import {
   X,
 } from 'lucide-react'
 import { NAVIGATION_LINKS } from '../../config/navigationLinks'
-import { hasAnyPermission, hasRole, isAdminUser } from '../../lib/permissions'
+import { hasAnyPermission, hasRole } from '../../lib/permissions'
 import ucbShieldLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
 import './navbar.css'
 
 const iconMap = {
   home: House,
-  admin_reservas: Users,
+  admin_reservas: ClipboardCheck,
   analytics: BarChart3,
   ia_predicciones: Sparkles,
-  profiles: UserRound,
-  roles: Users,
+  profiles: Users,
+  roles: ShieldCheck,
   penalties: AlertOctagon,
   areas: Layers,
   laboratorios: FlaskConical,
   horarios_laboratorios: CalendarClock,
   equipos: MonitorCog,
   materiales: Package,
-  calendar: Layers,
+  calendar: CalendarDays,
   tutorials_manage: CalendarPlus,
   mis_clases: BookOpenCheck,
   tutorials_public: BookOpenCheck,
@@ -49,30 +52,30 @@ const iconMap = {
   logout: LogOut,
 }
 
-const NAV_GROUP_ORDER = ['Inicio', 'Reservas', 'Inventario', 'Personas']
+const NAV_GROUP_ORDER = ['Inicio', 'Académico', 'Laboratorios', 'Inventario', 'Administración']
 
 const NAV_META = {
   home: { group: 'Inicio', aliases: ['inicio', 'panel', 'principal'], hint: 'Vista general' },
-  admin_reservas: { group: 'Reservas', aliases: ['reservas', 'admin', 'laboratorio'], hint: 'Aprobar, entrar y salir' },
-  analytics: { group: 'Reservas', aliases: ['analisis', 'estadisticas', 'ocupacion', 'uso laboratorios'], hint: 'Uso y demanda' },
-  ia_predicciones: { group: 'Reservas', aliases: ['prediccion', 'predicciones', 'ia', 'pronostico', 'desabastecimiento', 'demanda futura'], hint: 'Pronosticos IA' },
-  tutorials_manage: { group: 'Reservas', aliases: ['tutorias', 'publicar', 'sesiones'], hint: 'Crear sesiones' },
-  mis_clases: { group: 'Reservas', aliases: ['clases', 'docente', 'materiales clase', 'equipos clase', 'recursos'], hint: 'Pedir materiales y equipos' },
-  penalties: { group: 'Personas', aliases: ['penalizaciones', 'sanciones'], hint: 'Bloqueos activos' },
-  areas: { group: 'Reservas', aliases: ['areas', 'bloques'], hint: 'Organizacion academica' },
-  laboratorios: { group: 'Reservas', aliases: ['laboratorios', 'espacios'], hint: 'Salas y capacidad' },
-  horarios_laboratorios: { group: 'Reservas', aliases: ['horarios', 'clases', 'asignaturas'], hint: 'Clases recurrentes' },
+  admin_reservas: { group: 'Laboratorios', aliases: ['reservas', 'admin', 'laboratorio'], hint: 'Solicitudes, aprobaciones y accesos' },
+  analytics: { group: 'Laboratorios', aliases: ['analisis', 'estadisticas', 'ocupacion', 'uso laboratorios'], hint: 'Uso y demanda' },
+  ia_predicciones: { group: 'Laboratorios', aliases: ['prediccion', 'predicciones', 'ia', 'pronostico', 'desabastecimiento', 'demanda futura'], hint: 'Pronósticos y tendencias' },
+  tutorials_manage: { group: 'Académico', aliases: ['tutorias', 'publicar', 'sesiones'], hint: 'Publicar y gestionar tutorías' },
+  mis_clases: { group: 'Académico', aliases: ['clases', 'docente', 'materiales clase', 'equipos clase', 'recursos'], hint: 'Clases, horarios y recursos' },
+  penalties: { group: 'Administración', aliases: ['penalizaciones', 'sanciones'], hint: 'Bloqueos activos' },
+  areas: { group: 'Laboratorios', aliases: ['areas', 'bloques'], hint: 'Organización académica' },
+  laboratorios: { group: 'Laboratorios', aliases: ['laboratorios', 'espacios'], hint: 'Salas y capacidad' },
+  horarios_laboratorios: { group: 'Laboratorios', aliases: ['horarios', 'clases', 'asignaturas'], hint: 'Clases recurrentes' },
   equipos: { group: 'Inventario', aliases: ['equipos', 'inventario', 'mantenimiento'], hint: 'Prestamos y estado' },
   materiales: { group: 'Inventario', aliases: ['materiales', 'reactivos', 'stock'], hint: 'Existencias' },
-  profiles: { group: 'Personas', aliases: ['perfiles', 'usuarios', 'cuentas'], hint: 'Editar y reactivar' },
-  roles: { group: 'Personas', aliases: ['roles', 'permisos', 'accesos'], hint: 'Permisos del sistema' },
-  calendar: { group: 'Reservas', aliases: ['calendario', 'disponibilidad', 'horarios'], hint: 'Horarios libres' },
-  tutorials_public: { group: 'Reservas', aliases: ['tutorias', 'inscripcion'], hint: 'Inscripciones' },
-  tutorials_history: { group: 'Reservas', aliases: ['historial tutorias', 'tutorias atendidas', 'sesiones atendidas'], hint: 'Sesiones finalizadas' },
-  history: { group: 'Reservas', aliases: ['historial', 'pasadas', 'actividad'], hint: 'Reservas pasadas' },
-  reserve: { group: 'Reservas', aliases: ['reservar', 'laboratorio', 'nueva reserva'], hint: 'Crear solicitud' },
-  account: { group: 'Personas', aliases: ['cuenta', 'perfil', 'contrasena'], hint: 'Datos y seguridad' },
-  security: { group: 'Personas', aliases: ['seguridad', 'auditoria', 'rbac'], hint: 'Consulta OSI' },
+  profiles: { group: 'Administración', aliases: ['perfiles', 'usuarios', 'cuentas'], hint: 'Usuarios y expedientes' },
+  roles: { group: 'Administración', aliases: ['roles', 'permisos', 'accesos'], hint: 'Roles y matriz de accesos' },
+  calendar: { group: 'Laboratorios', aliases: ['calendario', 'disponibilidad', 'horarios'], hint: 'Horarios libres' },
+  tutorials_public: { group: 'Académico', aliases: ['tutorias', 'inscripcion'], hint: 'Inscripciones' },
+  tutorials_history: { group: 'Académico', aliases: ['historial tutorias', 'tutorias atendidas', 'sesiones atendidas'], hint: 'Sesiones finalizadas' },
+  history: { group: 'Laboratorios', aliases: ['historial', 'pasadas', 'actividad'], hint: 'Reservas pasadas' },
+  reserve: { group: 'Laboratorios', aliases: ['reservar', 'laboratorio', 'nueva reserva'], hint: 'Crear solicitud' },
+  account: { group: 'Administración', aliases: ['cuenta', 'perfil', 'contrasena'], hint: 'Datos y seguridad' },
+  security: { group: 'Administración', aliases: ['seguridad', 'auditoria', 'rbac'], hint: 'Auditoría y revisión de accesos' },
 }
 
 function normalizeSearchText(value) {
@@ -86,7 +89,18 @@ function normalizeSearchText(value) {
 function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const isAdmin = isAdminUser(user)
+  const toggleRef = useRef(null)
+  useEffect(() => {
+    if (!isOpen) return
+    const previousOverflow = document.body.style.overflow
+    if (window.matchMedia('(max-width: 860px)').matches) document.body.style.overflow = 'hidden'
+    const closeOnEscape = (event) => { if (event.key === 'Escape') { setIsOpen(false); toggleRef.current?.focus() } }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('keydown', closeOnEscape)
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isOpen])
   const navPriority = {
     home: 0,
     reserve: 1,
@@ -118,7 +132,7 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
   })
 
   const navLinks = visibleLinks
-    .filter((link) => !link.action)
+    .filter((link) => !link.action && link.id !== 'account')
     .sort((a, b) => (navPriority[a.id] ?? 99) - (navPriority[b.id] ?? 99) || a.label.localeCompare(b.label))
   const logoutLink = visibleLinks.find((link) => link.action === 'logout') || null
   const normalizedQuery = normalizeSearchText(searchQuery)
@@ -149,9 +163,11 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
     return groups.filter((group) => group.links.length > 0)
   }, [filteredNavLinks])
 
-  const primaryAction = isAdmin
-    ? navLinks.find((link) => link.id === 'admin_reservas') || navLinks.find((link) => link.id !== 'home')
-    : navLinks.find((link) => link.id === 'reserve') || navLinks.find((link) => link.id === 'calendar')
+  const primarySection = hasAnyPermission(user, ['crear_usuarios']) ? 'profiles'
+    : hasAnyPermission(user, ['gestionar_clases_propias']) ? 'mis_clases'
+      : hasAnyPermission(user, ['gestionar_reservas']) ? 'admin_reservas'
+        : hasAnyPermission(user, ['consultar_auditoria_seguridad']) ? 'security' : 'reserve'
+  const primaryAction = navLinks.find((link) => link.id === primarySection)
 
   const handleNavigate = (path) => {
     setIsOpen(false)
@@ -176,9 +192,11 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
         <button
           type="button"
           className="sidebar-toggle"
+          ref={toggleRef}
           onClick={() => setIsOpen((prev) => !prev)}
           aria-label={isOpen ? 'Cerrar menu' : 'Abrir menu'}
           aria-expanded={isOpen}
+          aria-controls="main-sidebar"
         >
           {isOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
@@ -186,7 +204,7 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
 
       {isOpen && <div className="sidebar-overlay" onClick={() => setIsOpen(false)} />}
 
-      <aside className={`sidebar ${isOpen ? 'sidebar--open' : ''}`}>
+      <aside id="main-sidebar" className={`sidebar ${isOpen ? 'sidebar--open' : ''}`}>
         <div className="sidebar-brand">
           <img src={ucbShieldLogo} alt="Escudo UCB San Pablo La Paz" className="sidebar-logo" />
           <div className="sidebar-brand-text">
@@ -196,13 +214,15 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
           </div>
         </div>
 
+        <div className="sidebar-workspace"><span className="sidebar-workspace-dot" /><span>{user?.role || 'Espacio personal'}</span></div>
+
         {primaryAction ? (
           <button type="button" className="sidebar-primary-action" onClick={() => handleNavigate(primaryAction.path)}>
             {(() => {
               const Icon = iconMap[primaryAction.icon]
               return Icon ? <Icon size={18} aria-hidden="true" /> : null
             })()}
-            <span>{isAdmin ? 'Panel operativo' : 'Reservar ahora'}</span>
+            <span>{primaryAction.label}</span><ChevronRight size={15} className="sidebar-action-arrow" />
           </button>
         ) : null}
 
@@ -212,10 +232,11 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
             <input
               id="sidebar-search-input"
               type="search"
-              placeholder="Buscar accion..."
+              placeholder="Buscar en el menú…"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
             />
+            {searchQuery ? <button type="button" className="sidebar-search-clear" onClick={() => setSearchQuery('')} aria-label="Limpiar búsqueda"><X size={14} /></button> : null}
           </label>
           {normalizedQuery ? (
             <p className="sidebar-search-hint">
@@ -224,10 +245,10 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
           ) : null}
         </div>
 
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav" aria-label="Navegación principal">
           {groupedNavLinks.map((group) => (
             <div key={group.groupName} className="sidebar-group">
-              <p className="sidebar-group-title">{group.groupName}</p>
+              <p className="sidebar-group-title">{group.groupName}<span aria-hidden="true">{group.links.length}</span></p>
               {group.links.map((link) => {
                 const Icon = iconMap[link.icon]
                 const hint = NAV_META[link.id]?.hint
@@ -237,7 +258,9 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
                     href={link.path}
                     className={`sidebar-link ${activeSection === link.id ? 'sidebar-link--active' : ''}`}
                     aria-current={activeSection === link.id ? 'page' : undefined}
+                    title={hint}
                     onClick={(event) => {
+                      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
                       event.preventDefault()
                       handleNavigate(link.path)
                     }}
@@ -247,6 +270,7 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
                       <strong>{link.label}</strong>
                       {hint ? <small>{hint}</small> : null}
                     </span>
+                    {activeSection === link.id ? <ChevronRight className="sidebar-link-arrow" size={15} aria-hidden="true" /> : null}
                   </a>
                 )
               })}
@@ -265,14 +289,15 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
               </div>
               <div className="sidebar-user-info">
                 <span className="sidebar-user-name">{user.name || user.username}</span>
-                <span className="sidebar-user-role">{user.role || 'Usuario'}</span>
+                <span className="sidebar-user-role">Mi cuenta y contraseña</span>
               </div>
+              <ChevronRight size={16} className="sidebar-user-arrow" />
             </button>
           ) : null}
           {logoutLink ? (
             <button type="button" className="sidebar-logout" onClick={handleLogout}>
               <LogOut size={16} aria-hidden="true" />
-              <span>Salir</span>
+              <span>Cerrar sesión</span>
             </button>
           ) : null}
         </div>

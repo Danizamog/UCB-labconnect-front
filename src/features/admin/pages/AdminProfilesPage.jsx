@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Clock3, Copy, KeyRound, Plus, Search, ShieldAlert, ShieldCheck, Unlock, UserRoundCheck, UserX } from 'lucide-react'
+import { AlertTriangle, ArrowRight, CheckCircle2, Clock3, Copy, FileText, KeyRound, Mail, Plus, Search, ShieldAlert, ShieldCheck, Unlock, UserPlus, UserRoundCheck, UserX } from 'lucide-react'
 import { createUserProfile, deactivateUserProfile, listUserProfiles, resetUserPassword, unlockUserProfile, updateUserProfile } from '../services/profileService'
 import { listAssetResponsibilityFlags } from '../services/infrastructureService'
 import { assignUserRole, listRoles } from '../services/rolesService'
@@ -10,6 +10,7 @@ import {
 } from '../../reservations/services/reservationsService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
+import WorkflowDialog from '../../../shared/components/WorkflowDialog'
 import './AdminProfilesPage.css'
 
 const defaultForm = {
@@ -149,6 +150,7 @@ function AdminProfilesPage({ user }) {
   const [isLoadingContext, setIsLoadingContext] = useState(false)
   const [isReactivating, setIsReactivating] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const [detailTab, setDetailTab] = useState('profile')
   const [createdCredential, setCreatedCredential] = useState(null)
   const [createForm, setCreateForm] = useState(defaultCreateForm)
   const [temporaryPassword, setTemporaryPassword] = useState('')
@@ -336,6 +338,7 @@ function AdminProfilesPage({ user }) {
 
   const handleEdit = (profile) => {
     resetFeedback()
+    setDetailTab('profile')
     setEditingUser(profile)
     setForm(mapProfileForm(profile, roles))
     setReactivationForm(defaultReactivationForm)
@@ -349,11 +352,12 @@ function AdminProfilesPage({ user }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    if (!editingUser) {
+    if (!editingUser || securityActionPending) {
       return
     }
 
     resetFeedback()
+    setSecurityActionPending(true)
 
     try {
       const payload = {}
@@ -392,6 +396,8 @@ function AdminProfilesPage({ user }) {
       setMessage(Object.keys(payload).length > 0 || (form.roleId && form.roleId !== currentRoleId) ? 'Perfil actualizado correctamente.' : 'No habia cambios pendientes para guardar.')
     } catch (err) {
       setError(err.message || 'No se pudo guardar el perfil')
+    } finally {
+      setSecurityActionPending(false)
     }
   }
 
@@ -535,37 +541,39 @@ function AdminProfilesPage({ user }) {
           <div><span>Bloqueados</span><strong>{summary.blocked}</strong></div>
           <div><span>Danos abiertos</span><strong>{summary.flagged}</strong></div>
         </div>
-        {canCreate ? <button type="button" className="profiles-primary" onClick={() => setShowCreate((value) => !value)}><Plus size={16} /> {showCreate ? 'Cancelar' : 'Crear Usuario'}</button> : null}
+        {canCreate ? <button type="button" className="profiles-primary profiles-create-action" onClick={() => { resetFeedback(); setShowCreate(true) }}><UserPlus size={18} /> Crear usuario</button> : null}
       </header>
 
       {message ? <p className="profiles-alert success">{message}</p> : null}
       {error ? <p className="profiles-alert error">{error}</p> : null}
 
-      {createdCredential ? <section className="profiles-card profiles-form" aria-label="Credencial inicial generada">
-        <div className="profiles-section-head"><div><h3><KeyRound size={18} /> Cuenta local creada</h3><p>{createdCredential.username} · {createdCredential.userCode}</p></div></div>
-        <p>Contraseña temporal generada de forma segura. Se muestra únicamente ahora; al cerrar esta tarjeta no podrás recuperarla.</p>
-        <p><code>{createdCredential.password}</code></p>
-        <div className="profiles-actions"><button type="button" className="profiles-secondary" onClick={async () => {
+      {createdCredential ? <WorkflowDialog title="La cuenta está lista" eyebrow="Usuario creado" icon={CheckCircle2} description="Entrega esta credencial al usuario para su primer acceso." onClose={() => setCreatedCredential(null)} footer={<button type="button" className="profiles-primary" onClick={() => setCreatedCredential(null)}>Ya la resguardé <ArrowRight size={16} /></button>}>
+        {error ? <p className="workflow-dialog-error" role="alert">{error}</p> : null}
+        <div className="profiles-credential-identity"><Mail size={20} /><div><strong>{createdCredential.username}</strong><span>{createdCredential.userCode}</span></div><span className="profiles-status-pill success">Cuenta local</span></div>
+        <div className="profiles-credential-box"><span>Contraseña temporal · visualización única</span><code>{createdCredential.password}</code><button type="button" className="profiles-secondary" onClick={async () => {
           try { await navigator.clipboard.writeText(createdCredential.password); setMessage('Contraseña temporal copiada.') }
           catch { setError('No se pudo copiar. Puedes seleccionar la contraseña visible y copiarla manualmente.') }
-        }}><Copy size={15} /> Copiar contraseña</button><button type="button" className="profiles-primary" onClick={() => setCreatedCredential(null)}>Ya la resguardé · Cerrar</button></div>
-        <p className="profiles-inline-hint">Entrégala por el canal institucional. En su primer ingreso a LabConnect, el usuario deberá sustituirla antes de continuar. Esta cuenta no crea un buzón de correo.</p>
-      </section> : null}
+        }}><Copy size={15} /> {message === 'Contraseña temporal copiada.' ? 'Copiada' : 'Copiar contraseña'}</button></div>
+        <div className="workflow-note"><ShieldCheck size={19} /><div><strong>El siguiente paso es del usuario</strong><p>En su primer ingreso deberá elegir una nueva contraseña. Guarda esta credencial antes de cerrar: no volverá a mostrarse.</p></div></div>
+      </WorkflowDialog> : null}
 
       {showCreate ? (
-        <section className="profiles-card profiles-form" aria-label="Crear Usuario">
-          <div className="profiles-section-head"><div><h3><Plus size={18} /> Crear Usuario</h3><p>El User ID se genera automáticamente con el formato UCB-AÑO-CÓDIGO.</p></div></div>
-          <form onSubmit={handleCreate}>
+        <WorkflowDialog title="Crear usuario" eyebrow="Gestión de identidades" icon={UserPlus} description="Registra una cuenta local para acceder a LabConnect." busy={securityActionPending} onClose={() => setShowCreate(false)} footer={<><button type="button" className="profiles-ghost" onClick={() => setShowCreate(false)} disabled={securityActionPending}>Cancelar</button><button type="submit" form="create-user-form" className="profiles-primary" disabled={securityActionPending}><UserPlus size={16} /> {securityActionPending ? 'Creando cuenta...' : 'Crear cuenta'}</button></>}>
+          {error ? <p className="workflow-dialog-error" role="alert">{error}</p> : null}
+          <form id="create-user-form" className="profiles-form profiles-create-form" onSubmit={handleCreate}>
+            <section><h3 className="workflow-section-title"><span>01</span> Identidad del usuario</h3>
             <div className="profiles-form-grid">
+              <label><span>Nombre completo <b>*</b></span><input autoComplete="name" placeholder="Ej. María López Vargas" minLength={2} maxLength={160} value={createForm.name} onChange={(event) => setCreateForm((value) => ({ ...value, name: event.target.value }))} required /></label>
               <label><span>Correo institucional</span><input type="email" pattern="[^@\s]+@ucb\.edu\.bo" title="Utiliza un correo con dominio @ucb.edu.bo" value={createForm.username} onChange={(event) => setCreateForm((value) => ({ ...value, username: event.target.value }))} placeholder="usuario@ucb.edu.bo" required /></label>
-              <label><span>Nombre completo</span><input value={createForm.name} onChange={(event) => setCreateForm((value) => ({ ...value, name: event.target.value }))} required /></label>
+            </div><p className="profiles-field-help">Solo correos @ucb.edu.bo. El identificador del usuario se genera automáticamente.</p></section>
+            <section><h3 className="workflow-section-title"><span>02</span> Perfil y acceso</h3><div className="profiles-form-grid">
               <label><span>Tipo de perfil</span><select value={createForm.profile_type} onChange={(event) => setCreateForm((value) => ({ ...value, profile_type: event.target.value }))}><option value="student">Estudiante</option><option value="teacher">Docente</option><option value="staff">Personal</option><option value="guest">Invitado</option><option value="lab_manager">Encargado</option></select></label>
               {canAssign ? <label><span>Rol inicial</span><select value={createForm.roleId} onChange={(event) => setCreateForm((value) => ({ ...value, roleId: event.target.value }))}><option value="">Sin rol</option>{roles.filter((role) => !['Administrador', 'Administrador de Accesos', 'OSI - Auditor de Seguridad'].includes(role.nombre)).map((role) => <option key={role.id} value={role.id}>{role.nombre}</option>)}</select></label> : null}
             </div>
-            <p className="profiles-inline-hint">El sistema generará una contraseña temporal segura y la mostrará una sola vez. El usuario deberá cambiarla al iniciar sesión por primera vez. Acceso exclusivo a LabConnect con dominio @ucb.edu.bo.</p>
-            <div className="profiles-actions"><button type="submit" className="profiles-primary" disabled={securityActionPending}>{securityActionPending ? 'Creando...' : 'Crear usuario'}</button></div>
+            </section>
+            <div className="workflow-note"><KeyRound size={20} /><div><strong>Contraseña segura, generada automáticamente</strong><p>Al crear la cuenta verás una clave temporal de 20 caracteres. El usuario deberá cambiarla al ingresar por primera vez.</p></div></div>
           </form>
-        </section>
+        </WorkflowDialog>
       ) : null}
 
       <div className="profiles-grid">
@@ -624,6 +632,7 @@ function AdminProfilesPage({ user }) {
                     className={`profiles-item${editingUser?.id === profile.id ? ' editing' : ''} ${state.key}`}
                   >
                     <div className="profiles-item-head">
+                      <span className="profiles-directory-avatar" aria-hidden="true">{getProfileDisplayName(profile).split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}</span>
                       <div>
                         <strong>{getProfileDisplayName(profile)}</strong>
                         <p>{getProfileDisplayIdentity(profile)}</p>
@@ -638,7 +647,7 @@ function AdminProfilesPage({ user }) {
 
                     {activePenalty ? (
                       <div className="profiles-inline-banner warning">
-                        <ShieldAlert size={16} />
+                        <ShieldAlert size={15} aria-hidden="true" />
                         <div>
                           <strong>Bloqueo activo</strong>
                           <p>{activePenalty.reason}</p>
@@ -648,17 +657,17 @@ function AdminProfilesPage({ user }) {
 
                     {flag && Number(flag.active_damage_count || 0) > 0 ? (
                       <div className="profiles-inline-banner danger">
-                        <AlertTriangle size={16} />
+                        <AlertTriangle size={15} aria-hidden="true" />
                         <div>
                           <strong>Incidentes pendientes</strong>
-                          <p>{flag.active_damage_count} dano(s) abierto(s) en historial de activos.</p>
+                          <p>{flag.active_damage_count} {Number(flag.active_damage_count) === 1 ? 'daño abierto' : 'daños abiertos'} en el historial de activos.</p>
                         </div>
                       </div>
                     ) : null}
 
                     <div className="profiles-actions compact">
                       <button type="button" className="profiles-secondary" onClick={() => handleEdit(profile)}>
-                        Ver expediente
+                        <FileText size={15} /> Ver expediente <ArrowRight size={14} />
                       </button>
                       {activePenalty && canManagePenalties ? (
                         <button type="button" className="profiles-primary" onClick={() => handleEdit(profile)}>
@@ -682,9 +691,10 @@ function AdminProfilesPage({ user }) {
           )}
         </section>
 
-        <section className="profiles-card profiles-detail-card">
-          {editingUser ? (
+          {editingUser ? <WorkflowDialog title="Expediente de usuario" description="Consulta y administra la información de esta cuenta." eyebrow="Directorio institucional" icon={FileText} wide onClose={cancelEdit} busy={securityActionPending} footer={<><button type="button" className="profiles-ghost" onClick={cancelEdit} disabled={securityActionPending}>Cerrar expediente</button>{detailTab === 'profile' && (canManage || canUnlockSecurity || canDeactivate) ? <button form="profile-panel" type="submit" className="profiles-primary" disabled={securityActionPending}>{securityActionPending ? 'Guardando...' : 'Guardar cambios'}<CheckCircle2 size={16} /></button> : null}</>}>
             <div className="profiles-detail-shell">
+              {error ? <p className="workflow-dialog-error" role="alert">{error}</p> : null}
+              {message ? <p className="profiles-dialog-success" role="status">{message}</p> : null}
               <div className="profiles-detail-hero">
                 <div>
                   <p className="profiles-kicker">Expediente del usuario</p>
@@ -697,7 +707,19 @@ function AdminProfilesPage({ user }) {
                 </span>
               </div>
 
-              <div className="profiles-spotlight-grid">
+              <div className="profiles-detail-tabs" role="tablist" aria-label="Secciones del expediente" onKeyDown={(event) => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+                const tabs = [...event.currentTarget.querySelectorAll('[role="tab"]')]
+                const index = tabs.indexOf(document.activeElement)
+                const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length
+                event.preventDefault(); tabs[next].focus(); tabs[next].click()
+              }}>
+                <button type="button" role="tab" id="profile-tab" aria-controls="profile-panel" aria-selected={detailTab === 'profile'} onClick={() => setDetailTab('profile')}><UserRoundCheck size={16} /> Datos y rol</button>
+                {(canResetPassword || canDeactivate || canUnlockSecurity) ? <button type="button" role="tab" id="security-tab" aria-controls="security-panel" aria-selected={detailTab === 'security'} onClick={() => setDetailTab('security')}><ShieldCheck size={16} /> Seguridad</button> : null}
+                {canManagePenalties ? <button type="button" role="tab" id="activity-tab" aria-controls="activity-panel" aria-selected={detailTab === 'activity'} onClick={() => setDetailTab('activity')}><Clock3 size={16} /> Bloqueos e historial</button> : null}
+              </div>
+
+              <div className="profiles-spotlight-grid" hidden={detailTab !== 'profile'}>
                 <article className={`profiles-spotlight-card ${selectedProfileState?.key || 'active'}`}>
                   <div className="profiles-spotlight-icon">
                     {selectedProfileState?.key === 'blocked' ? <ShieldAlert size={18} /> : null}
@@ -734,7 +756,7 @@ function AdminProfilesPage({ user }) {
                 </article>
               </div>
 
-              <form className="profiles-form" onSubmit={handleSubmit}>
+              <form id="profile-panel" role="tabpanel" aria-labelledby="profile-tab" hidden={detailTab !== 'profile'} className="profiles-form" onSubmit={handleSubmit}>
                 <div className="profiles-form-section">
                   <span className="profiles-form-section-label">Datos del usuario</span>
                   <div className="profiles-form-grid">
@@ -783,18 +805,10 @@ function AdminProfilesPage({ user }) {
                   </div>
                 </div>
 
-                <div className="profiles-actions">
-                  <button type="submit" className="profiles-secondary" disabled={!canManage && !canUnlockSecurity && !canDeactivate}>
-                    Guardar cambios
-                  </button>
-                  <button type="button" className="profiles-ghost" onClick={cancelEdit}>
-                    Cerrar expediente
-                  </button>
-                </div>
               </form>
 
               {(canResetPassword || canDeactivate || canUnlockSecurity) ? (
-                <section className="profiles-reactivation-card">
+                <section id="security-panel" role="tabpanel" aria-labelledby="security-tab" hidden={detailTab !== 'security'} className="profiles-reactivation-card">
                   <div className="profiles-section-head"><div><h4>Credenciales y bloqueo</h4><p>Acciones independientes, auditadas y limitadas por permisos RBAC.</p></div></div>
                   <div className="profiles-validation-grid">
                     <article className={`profiles-validation-card ${editingUser.security_locked ? 'blocked' : 'success'}`}><span>Bloqueo de seguridad</span><strong>{editingUser.security_locked ? 'Bloqueado' : 'Sin bloqueo'}</strong><p>{editingUser.failed_login_attempts || 0} de 3 intentos fallidos.</p></article>
@@ -810,7 +824,7 @@ function AdminProfilesPage({ user }) {
               ) : null}
 
               {canManagePenalties ? (
-                <section className="profiles-reactivation-card">
+                <section id="activity-panel" role="tabpanel" aria-labelledby="activity-tab" hidden={detailTab !== 'activity'} className="profiles-reactivation-card">
                   <div className="profiles-section-head">
                     <div>
                       <h4>Reactivacion de cuenta</h4>
@@ -975,14 +989,7 @@ function AdminProfilesPage({ user }) {
                 </section>
               ) : null}
             </div>
-          ) : (
-            <div className="profiles-detail-empty">
-              <p className="profiles-kicker">Expediente del usuario</p>
-              <h3>Selecciona un perfil</h3>
-              <p>Desde aqui podras revisar su estado, editar datos basicos y, si corresponde, reactivar la cuenta con evidencia y trazabilidad.</p>
-            </div>
-          )}
-        </section>
+          </WorkflowDialog> : null}
       </div>
     </section>
   )
