@@ -1,0 +1,496 @@
+/* Final visual layer: compact, task-first, production UI */
+
+:root {
+  --ui-bg: #f2f5f8;
+  --ui-panel: #ffffff;
+  --ui-panel-soft: #f8fafc;
+  --ui-border: #d8e1eb;
+  --ui-border-soft: #e9eef5;
+  --ui-text: #132238;
+  --ui-muted: #63748b;
+  --ui-blue: #0c4772;
+  --ui-blue-soft: #e8f3fb;
+  --ui-gold: #f2c94c;
+  --ui-green-soft: #edf8f0;
+  --ui-red-soft: #fff1f2;
+  --ui-shadow: 0 10px 24px rgba(19, 34, 56, 0.07);
+}
+
+body {
+  background: var(--ui-bg) !important;
+}
+
+.home-main {
+  background: var(--ui-bg) !important;
+}
+
+.content-window {
+  background: var(--ui-bg) !important;
+}
+
+/* Top bar */
+.home-toolbar {
+  min-height: 58px !important;
+  padding: 9px 22px !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-bottom: 1px solid var(--ui-border) !important;
+  box-shadow: 0 4px 16px rgba(19, 34, 56, 0.04) !important;
+}
+
+.home-toolbar-copy strong {
+  color: var(--ui-text) !important;
+  font-size: 0.95rem !important;
+}
+
+.home-toolbar-copy span {
+  color: var(--ui-muted) !important;
+}
+
+.module-loading {
+  margin: 22px;
+  padding: 18px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ui-muted);
+  box-shadow: var(--ui-shadow);
+  font-weight: 700;
+}
+
+/* Page chrome */
+.content-window > :is(.infra-page, .profiles-page, .roles-page, .reservations-page, .tutorials-page, .ucb-map-page) {
+  background: var(--ui-bg) !important;
+}
+
+:is(.infra-header, .profiles-header, .roles-header, .reservations-header, .tutorials-header, .ucb-map-header) {
+  margin: 18px 22px 12px !important;
+  padding: 22px 26px !important;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 14px !important;
+  background: var(--ui-panel) !important;
+  color: var(--ui-text) !important;
+  box-shadow: var(--ui-shadow) !important;
+}
+
+:is(.infra-header, .profiles-header, .roles-header, .reservations-header, .tutorials-header, .ucb-map-header)::before,
+:is(.infra-header, .profiles-header, .roles-header, .reservations-header, .tutorials-header, .ucb-map-header)::after {
+  display: none !important;
+}
+
+:is(.infra-kicker, .profiles-kicker, .roles-header-kicker, .reservations-kicker, .tutorials-kicker, .ucb-map-kicker) {
+  margin: 0 0 6px !important;
+  color: var(--ui-blue) !important;
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+}
+
+:is(.infra-header h2, .profiles-header h2, .roles-header h2, .reservations-header h2, .tutorials-header h2, .ucb-map-header h2) {
+  margin: 0 !important;
+  color: var(--ui-text) !important;
+  font-size: clamp(1.5rem, 2vw, 2rem) !important;
+  line-height: 1.12 !important;
+  font-weight: 800 !important;
+  letter-spacing: 0 !important;
+}
+
+:is(.infra-header p, .profiles-header p, .roles-header p, .reservations-header p, .tutorials-header p, .ucb-map-header p):not(:is(.infra-kicker, .profiles-kicker, .roles-header-kicker, .reservations-kicker, .tutorials-kicker, .ucb-map-kicker)) {
+  margin: 8px 0 0 !important;
+  max-width: 760px !important;
+  color: var(--ui-muted) !important;
+  font-size: 0.94rem !important;
+  line-height: 1.45 !important;
+}
+
+:is(.infra-summary, .profiles-summary, .reservations-summary, .tutorials-summary) {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+
+:is(.infra-summary div, .profiles-summary div, .reservations-summary div, .tutorials-summary div, .reservations-summary-card) {
+  min-width: 88px !important;
+  padding: 9px 12px !important;
+  border: 1px solid var(--ui-border-soft) !important;
+  border-radius: 10px !important;
+  background: var(--ui-panel-soft) !important;
+  box-shadow: none !important;
+}
+
+:is(.infra-summary span, .profiles-summary span, .reservations-summary span, .tutorials-summary span) {
+  color: var(--ui-muted) !important;
+  font-size: 0.7rem !important;
+  font-weight: 800 !important;
+}
+
+:is(.infra-summary strong, .profiles-summary strong, .reservations-summary strong, .tutorials-summary strong) {
+  color: var(--ui-text) !important;
+  font-size: 1.22rem !important;
+  font-weight: 800 !important;
+}
+
+/* Layout spacing */
+:is(.infra-grid, .infra-body, .profiles-grid, .roles-body, .tutorials-page, .ucb-map-layout) {
+  padding: 10px 22px 28px !important;
+  gap: 16px !important;
+}
+
+.reservations-page {
+  padding: 0 22px 28px !important;
+  display: grid !important;
+  gap: 14px !important;
+}
+
+.reservations-page > .reservations-header {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Panels */
+:is(.infra-card, .profiles-card, .roles-form-card, .roles-permissions-panel, .roles-matrix-container, .reservations-panel, .tutorials-panel, .home-modern-section, .home-role-panel, .ucb-map-frame-card, .ucb-map-buildings) {
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 14px !important;
+  background: var(--ui-panel) !important;
+  box-shadow: var(--ui-shadow) !important;
+  backdrop-filter: none !important;
+}
+
+:is(.infra-card, .profiles-card, .reservations-panel, .tutorials-panel) {
+  padding: 18px !important;
+}
+
+:is(.infra-card:hover, .profiles-card:hover, .roles-form-card:hover, .reservations-panel:hover, .tutorials-panel:hover) {
+  transform: none !important;
+  box-shadow: var(--ui-shadow) !important;
+}
+
+:is(.infra-section-head, .profiles-card-head, .profiles-section-head, .roles-section-head, .reservations-panel-header, .tutorials-panel-header) {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  margin: 0 0 14px !important;
+  padding: 0 0 10px !important;
+  border-bottom: 1px solid var(--ui-border-soft) !important;
+}
+
+:is(.infra-section-head h3, .profiles-card-head h3, .profiles-section-head h3, .roles-section-head h3, .reservations-panel-header h3, .tutorials-panel-header h3) {
+  color: var(--ui-text) !important;
+  font-size: 1.02rem !important;
+  font-weight: 800 !important;
+}
+
+:is(.infra-section-head p, .profiles-card-head p, .profiles-section-head p, .roles-section-head p, .reservations-panel-subtitle, .tutorials-panel-subtitle) {
+  color: var(--ui-muted) !important;
+  font-size: 0.88rem !important;
+}
+
+/* Reservation workspace: remove duplicated visual noise */
+.reservations-workspace-status,
+.reservations-step-grid {
+  display: none !important;
+}
+
+.reservations-panel:has(.reservations-workspace-nav) {
+  padding: 16px !important;
+}
+
+.reservations-panel:has(.reservations-workspace-nav) .reservations-panel-header {
+  margin-bottom: 12px !important;
+}
+
+.reservations-workspace-nav {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+  gap: 10px !important;
+}
+
+.reservations-workspace-tab {
+  min-height: 78px !important;
+  padding: 13px 14px !important;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  color: var(--ui-text) !important;
+  box-shadow: none !important;
+}
+
+.reservations-workspace-tab span:not(.reservations-workspace-icon) {
+  color: var(--ui-muted) !important;
+  font-size: 0.82rem !important;
+  line-height: 1.35 !important;
+}
+
+.reservations-workspace-tab.is-active {
+  border-color: rgba(12, 71, 114, 0.45) !important;
+  background: var(--ui-blue-soft) !important;
+  box-shadow: inset 4px 0 0 var(--ui-gold) !important;
+}
+
+.reservations-workspace-icon,
+.reservations-summary-card-icon,
+.reservations-task-card-icon {
+  border-radius: 9px !important;
+  background: var(--ui-blue-soft) !important;
+  color: var(--ui-blue) !important;
+}
+
+.reservations-task-grid,
+.reservations-insight-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+  gap: 10px !important;
+}
+
+.reservations-task-card,
+.reservations-insight-card {
+  min-height: 128px !important;
+  padding: 16px !important;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+.reservations-task-card strong,
+.reservations-insight-card strong {
+  color: var(--ui-text) !important;
+  font-size: 2rem !important;
+  line-height: 1.1 !important;
+}
+
+.reservations-task-card p,
+.reservations-insight-card p {
+  color: var(--ui-muted) !important;
+  font-size: 0.88rem !important;
+  line-height: 1.4 !important;
+}
+
+/* Inventory command center */
+.infra-command-panel {
+  display: grid !important;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr) !important;
+  align-items: stretch !important;
+  gap: 14px !important;
+  padding: 18px !important;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 14px !important;
+  background: #fff !important;
+  box-shadow: var(--ui-shadow) !important;
+}
+
+.infra-command-copy {
+  display: grid !important;
+  align-content: center !important;
+  gap: 6px !important;
+  padding: 16px !important;
+  border-radius: 12px !important;
+  background: var(--ui-panel-soft) !important;
+}
+
+.infra-command-copy h3 {
+  margin: 0 !important;
+  color: var(--ui-text) !important;
+  font-size: 1.25rem !important;
+}
+
+.infra-command-copy p {
+  color: var(--ui-muted) !important;
+  font-size: 0.9rem !important;
+}
+
+.infra-action-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+.infra-action-card {
+  min-height: 118px !important;
+  padding: 14px !important;
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+.infra-action-card strong,
+.infra-action-card h4 {
+  color: var(--ui-text) !important;
+  font-size: 0.98rem !important;
+}
+
+.infra-action-card p,
+.infra-action-card small {
+  color: var(--ui-muted) !important;
+  font-size: 0.84rem !important;
+  line-height: 1.35 !important;
+}
+
+.infra-action-card span:first-child,
+.infra-action-card-icon {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 9px !important;
+  background: var(--ui-blue-soft) !important;
+  color: var(--ui-blue) !important;
+}
+
+/* Tickets, loans, lists */
+.infra-list,
+.reservation-card-grid,
+.tutorials-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.infra-ticket-card,
+.reservation-user-card,
+.tutorial-card,
+.profiles-item,
+.infra-item {
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+.infra-ticket-card {
+  padding: 15px !important;
+}
+
+.infra-ticket-head h4,
+.reservation-user-card h4,
+.tutorial-card h3,
+.profiles-item h3 {
+  color: var(--ui-text) !important;
+  font-size: 1rem !important;
+  line-height: 1.25 !important;
+}
+
+.infra-ticket-copy,
+.infra-ticket-meta,
+.reservation-user-card-meta,
+.tutorial-copy,
+.profiles-meta {
+  color: var(--ui-muted) !important;
+  font-size: 0.86rem !important;
+}
+
+.infra-chip,
+.infra-status-badge,
+.reservations-status,
+.tutorial-badge,
+.profiles-badge {
+  border-radius: 999px !important;
+  font-size: 0.74rem !important;
+  font-weight: 800 !important;
+}
+
+/* Forms and tables */
+:is(.infra-form input, .infra-form select, .infra-form textarea, .profiles-form input, .profiles-form select, .roles-input, .reservations-controls input, .reservations-controls select, .reservations-form input, .reservations-form select, .reservations-form textarea, .tutorials-form input, .tutorials-form select, .tutorials-form textarea) {
+  min-height: 42px !important;
+  border-radius: 9px !important;
+  border: 1px solid var(--ui-border) !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+:is(.infra-form-section, .profiles-form-section, .roles-permission-section, .reservations-form-section, .tutorials-form-section) {
+  border: 1px solid var(--ui-border-soft) !important;
+  border-radius: 12px !important;
+  background: var(--ui-panel-soft) !important;
+}
+
+:is(.infra-primary, .profiles-primary, .roles-save-button, .reservations-primary, .reservation-modal-primary, .tutorials-primary, .credentials-submit) {
+  min-height: 40px !important;
+  border-radius: 9px !important;
+  background: var(--ui-blue) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+:is(.infra-secondary, .profiles-secondary, .roles-tab-button, .reservations-secondary, .reservation-modal-secondary, .tutorials-secondary) {
+  min-height: 40px !important;
+  border-radius: 9px !important;
+  border: 1px solid var(--ui-border) !important;
+  background: #fff !important;
+  color: var(--ui-text) !important;
+  box-shadow: none !important;
+}
+
+:is(.infra-danger, .profiles-danger, .reservations-danger, .tutorials-danger) {
+  min-height: 40px !important;
+  border-radius: 9px !important;
+  border: 1px solid #fecdd3 !important;
+  background: var(--ui-red-soft) !important;
+  color: #9f1239 !important;
+  box-shadow: none !important;
+}
+
+.infra-table-wrap,
+.reservations-table,
+.profiles-list,
+.roles-matrix-container {
+  border: 1px solid var(--ui-border) !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+.infra-table th,
+.reservations-table th {
+  padding: 11px 12px !important;
+  background: #f5f8fb !important;
+  color: var(--ui-muted) !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+}
+
+.infra-table td,
+.reservations-table td {
+  padding: 12px !important;
+  color: var(--ui-text) !important;
+}
+
+.infra-filter-panel,
+.reservations-controls,
+.profiles-search,
+.cal-lab-controls {
+  border: 1px solid var(--ui-border-soft) !important;
+  border-radius: 12px !important;
+  background: var(--ui-panel-soft) !important;
+}
+
+.infra-empty,
+.profiles-empty,
+.reservations-empty,
+.tutorials-empty {
+  border: 1px dashed #c8d5e3 !important;
+  border-radius: 12px !important;
+  background: var(--ui-panel-soft) !important;
+  color: var(--ui-muted) !important;
+}
+
+@media (max-width: 980px) {
+  :is(.infra-header, .profiles-header, .roles-header, .reservations-header, .tutorials-header, .ucb-map-header) {
+    grid-template-columns: 1fr !important;
+    margin: 12px !important;
+  }
+
+  .reservations-page,
+  :is(.infra-grid, .infra-body, .profiles-grid, .roles-body, .tutorials-page, .ucb-map-layout) {
+    padding: 12px !important;
+  }
+
+  .infra-command-panel {
+    grid-template-columns: 1fr !important;
+  }
+
+  .infra-action-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
