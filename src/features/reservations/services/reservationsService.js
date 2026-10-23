@@ -1,0 +1,1248 @@
+import { listAdminLabs } from '../../admin/services/infrastructureService'
+import { getAuthToken } from '../../../shared/utils/storage'
+import { clearStoredSession } from '../../auth/services/authService'
+
+const gatewayBase = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
+const reservationsBase = gatewayBase.endsWith('/v1') ? gatewayBase : `${gatewayBase}/v1`
+const requestCache = new Map()
+const inFlightRequests = new Map()
+const AVAILABILITY_CACHE_TTL_MS = 15 * 1000
+
+
+
+function authHeaders(withJson = false) {
+  const token = getAuthToken()
+  const headers = {
+    ...(withJson ? { 'Content-Type': 'application/json' } : {}),
+  }
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+  return headers
+}
+
+async function parseJson(response, fallback) {
+  return response.json().catch(() => fallback)
+}
+
+function cloneCachedValue(value) {
+  if (typeof globalThis.structuredClone === 'function') {
+    return globalThis.structuredClone(value)
+  }
+
+  return JSON.parse(JSON.stringify(value))
+}
+
+function buildRequestCacheKey(url, options = {}, token = '') {
+  const method = String(options.method || 'GET').toUpperCase()
+  return `${method}:${url}:${token}`
+}
+
+// Prefijos de URL para invalidacion granular del cache. La idea es que una
+// mutacion solo borre los listados/recursos que realmente puede afectar, en
+// vez de tirar todo el cache (con eso una mutacion en /reservations forzaba
+// refetch de penalties, notificaciones, supplies, etc.).
+const CACHE_PREFIXES = {
+  reservations: '/reservations',
+  availability: '/availability/labs/',
+  notifications: '/notifications',
+  penalties: '/penalties',
+  supplies: '/supply-reservations',
+}
+
+function clearCacheByNamespaces(...namespaces) {
+  const prefixes = namespaces.map((ns) => CACHE_PREFIXES[ns] || ns).filter(Boolean)
+  if (prefixes.length === 0) return
+
+  const matches = (key) => prefixes.some((prefix) => key.includes(prefix))
+  for (const key of [...requestCache.keys()]) {
+    if (matches(key)) requestCache.delete(key)
+  }
+  for (const key of [...inFlightRequests.keys()]) {
+    if (matches(key)) inFlightRequests.delete(key)
+  }
+}
+
+async function request(url, options = {}) {
+  const { cacheTtlMs = 0, skipCache = false, ...fetchOptions } = options
+  const method = String(fetchOptions.method || 'GET').toUpperCase()
+  const token = getAuthToken() || ''
+  const canCache = method === 'GET' && cacheTtlMs > 0 && !skipCache
+  const cacheKey = buildRequestCacheKey(url, fetchOptions, token)
+
+  if (canCache) {
+    const cachedEntry = requestCache.get(cacheKey)
+    if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+      return cloneCachedValue(cachedEntry.data)
+    }
+
+    const existingRequest = inFlightRequests.get(cacheKey)
+    if (existingRequest) {
+      return cloneCachedValue(await existingRequest)
+    }
+  }
+
+  const fetchPromise = (async () => {
+  const response = await fetch(url, {
+    ...fetchOptions,
+    headers: {
+      ...authHeaders(Boolean(fetchOptions.body)),
+      ...(fetchOptions.headers || {}),
+    },
+  })
+
+  const data = await parseJson(response, null)
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearStoredSession()
+    }
+    throw new Error(data?.detail || `Error ${response.status}`)
+  }
+
+    if (canCache) {
+      requestCache.set(cacheKey, {
+        data,
+        expiresAt: Date.now() + cacheTtlMs,
+      })
+    }
+
+  return data
+  })()
+
+  if (canCache) {
+    inFlightRequests.set(cacheKey, fetchPromise)
+  }
+
+  try {
+    const result = await fetchPromise
+    return canCache ? cloneCachedValue(result) : result
+  } finally {
+    if (canCache) {
+      inFlightRequests.delete(cacheKey)
+    }
+  }
+}
+
+function splitDateTime(isoDateTime = '') {
+  const normalized = String(isoDateTime || '').replace(' ', 'T')
+  const [datePart = '', timePart = ''] = normalized.split('T')
+  const hhmm = timePart.slice(0, 5)
+  return { date: datePart, time: hhmm }
+}
+
+function mapReservation(record) {
+  const { date: startDate, time: startTime } = splitDateTime(record?.start_at)
+  const { date: endDate, time: endTime } = splitDateTime(record?.end_at)
+  const { time: checkInTime } = splitDateTime(record?.check_in_at)
+  const { time: checkOutTime } = splitDateTime(record?.check_out_at)
+
+  return {
+    id: record?.id,
+    laboratory_id: record?.laboratory_id || '',
+    laboratory_name: record?.laboratory_name || '',
+    area_id: record?.area_id || '',
+    requested_by: record?.requested_by || '',
+    requested_by_name: record?.requested_by_name || '',
+    requested_by_email: record?.requested_by_email || '',
+    purpose: record?.purpose || '',
+    start_at: record?.start_at || '',
+    end_at: record?.end_at || '',
+    start_time: startTime,
+    end_time: endTime,
+    date: startDate || endDate,
+    status: record?.status || 'pending',
+    notes: record?.notes || '',
+    cancel_reason: record?.cancel_reason || '',
+    is_active: record?.is_active !== false,
+    created: record?.created || '',
+    updated: record?.updated || '',
+    station_label: record?.station_label || '',
+    check_in_at: record?.check_in_at || '',
+    check_out_at: record?.check_out_at || '',
+    check_in_time: checkInTime || '',
+    check_out_time: checkOutTime || '',
+    is_walk_in: Boolean(record?.is_walk_in),
+    user_modification_count: Number(record?.user_modification_count || 0),
+    requires_full_lab: Boolean(record?.requires_full_lab),
+    responsible_teacher: record?.responsible_teacher || '',
+    responsible_teacher_name: record?.responsible_teacher_name || '',
+    project_description: record?.project_description || '',
+  }
+}
+
+function mapReservationPage(record) {
+  return {
+    items: Array.isArray(record?.items) ? record.items.map(mapReservation) : [],
+    pageNumber: Number(record?.pageNumber || 0),
+    pageSize: Number(record?.pageSize || 10),
+    totalElements: Number(record?.totalElements || 0),
+    totalPages: Number(record?.totalPages || 0),
+    sortBy: String(record?.sortBy || 'start_at'),
+    sortType: String(record?.sortType || 'DESC').toUpperCase(),
+    where: String(record?.where || ''),
+  }
+}
+
+function normalizeStringArray(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+
+  return []
+}
+
+export function isLabAccessibleToUser(lab, user) {
+  if (!lab || lab.is_active === false) {
+    return false
+  }
+
+  const permissions = Array.isArray(user?.permissions) ? user.permissions : []
+
+  const allowedRoles = normalizeStringArray(lab?.allowed_roles)
+  if (allowedRoles.length > 0 && !allowedRoles.includes(String(user?.role || '').trim())) {
+    return false
+  }
+
+  const allowedUserIds = normalizeStringArray(lab?.allowed_user_ids)
+  if (allowedUserIds.length > 0 && !allowedUserIds.includes(String(user?.user_id || '').trim())) {
+    return false
+  }
+
+  const requiredPermissions = normalizeStringArray(lab?.required_permissions)
+  if (requiredPermissions.length > 0 && !requiredPermissions.some((permission) => permissions.includes(permission))) {
+    return false
+  }
+
+  return true
+}
+
+function mapTutorialSession(record) {
+  const enrolledStudents = Array.isArray(record?.enrolled_students) ? record.enrolled_students : []
+
+  return {
+    id: record?.id || '',
+    tutor_id: record?.tutor_id || '',
+    tutor_name: record?.tutor_name || 'Tutor',
+    tutor_email: record?.tutor_email || '',
+    topic: record?.topic || '',
+    description: record?.description || '',
+    laboratory_id: record?.laboratory_id || '',
+    location: record?.location || '',
+    session_date: record?.session_date || '',
+    start_time: record?.start_time || '',
+    end_time: record?.end_time || '',
+    start_at: record?.start_at || '',
+    end_at: record?.end_at || '',
+    max_students: Number(record?.max_students || 0),
+    is_published: record?.is_published !== false,
+    enrolled_students: enrolledStudents.map((student) => ({
+      student_id: student?.student_id || '',
+      student_name: student?.student_name || 'Estudiante',
+      student_email: student?.student_email || '',
+      created_at: student?.created_at || '',
+    })),
+    created: record?.created || '',
+    updated: record?.updated || '',
+    enrolled_count: enrolledStudents.length,
+    seats_left: Math.max(Number(record?.max_students || 0) - enrolledStudents.length, 0),
+  }
+}
+
+function mapNotification(record) {
+  const payload = record?.payload && typeof record.payload === 'object' ? record.payload : {}
+  const previousStart = splitDateTime(payload?.old_start_at)
+  const previousEnd = splitDateTime(payload?.old_end_at)
+  const nextStart = splitDateTime(payload?.new_start_at)
+  const nextEnd = splitDateTime(payload?.new_end_at)
+  const reminderStart = splitDateTime(payload?.starts_at)
+  const reservationStart = splitDateTime(payload?.start_at)
+  const tutorialOldStart = {
+    date: payload?.old_session_date || '',
+    time: payload?.old_start_time || '',
+  }
+  const tutorialOldEnd = {
+    date: payload?.old_session_date || '',
+    time: payload?.old_end_time || '',
+  }
+  const tutorialNewStart = {
+    date: payload?.new_session_date || '',
+    time: payload?.new_start_time || '',
+  }
+  const tutorialNewEnd = {
+    date: payload?.new_session_date || '',
+    time: payload?.new_end_time || '',
+  }
+
+  return {
+    id: record?.id || '',
+    recipient_user_id: record?.recipient_user_id || '',
+    type: record?.notification_type || '',
+    title: record?.title || 'Cambio detectado',
+    message: record?.message || '',
+    is_read: Boolean(record?.is_read),
+    created_at: record?.created_at || '',
+    payload,
+    reservation_id: payload?.reservation_id || '',
+    purpose: payload?.purpose || payload?.topic || '',
+    change_kinds: Array.isArray(payload?.change_kinds) ? payload.change_kinds : [],
+    old_laboratory_id: payload?.old_laboratory_id || '',
+    new_laboratory_id: payload?.new_laboratory_id || '',
+    old_laboratory_name: payload?.old_laboratory_name || '',
+    new_laboratory_name: payload?.new_laboratory_name || '',
+    old_date: previousStart.date || previousEnd.date || '',
+    new_date: nextStart.date || nextEnd.date || '',
+    old_time_range: previousStart.time && previousEnd.time ? `${previousStart.time} - ${previousEnd.time}` : '',
+    new_time_range: nextStart.time && nextEnd.time ? `${nextStart.time} - ${nextEnd.time}` : '',
+    actor_name: payload?.actor_name || '',
+    reminder_kind: payload?.reminder_kind || '',
+    reminder_laboratory_id: payload?.laboratory_id || '',
+    reminder_date: reminderStart.date || payload?.session_date || '',
+    reminder_time: reminderStart.time || payload?.start_time || '',
+    reminder_end_time: payload?.end_time || '',
+    reminder_location: payload?.location || payload?.laboratory_name || '',
+    reminder_tutor_name: payload?.tutor_name || '',
+    reminder_event_type: record?.notification_type === 'tutorial_reminder' ? 'tutorial' : 'reservation',
+    status: payload?.status || '',
+    cancel_reason: payload?.cancel_reason || '',
+    target_path: payload?.target_path || '',
+    tutorial_session_id: payload?.tutorial_session_id || '',
+    tutorial_date: payload?.session_date || payload?.new_session_date || '',
+    tutorial_start_time: payload?.start_time || payload?.new_start_time || '',
+    tutorial_end_time: payload?.end_time || payload?.new_end_time || '',
+    tutorial_location: payload?.location || payload?.new_location || '',
+    tutor_name: payload?.tutor_name || payload?.new_tutor_name || '',
+    old_tutor_name: payload?.old_tutor_name || '',
+    new_tutor_name: payload?.new_tutor_name || '',
+    old_tutorial_location: payload?.old_location || '',
+    new_tutorial_location: payload?.new_location || '',
+    old_tutorial_date: tutorialOldStart.date || tutorialOldEnd.date || '',
+    new_tutorial_date: tutorialNewStart.date || tutorialNewEnd.date || '',
+    old_tutorial_time_range: tutorialOldStart.time && tutorialOldEnd.time ? `${tutorialOldStart.time} - ${tutorialOldEnd.time}` : '',
+    new_tutorial_time_range: tutorialNewStart.time && tutorialNewEnd.time ? `${tutorialNewStart.time} - ${tutorialNewEnd.time}` : '',
+    start_date: nextStart.date || reminderStart.date || reservationStart.date || '',
+    start_time: nextStart.time || reminderStart.time || reservationStart.time || '',
+    penalty_id: payload?.penalty_id || '',
+    penalty_reason: payload?.reason || '',
+    penalty_end_at: payload?.ends_at || '',
+    penalty_evidence_id: payload?.evidence_report_id || '',
+  }
+}
+
+function mapPenalty(record) {
+  return {
+    id: record?.id || '',
+    user_id: record?.user_id || '',
+    user_name: record?.user_name || '',
+    user_email: record?.user_email || '',
+    reason: record?.reason || '',
+    evidence_type: record?.evidence_type || 'damage_report',
+    evidence_ticket_id: record?.evidence_ticket_id || '',
+    evidence_report_id: record?.evidence_report_id || '',
+    incident_scope: record?.incident_scope || 'asset',
+    incident_laboratory_id: record?.incident_laboratory_id || '',
+    incident_date: record?.incident_date || '',
+    incident_start_time: record?.incident_start_time || '',
+    incident_end_time: record?.incident_end_time || '',
+    asset_id: record?.asset_id || '',
+    related_reservation_id: record?.related_reservation_id || '',
+    starts_at: record?.starts_at || '',
+    ends_at: record?.ends_at || '',
+    notes: record?.notes || '',
+    status: record?.status || 'scheduled',
+    is_active: Boolean(record?.is_active),
+    email_sent: Boolean(record?.email_sent),
+    created_at: record?.created_at || '',
+    updated_at: record?.updated_at || '',
+    created_by: record?.created_by || '',
+    created_by_name: record?.created_by_name || '',
+    lifted_at: record?.lifted_at || '',
+    lifted_by: record?.lifted_by || '',
+    lifted_by_name: record?.lifted_by_name || '',
+    lift_reason: record?.lift_reason || '',
+  }
+}
+
+function mapPenaltyRegularization(record) {
+  return {
+    is_regularized: Boolean(record?.is_regularized),
+    has_open_damage_flags: Boolean(record?.has_open_damage_flags),
+    active_damage_count: Number(record?.active_damage_count || 0),
+    summary: record?.summary || '',
+    latest_ticket_id: record?.latest_ticket_id || '',
+    latest_ticket_title: record?.latest_ticket_title || '',
+    latest_asset_name: record?.latest_asset_name || '',
+    latest_reported_at: record?.latest_reported_at || '',
+  }
+}
+
+function mapPenaltyReactivationHistory(record) {
+  return {
+    id: record?.id || '',
+    penalty_id: record?.penalty_id || '',
+    user_id: record?.user_id || '',
+    user_name: record?.user_name || '',
+    user_email: record?.user_email || '',
+    actor_user_id: record?.actor_user_id || '',
+    actor_name: record?.actor_name || '',
+    executed_at: record?.executed_at || '',
+    lift_reason: record?.lift_reason || '',
+    resolution_notes: record?.resolution_notes || '',
+    action_source: record?.action_source || 'admin_profile',
+    user_was_inactive: Boolean(record?.user_was_inactive),
+    user_is_active_after: Boolean(record?.user_is_active_after),
+    privileges_restored: Boolean(record?.privileges_restored),
+    active_penalty_count_after: Number(record?.active_penalty_count_after || 0),
+    active_damage_count_at_validation: Number(record?.active_damage_count_at_validation || 0),
+    regularization_confirmed: Boolean(record?.regularization_confirmed),
+    regularization_summary: record?.regularization_summary || '',
+    notification_sent: Boolean(record?.notification_sent),
+    email_sent: Boolean(record?.email_sent),
+    created: record?.created || '',
+    updated: record?.updated || '',
+  }
+}
+
+function mapPenaltyReactivationContext(record) {
+  return {
+    user_id: record?.user_id || '',
+    user_name: record?.user_name || '',
+    user_email: record?.user_email || '',
+    user_is_active: Boolean(record?.user_is_active),
+    block_status: record?.block_status || 'active',
+    active_penalty: record?.active_penalty ? mapPenalty(record.active_penalty) : null,
+    active_penalty_count: Number(record?.active_penalty_count || 0),
+    can_reactivate: Boolean(record?.can_reactivate),
+    privileges_restored_if_confirmed: Boolean(record?.privileges_restored_if_confirmed),
+    regularization: mapPenaltyRegularization(record?.regularization || {}),
+    history: Array.isArray(record?.history) ? record.history.map(mapPenaltyReactivationHistory) : [],
+  }
+}
+
+export async function listAvailableLabs(user = null) {
+  const labs = await listAdminLabs()
+  return labs.filter((lab) => isLabAccessibleToUser(lab, user))
+}
+
+export async function listReservations(filters = {}) {
+  const search = new URLSearchParams()
+  if (filters.laboratory_id) search.set('laboratory_id', filters.laboratory_id)
+  if (filters.date) search.set('day', filters.date)
+  if (filters.status) search.set('status', filters.status)
+
+  const query = search.toString() ? `?${search.toString()}` : ''
+  const data = await request(`${reservationsBase}/reservations${query}`, { cacheTtlMs: 2000 })
+  const mapped = Array.isArray(data) ? data.map(mapReservation) : []
+
+  return mapped
+    .filter((reservation) => (!filters.requested_by || reservation.requested_by === filters.requested_by))
+    .sort((a, b) => {
+      if (a.date === b.date) {
+        return a.start_time.localeCompare(b.start_time)
+      }
+      return a.date.localeCompare(b.date)
+    })
+}
+
+export async function listMyReservations(options = {}) {
+  const skipCache = Boolean(options?.skipCache)
+  const data = await request(`${reservationsBase}/reservations/mine`, {
+    cacheTtlMs: skipCache ? 0 : 2000,
+    skipCache,
+  })
+  const mapped = Array.isArray(data) ? data.map(mapReservation) : []
+  return mapped.sort((a, b) => {
+    if (a.date === b.date) {
+      return a.start_time.localeCompare(b.start_time)
+    }
+    return a.date.localeCompare(b.date)
+  })
+}
+
+export async function getReservationById(reservationId) {
+  if (!reservationId) {
+    throw new Error('No se pudo identificar la reserva seleccionada.')
+  }
+
+  const data = await request(`${reservationsBase}/reservations/${reservationId}`, { cacheTtlMs: 500 })
+  return mapReservation(data || {})
+}
+
+export async function searchMyReservationHistory(filters = {}) {
+  const search = new URLSearchParams()
+  search.set('pageNumber', String(Math.max(Number(filters.pageNumber || 0), 0)))
+  search.set('pageSize', String(Math.max(Number(filters.pageSize || 10), 1)))
+  search.set('sortBy', String(filters.sortBy || 'start_at'))
+  search.set('sortType', String(filters.sortType || 'DESC').toUpperCase())
+
+  const skipCache = Boolean(filters.skipCache)
+  const data = await request(
+    `${reservationsBase}/reservations/mine/history/search?${search.toString()}`,
+    {
+      cacheTtlMs: skipCache ? 0 : 2000,
+      skipCache,
+    },
+  )
+  return mapReservationPage(data || {})
+}
+
+export async function listReservationsPage(filters = {}) {
+  const search = new URLSearchParams()
+  search.set('pageNumber', String(Math.max(Number(filters.pageNumber || 0), 0)))
+  search.set('pageSize', String(Math.max(Number(filters.pageSize || 10), 1)))
+  search.set('sortBy', String(filters.sortBy || 'start_at'))
+  search.set('sortType', String(filters.sortType || 'DESC').toUpperCase())
+
+  if (filters.laboratory_id) search.set('laboratory_id', filters.laboratory_id)
+  if (filters.date) search.set('day', filters.date)
+  if (filters.status && filters.status !== 'all') search.set('status', filters.status)
+  if (filters.where) search.set('where', String(filters.where).trim())
+
+  const data = await request(`${reservationsBase}/reservations/search?${search.toString()}`, { cacheTtlMs: 2000 })
+  return mapReservationPage(data || {})
+}
+
+export async function getReservationStats(options = {}) {
+  const skipCache = Boolean(options?.skipCache)
+  const data = await request(`${reservationsBase}/reservations/stats`, {
+    cacheTtlMs: skipCache ? 0 : 1500,
+    skipCache,
+  })
+  return {
+    total: Number(data?.total || 0),
+    pending: Number(data?.pending || 0),
+    walk_in: Number(data?.walk_in || 0),
+  }
+}
+
+export async function getMyAgendaSummary(options = {}) {
+  const search = new URLSearchParams()
+  const normalizedLimit = Math.max(Number(options.limit || 5), 1)
+  search.set('limit', String(normalizedLimit))
+
+  const skipCache = Boolean(options?.skipCache)
+  const query = search.toString() ? `?${search.toString()}` : ''
+  const data = await request(`${reservationsBase}/reservations/summary${query}`, {
+    cacheTtlMs: skipCache ? 0 : 1500,
+    skipCache,
+  })
+
+  return {
+    generated_at: data?.generated_at || '',
+    reservation_count: Number(data?.reservation_count || 0),
+    tutorial_count: Number(data?.tutorial_count || 0),
+    total_count: Number(data?.total_count || 0),
+    upcoming_reservations: Array.isArray(data?.upcoming_reservations)
+      ? data.upcoming_reservations.map(mapReservation)
+      : [],
+    upcoming_tutorials: Array.isArray(data?.upcoming_tutorials)
+      ? data.upcoming_tutorials.map(mapTutorialSession)
+      : [],
+  }
+}
+
+export async function createReservation(payload, user) {
+  const normalized = {
+    laboratory_id: String(payload.laboratory_id || ''),
+    area_id: String(payload.area_id || ''),
+    requested_by: String(user?.user_id || ''),
+    purpose: String(payload.purpose || '').trim(),
+    start_at: `${payload.date}T${payload.start_time}:00`,
+    end_at: `${payload.date}T${payload.end_time}:00`,
+    attendees_count: Number(payload.attendees_count || 0) || 0,
+    notes: String(payload.notes || ''),
+    requires_full_lab: Boolean(payload.requires_full_lab),
+    responsible_teacher: String(payload.responsible_teacher || ''),
+    responsible_teacher_name: String(payload.responsible_teacher_name || ''),
+    project_description: String(payload.project_description || '').trim(),
+  }
+
+  if (!normalized.laboratory_id || !payload.date || !payload.start_time || !payload.end_time) {
+    throw new Error('Debes seleccionar laboratorio, fecha y un rango horario valido.')
+  }
+
+  const record = await request(`${reservationsBase}/reservations`, {
+    method: 'POST',
+    body: JSON.stringify(normalized),
+  })
+  clearCacheByNamespaces('reservations', 'availability', 'notifications')
+  return mapReservation(record)
+}
+
+export async function updateReservation(reservationId, payload) {
+  const normalized = {
+    laboratory_id: String(payload.laboratory_id || ''),
+    area_id: String(payload.area_id || ''),
+    purpose: String(payload.purpose || '').trim(),
+    start_at: `${payload.date}T${payload.start_time}:00`,
+    end_at: `${payload.date}T${payload.end_time}:00`,
+    notes: String(payload.notes || ''),
+  }
+
+  // Solo se envia la exclusividad si el formulario la incluye, para no sobreescribir el
+  // valor existente con un default cuando la edicion no toca ese campo.
+  if (payload.requires_full_lab !== undefined) {
+    normalized.requires_full_lab = Boolean(payload.requires_full_lab)
+  }
+  if (payload.responsible_teacher !== undefined) {
+    normalized.responsible_teacher = String(payload.responsible_teacher || '')
+    normalized.responsible_teacher_name = String(payload.responsible_teacher_name || '')
+  }
+  if (payload.project_description !== undefined) {
+    normalized.project_description = String(payload.project_description || '').trim()
+  }
+
+  if (!reservationId || !normalized.laboratory_id || !payload.date || !payload.start_time || !payload.end_time) {
+    throw new Error('Debes completar laboratorio, fecha y horario para actualizar la reserva.')
+  }
+
+  const record = await request(`${reservationsBase}/reservations/${reservationId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(normalized),
+  })
+  clearCacheByNamespaces('reservations', 'availability', 'notifications')
+  return mapReservation(record)
+}
+
+export async function deleteReservation(reservationId) {
+  if (!reservationId) {
+    throw new Error('No se pudo identificar la reserva a cancelar.')
+  }
+
+  await request(`${reservationsBase}/reservations/${reservationId}`, {
+    method: 'DELETE',
+  })
+  clearCacheByNamespaces('reservations', 'availability', 'notifications')
+}
+
+export async function updateReservationStatus(reservationId, status, options = {}) {
+  const cancelReason = String(options?.cancel_reason || '').trim()
+  const record = await request(`${reservationsBase}/reservations/${reservationId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      status,
+      cancel_reason: status === 'rejected' ? cancelReason : '',
+    }),
+  })
+  clearCacheByNamespaces('reservations', 'availability', 'notifications')
+  return mapReservation(record)
+}
+
+export async function registerReservationEntry(reservationId, payload = {}) {
+  const record = await request(`${reservationsBase}/reservations/${reservationId}/check-in`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      station_label: String(payload.station_label || '').trim(),
+      occupant_name: String(payload.occupant_name || '').trim(),
+      occupant_email: String(payload.occupant_email || '').trim(),
+      notes: String(payload.notes || '').trim(),
+    }),
+  })
+  clearCacheByNamespaces('reservations', 'availability')
+  return mapReservation(record)
+}
+
+export async function registerReservationExit(reservationId) {
+  const record = await request(`${reservationsBase}/reservations/${reservationId}/check-out`, {
+    method: 'PATCH',
+  })
+  clearCacheByNamespaces('reservations', 'availability')
+  return mapReservation(record)
+}
+
+export async function markReservationAbsent(reservationId) {
+  const record = await request(`${reservationsBase}/reservations/${reservationId}/absent`, {
+    method: 'PATCH',
+  })
+  clearCacheByNamespaces('reservations', 'availability')
+  return mapReservation(record)
+}
+
+export async function createWalkInReservation(payload) {
+  const record = await request(`${reservationsBase}/reservations/walk-in`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  clearCacheByNamespaces('reservations', 'availability')
+  return mapReservation(record)
+}
+
+export async function getOccupancyDashboard(laboratoryId = '') {
+  const query = laboratoryId ? `?laboratory_id=${encodeURIComponent(laboratoryId)}` : ''
+  return request(`${reservationsBase}/reservations/occupancy${query}`, { cacheTtlMs: 1500 })
+}
+
+function mapLaboratoryUsageStat(record) {
+  return {
+    laboratory_id: record?.laboratory_id || '',
+    laboratory_name: record?.laboratory_name || '',
+    laboratory_location: record?.laboratory_location || '',
+    area_id: record?.area_id || '',
+    area_name: record?.area_name || '',
+    available_blocks: Number(record?.available_blocks || 0),
+    blocked_blocks: Number(record?.blocked_blocks || 0),
+    used_blocks: Number(record?.used_blocks || 0),
+    reserved_blocks: Number(record?.reserved_blocks || 0),
+    in_progress_blocks: Number(record?.in_progress_blocks || 0),
+    completed_blocks: Number(record?.completed_blocks || 0),
+    occupancy_percentage: Number(record?.occupancy_percentage || 0),
+  }
+}
+
+export async function getLaboratoryUsageAnalytics(period = 'daily', startDate = null, endDate = null) {
+  const params = new URLSearchParams()
+  params.set('period', period)
+  if (startDate) params.set('start_date', startDate)
+  if (endDate) params.set('end_date', endDate)
+
+  const data = await request(
+    `${reservationsBase}/reservations/analytics/laboratory-usage?${params.toString()}`,
+    { cacheTtlMs: 1500 },
+  )
+
+  return {
+    period: data?.period || period,
+    period_label: data?.period_label || '',
+    start_date: data?.start_date || '',
+    end_date: data?.end_date || '',
+    generated_at: data?.generated_at || '',
+    labs: Array.isArray(data?.labs) ? data.labs.map(mapLaboratoryUsageStat) : [],
+    totals: {
+      laboratories_count: Number(data?.totals?.laboratories_count || 0),
+      available_blocks: Number(data?.totals?.available_blocks || 0),
+      blocked_blocks: Number(data?.totals?.blocked_blocks || 0),
+      used_blocks: Number(data?.totals?.used_blocks || 0),
+      reserved_blocks: Number(data?.totals?.reserved_blocks || 0),
+      in_progress_blocks: Number(data?.totals?.in_progress_blocks || 0),
+      completed_blocks: Number(data?.totals?.completed_blocks || 0),
+      occupancy_percentage: Number(data?.totals?.occupancy_percentage || 0),
+    },
+    highest_usage_laboratory: data?.highest_usage_laboratory ? mapLaboratoryUsageStat(data.highest_usage_laboratory) : null,
+    lowest_usage_laboratory: data?.lowest_usage_laboratory ? mapLaboratoryUsageStat(data.lowest_usage_laboratory) : null,
+    hourly_usage: Array.isArray(data?.hourly_usage) ? data.hourly_usage : [],
+    weekday_usage: Array.isArray(data?.weekday_usage) ? data.weekday_usage : [],
+  }
+}
+
+export async function getLabAvailability(laboratoryId, day, options = {}) {
+  if (!laboratoryId || !day) {
+    return { slots: [], slot_minutes: 60 }
+  }
+
+  const search = new URLSearchParams({ day })
+  return request(`${reservationsBase}/availability/labs/${laboratoryId}?${search.toString()}`, {
+    cacheTtlMs: options.cacheTtlMs ?? AVAILABILITY_CACHE_TTL_MS,
+    skipCache: Boolean(options.skipCache),
+  })
+}
+
+export async function prefetchLabAvailability(laboratoryId, days = []) {
+  if (!laboratoryId || !Array.isArray(days) || days.length === 0) {
+    return []
+  }
+
+  const uniqueDays = [...new Set(days.filter(Boolean))]
+  return Promise.allSettled(
+    uniqueDays.map((day) => getLabAvailability(laboratoryId, day)),
+  )
+}
+
+export async function listReservationNotifications(options = {}) {
+  const skipCache = Boolean(options?.skipCache)
+  const data = await request(`${reservationsBase}/notifications/mine`, {
+    cacheTtlMs: skipCache ? 0 : 1500,
+    skipCache,
+  })
+  return Array.isArray(data) ? data.map(mapNotification) : []
+}
+
+export async function markReservationNotificationAsRead(notificationId) {
+  const record = await request(`${reservationsBase}/notifications/${notificationId}/read`, {
+    method: 'PUT',
+  })
+  clearCacheByNamespaces('notifications')
+  return mapNotification(record)
+}
+
+export async function markAllReservationNotificationsAsRead() {
+  const data = await request(`${reservationsBase}/notifications/read-all`, {
+    method: 'PUT',
+  })
+  clearCacheByNamespaces('notifications')
+  return data
+}
+
+function mapSupplyReservation(record) {
+  return {
+    id: String(record?.id || ''),
+    stock_item_id: String(record?.stock_item_id || ''),
+    stock_item_name: record?.stock_item_name || '',
+    laboratory_id: String(record?.laboratory_id || ''),
+    laboratory_name: record?.laboratory_name || '',
+    quantity: Number(record?.quantity || 0),
+    quantity_available: Number(record?.quantity_available || 0),
+    status: String(record?.status || 'pending'),
+    requested_by: String(record?.requested_by || ''),
+    requested_for: String(record?.requested_for || ''),
+    notes: String(record?.notes || ''),
+    tutorial_session_id: String(record?.tutorial_session_id || ''),
+    lab_reservation_id: String(record?.lab_reservation_id || ''),
+    recurrence: String(record?.recurrence || ''),
+    recurrence_end_date: String(record?.recurrence_end_date || ''),
+    recurrence_group_id: String(record?.recurrence_group_id || ''),
+    created: String(record?.created || ''),
+    updated: String(record?.updated || ''),
+  }
+}
+
+export async function listSupplyReservations(filters = {}) {
+  const search = new URLSearchParams()
+  if (filters.status) search.set('status', filters.status)
+  if (filters.tutorial_session_id) search.set('tutorial_session_id', filters.tutorial_session_id)
+  if (filters.stock_item_id) search.set('stock_item_id', filters.stock_item_id)
+  if (filters.lab_reservation_id) search.set('lab_reservation_id', filters.lab_reservation_id)
+
+  const query = search.toString() ? `?${search.toString()}` : ''
+  const data = await request(`${reservationsBase}/supply-reservations${query}`, {
+    cacheTtlMs: filters.skipCache ? 0 : 1500,
+    skipCache: Boolean(filters.skipCache),
+  })
+  return Array.isArray(data) ? data.map(mapSupplyReservation) : []
+}
+
+export async function createSupplyReservation(payload) {
+  const body = {
+    stock_item_id: String(payload.stock_item_id || ''),
+    quantity: Number(payload.quantity || 0),
+    requested_for: String(payload.requested_for || ''),
+    notes: String(payload.notes || ''),
+    laboratory_id: String(payload.laboratory_id || ''),
+    tutorial_session_id: String(payload.tutorial_session_id || ''),
+    lab_reservation_id: String(payload.lab_reservation_id || ''),
+    recurrence: String(payload.recurrence || ''),
+    recurrence_end_date: String(payload.recurrence_end_date || ''),
+    recurrence_group_id: String(payload.recurrence_group_id || ''),
+  }
+
+  const record = await request(`${reservationsBase}/supply-reservations`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+  clearCacheByNamespaces('supplies', 'reservations')
+  return mapSupplyReservation(record)
+}
+
+export async function updateSupplyReservationStatus(reservationId, statusValue, options = {}) {
+  if (!reservationId) {
+    throw new Error('No se pudo identificar la reserva de insumo.')
+  }
+
+  const record = await request(`${reservationsBase}/supply-reservations/${reservationId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      status: String(statusValue || ''),
+      notes: options.notes !== undefined ? String(options.notes) : null,
+    }),
+  })
+  clearCacheByNamespaces('supplies', 'reservations')
+  return mapSupplyReservation(record)
+}
+
+export async function listMyPenalties() {
+  const data = await request(`${reservationsBase}/penalties/mine`, { cacheTtlMs: 1500 })
+  return Array.isArray(data) ? data.map(mapPenalty) : []
+}
+
+export async function listPenalties(filters = {}) {
+  const search = new URLSearchParams()
+  if (filters.active_only) {
+    search.set('active_only', 'true')
+  }
+  if (filters.page) {
+    search.set('paginate', 'true')
+    search.set('page', filters.page)
+  }
+  if (filters.per_page) {
+    search.set('per_page', filters.per_page)
+  }
+  if (filters.sort) {
+    search.set('sort', filters.sort)
+  }
+  
+  const query = search.toString() ? `?${search.toString()}` : ''
+  const data = await request(`${reservationsBase}/penalties${query}`, { cacheTtlMs: 1500 })
+  
+  if (Array.isArray(data)) {
+    return {
+      items: data.map(mapPenalty),
+      totalItems: data.length,
+      totalPages: 1,
+      page: 1,
+      perPage: data.length || 20
+    }
+  }
+  
+  return {
+    items: Array.isArray(data?.items) ? data.items.map(mapPenalty) : [],
+    totalItems: data?.total_items || 0,
+    totalPages: data?.total_pages || 1,
+    page: data?.page || 1,
+    perPage: data?.per_page || 20
+  }
+}
+
+export async function createPenalty(payload) {
+  const record = await request(`${reservationsBase}/penalties`, {
+    method: 'POST',
+    body: JSON.stringify({
+      user_id: String(payload.user_id || '').trim(),
+      user_name: String(payload.user_name || '').trim(),
+      user_email: String(payload.user_email || '').trim().toLowerCase(),
+      reason: String(payload.reason || '').trim(),
+      evidence_type: String(payload.evidence_type || 'damage_report'),
+      evidence_ticket_id: String(payload.evidence_ticket_id || '').trim(),
+      evidence_report_id: String(payload.evidence_report_id || '').trim(),
+      incident_scope: String(payload.incident_scope || 'asset').trim(),
+      incident_laboratory_id: String(payload.incident_laboratory_id || '').trim(),
+      incident_date: String(payload.incident_date || '').trim(),
+      incident_start_time: String(payload.incident_start_time || '').trim(),
+      incident_end_time: String(payload.incident_end_time || '').trim(),
+      asset_id: String(payload.asset_id || '').trim(),
+      starts_at: String(payload.starts_at || '').trim(),
+      ends_at: String(payload.ends_at || '').trim(),
+      notes: String(payload.notes || '').trim(),
+    }),
+  })
+  clearCacheByNamespaces('penalties', 'notifications', 'reservations')
+  return mapPenalty(record)
+}
+
+export async function liftPenalty(penaltyId, options = {}) {
+  const data = await request(`${reservationsBase}/penalties/${penaltyId}/lift`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      lift_reason: String(options.lift_reason || '').trim(),
+    }),
+  })
+  clearCacheByNamespaces('penalties', 'notifications', 'reservations')
+  return mapPenalty(data?.penalty || {})
+}
+
+export async function getPenaltyReactivationContext(userId) {
+  if (!userId) {
+    throw new Error('No se pudo identificar al usuario para revisar su bloqueo.')
+  }
+
+  const data = await request(`${reservationsBase}/penalties/reactivation-context/${userId}`, { cacheTtlMs: 1000 })
+  return mapPenaltyReactivationContext(data || {})
+}
+
+export async function reactivateUserAccount(penaltyId, payload = {}) {
+  if (!penaltyId) {
+    throw new Error('No se pudo identificar la penalizacion activa del usuario.')
+  }
+
+  const data = await request(`${reservationsBase}/penalties/${penaltyId}/reactivate`, {
+    method: 'POST',
+    body: JSON.stringify({
+      lift_reason: String(payload.lift_reason || '').trim(),
+      resolution_notes: String(payload.resolution_notes || '').trim(),
+      action_source: String(payload.action_source || 'admin_profile').trim() || 'admin_profile',
+    }),
+  })
+  clearCacheByNamespaces('penalties', 'notifications', 'reservations')
+
+  return {
+    penalty: mapPenalty(data?.penalty || {}),
+    reactivation: mapPenaltyReactivationHistory(data?.reactivation || {}),
+    regularization: mapPenaltyRegularization(data?.regularization || {}),
+    privileges_restored: Boolean(data?.privileges_restored),
+    active_block_removed: Boolean(data?.active_block_removed),
+    user_status: data?.user_status || 'active',
+  }
+}
+
+let sharedSocket = null
+let sharedReconnectTimer = null
+let sharedHasLoggedError = false
+let sharedReconnectAttempt = 0
+let sharedLastConnectAt = 0
+let sharedShutdownTimer = null
+const sharedListeners = new Set()
+const sharedResyncHandlers = new Set()
+const sharedSubscriptions = new Map()
+const RECONNECT_BASE_MS = 1500
+const RECONNECT_MAX_MS = 30000
+const RESYNC_THRESHOLD_MS = 5000
+const SHUTDOWN_GRACE_MS = 250
+const ALL_REALTIME_TOPICS = [
+  'lab_reservation',
+  'lab_access',
+  'lab_block',
+  'lab_schedule',
+  'tutorial_session',
+  'user_notification',
+  'user_penalty',
+]
+
+function getReservationsWsUrl() {
+  const configured = (import.meta.env.VITE_RESERVATION_WS_URL || '').replace(/\/$/, '')
+  if (configured) {
+    return configured.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')
+  }
+  return 'ws://localhost:8005/v1/ws/reservations'
+}
+
+function notifyRealtimeListeners(data) {
+  sharedListeners.forEach((listener) => {
+    try {
+      listener(data)
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.warn('[RealtimeWS] listener threw', err)
+      }
+    }
+  })
+}
+
+function notifyResyncHandlers() {
+  sharedResyncHandlers.forEach((handler) => {
+    try {
+      handler()
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.warn('[RealtimeWS] resync handler threw', err)
+      }
+    }
+  })
+}
+
+function aggregateSubscription() {
+  const topics = new Set()
+  const labs = new Set()
+  let hasUnscoped = false
+
+  sharedSubscriptions.forEach((entry) => {
+    if (Array.isArray(entry?.topics) && entry.topics.length > 0) {
+      entry.topics.forEach((topic) => topic && topics.add(String(topic)))
+    } else {
+      ALL_REALTIME_TOPICS.forEach((topic) => topics.add(topic))
+    }
+
+    if (Array.isArray(entry?.laboratoryIds) && entry.laboratoryIds.length > 0) {
+      entry.laboratoryIds.forEach((lab) => lab && labs.add(String(lab)))
+    } else {
+      hasUnscoped = true
+    }
+  })
+
+  return {
+    topics: Array.from(topics),
+    laboratoryIds: hasUnscoped ? [] : Array.from(labs),
+  }
+}
+
+function sendSubscription() {
+  if (!sharedSocket || sharedSocket.readyState !== WebSocket.OPEN) return
+  const payload = aggregateSubscription()
+  try {
+    sharedSocket.send(JSON.stringify({ type: 'subscribe', ...payload }))
+  } catch {
+    // ignore
+  }
+}
+
+function scheduleReservationsReconnect() {
+  if (sharedReconnectTimer || sharedListeners.size === 0) return
+  const delay = Math.min(RECONNECT_BASE_MS * 2 ** sharedReconnectAttempt, RECONNECT_MAX_MS)
+  sharedReconnectAttempt += 1
+  sharedReconnectTimer = setTimeout(() => {
+    sharedReconnectTimer = null
+    ensureReservationsSocket()
+  }, delay)
+}
+
+function buildAuthSubprotocols(token) {
+  if (!token) return undefined
+  return [`bearer.${token}`, 'json']
+}
+
+function cancelPendingShutdown() {
+  if (sharedShutdownTimer) {
+    clearTimeout(sharedShutdownTimer)
+    sharedShutdownTimer = null
+  }
+}
+
+function ensureReservationsSocket() {
+  cancelPendingShutdown()
+  if (sharedSocket && (sharedSocket.readyState === WebSocket.OPEN || sharedSocket.readyState === WebSocket.CONNECTING)) {
+    return
+  }
+
+  const url = getReservationsWsUrl()
+  const token = getAuthToken()
+  const protocols = buildAuthSubprotocols(token)
+
+  let socket
+  try {
+    socket = protocols ? new WebSocket(url, protocols) : new WebSocket(url)
+  } catch {
+    if (!sharedHasLoggedError) {
+      console.warn('[RealtimeWS] No se pudo crear la conexion en tiempo real. Se reintentara cuando el backend este disponible.')
+      sharedHasLoggedError = true
+    }
+    scheduleReservationsReconnect()
+    return
+  }
+
+  sharedSocket = socket
+  const isReconnect = sharedLastConnectAt > 0 && Date.now() - sharedLastConnectAt > RESYNC_THRESHOLD_MS
+
+  socket.onopen = () => {
+    sharedHasLoggedError = false
+    sharedReconnectAttempt = 0
+    sharedLastConnectAt = Date.now()
+    sendSubscription()
+    if (import.meta.env.DEV) {
+      console.debug('[RealtimeWS] Connected (shared)')
+    }
+    if (isReconnect) {
+      notifyResyncHandlers()
+    }
+  }
+
+  socket.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data)
+      if (data?.type === 'connected') return
+      if (data?.type === 'ping') {
+        try {
+          socket.send(JSON.stringify({ type: 'pong' }))
+        } catch {
+          // ignore
+        }
+        return
+      }
+      if (data?.type === 'pong') return
+      notifyRealtimeListeners(data)
+    } catch {
+      // ignore non-JSON messages
+    }
+  }
+
+  socket.onclose = () => {
+    if (sharedSocket === socket) {
+      sharedSocket = null
+    }
+    if (sharedListeners.size > 0) {
+      scheduleReservationsReconnect()
+    }
+  }
+
+  socket.onerror = () => {
+    if (!sharedHasLoggedError) {
+      console.warn('[RealtimeWS] Backend realtime no disponible. Reintentando en segundo plano.')
+      sharedHasLoggedError = true
+    }
+    try {
+      socket.close()
+    } catch {
+      // ignore
+    }
+  }
+}
+
+export function subscribeReservationsRealtime(onMessage, options = {}) {
+  if (typeof onMessage !== 'function') {
+    return () => {}
+  }
+
+  const { onResync, topics, laboratoryIds } = options
+  sharedListeners.add(onMessage)
+  sharedSubscriptions.set(onMessage, {
+    topics: Array.isArray(topics) ? topics.filter(Boolean) : null,
+    laboratoryIds: Array.isArray(laboratoryIds) ? laboratoryIds.filter(Boolean) : null,
+  })
+  if (typeof onResync === 'function') {
+    sharedResyncHandlers.add(onResync)
+  }
+  ensureReservationsSocket()
+  sendSubscription()
+
+  return () => {
+    sharedListeners.delete(onMessage)
+    sharedSubscriptions.delete(onMessage)
+    if (typeof onResync === 'function') {
+      sharedResyncHandlers.delete(onResync)
+    }
+    sendSubscription()
+    if (sharedListeners.size === 0) {
+      cancelPendingShutdown()
+      sharedShutdownTimer = setTimeout(() => {
+        sharedShutdownTimer = null
+        if (sharedListeners.size > 0) return
+        if (sharedReconnectTimer) {
+          clearTimeout(sharedReconnectTimer)
+          sharedReconnectTimer = null
+        }
+        sharedReconnectAttempt = 0
+        sharedLastConnectAt = 0
+        if (sharedSocket) {
+          try {
+            sharedSocket.onclose = null
+            sharedSocket.close()
+          } catch {
+            // ignore
+          }
+          sharedSocket = null
+        }
+      }, SHUTDOWN_GRACE_MS)
+    }
+  }
+}
+
+export function updateRealtimeSubscription(onMessage, options = {}) {
+  if (!sharedSubscriptions.has(onMessage)) return
+  const { topics, laboratoryIds } = options
+  sharedSubscriptions.set(onMessage, {
+    topics: Array.isArray(topics) ? topics.filter(Boolean) : null,
+    laboratoryIds: Array.isArray(laboratoryIds) ? laboratoryIds.filter(Boolean) : null,
+  })
+  sendSubscription()
+}
+
+export function applyRealtimeRecordPatch(list, event, options = {}) {
+  const { idKey = 'id', mapper, prepend = true } = options
+  if (!Array.isArray(list)) return list
+  const record = event?.record
+  if (!record) return list
+  const id = String(record?.[idKey] || '')
+  if (!id) return list
+  const action = String(event?.action || '').toLowerCase()
+  const mappedRecord = mapper ? mapper(record) : record
+
+  if (action === 'delete') {
+    const next = list.filter((item) => String(item?.[idKey]) !== id)
+    return next.length === list.length ? list : next
+  }
+
+  const index = list.findIndex((item) => String(item?.[idKey]) === id)
+  if (index === -1) {
+    return prepend ? [mappedRecord, ...list] : [...list, mappedRecord]
+  }
+  const next = list.slice()
+  next[index] = { ...next[index], ...mappedRecord }
+  return next
+}
+
+export { mapReservation as mapReservationRecord, mapPenalty as mapPenaltyRecord }
