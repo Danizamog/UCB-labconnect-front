@@ -163,7 +163,7 @@ function Navbar({ onLogout, onNavigate, activeSection = 'home', user }) {
     return groups.filter((group) => group.links.length > 0)
   }, [filteredNavLinks])
 
-  const primarySection = hasAnyPermission(user, ['crear_usuarios']) ? 'profiles'
+  const primarySection = hasAnyPermission(user, ['modificar_usuarios', 'reiniciar_credenciales']) ? 'profiles'
     : hasAnyPermission(user, ['gestionar_clases_propias']) ? 'mis_clases'
       : hasAnyPermission(user, ['gestionar_reservas']) ? 'admin_reservas'
         : hasAnyPermission(user, ['consultar_auditoria_seguridad']) ? 'security' : 'reserve'

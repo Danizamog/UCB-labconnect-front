@@ -93,16 +93,6 @@ export function listUserProfiles() {
   return request(`${profilesBase}/`, { cacheTtlMs: 30000 })
 }
 
-export function createUserProfile(payload) {
-  return request(`${profilesBase}/`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  }).then((data) => {
-    clearProfilesCache()
-    return data
-  })
-}
-
 export function updateUserProfile(userId, payload) {
   return request(`${profilesBase}/${userId}`, {
     method: 'PUT',

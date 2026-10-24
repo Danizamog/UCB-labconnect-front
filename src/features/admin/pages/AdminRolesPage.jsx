@@ -17,14 +17,14 @@ const PRIVILEGED_ROLE_NAMES = new Set(['Administrador', 'Administrador de Acceso
 const SYSTEM_ROLE_NAMES = new Set([...PRIVILEGED_ROLE_NAMES, 'Estudiante', 'Docente', 'Encargado de Laboratorio', 'Invitado'])
 const PRIVILEGED_PERMISSION_NAMES = new Set([
   'aprobar_clases',
-  'crear_usuarios', 'modificar_usuarios', 'dar_baja_usuarios', 'desbloquear_usuarios', 'reiniciar_credenciales',
+  'modificar_usuarios', 'dar_baja_usuarios', 'desbloquear_usuarios', 'reiniciar_credenciales',
   'gestionar_roles', 'asignar_roles', 'consultar_auditoria_seguridad', 'consultar_eventos_autenticacion',
   'consultar_sesiones_usuarios', 'consultar_incidentes_seguridad', 'revisar_accesos_rbac', 'exportar_reportes_seguridad',
 ])
 
 const PERMISSION_ICONS = {
   gestionar_clases_propias: '📚', aprobar_clases: '✅',
-  crear_usuarios: '➕', modificar_usuarios: '✏️', dar_baja_usuarios: '⛔', desbloquear_usuarios: '🔓', reiniciar_credenciales: '🗝️',
+  modificar_usuarios: '✏️', dar_baja_usuarios: '⛔', desbloquear_usuarios: '🔓', reiniciar_credenciales: '🗝️',
   consultar_usuarios: '👥', gestionar_usuarios: '🧑‍💼', gestionar_estado_cuentas: '🔐', consultar_directorio_operativo: '📇',
   consultar_roles: '🪪', gestionar_roles: '🛡️', asignar_roles: '🔑', iniciar_restablecimiento_credencial: '🔄',
   gestionar_reservas: '📅', gestionar_reservas_materiales: '📦', gestionar_reglas_reserva: '📋',
@@ -41,7 +41,7 @@ const PERMISSION_ICONS = {
 const FALLBACK_PERMISSION_OPTIONS = [
   'gestionar_clases_propias', 'aprobar_clases',
   'consultar_usuarios', 'consultar_directorio_operativo',
-  'crear_usuarios', 'modificar_usuarios', 'dar_baja_usuarios', 'desbloquear_usuarios', 'reiniciar_credenciales',
+  'modificar_usuarios', 'dar_baja_usuarios', 'desbloquear_usuarios', 'reiniciar_credenciales',
   'consultar_roles', 'gestionar_roles', 'asignar_roles',
   'gestionar_reservas', 'gestionar_reservas_materiales', 'gestionar_reglas_reserva',
   'gestionar_estructura_laboratorios', 'gestionar_horarios_laboratorio', 'gestionar_accesos_laboratorio',

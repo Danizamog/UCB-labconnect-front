@@ -35,7 +35,7 @@ function decodeJwtPayload(token) {
   }
 }
 
-function persistAuthResponse(data) {
+export function persistAuthResponse(data) {
   const token = String(data?.access_token || '').trim()
   if (!token || token === 'undefined' || token === 'null') {
     return {
@@ -53,6 +53,9 @@ function persistAuthResponse(data) {
         name: payload.name,
         picture: payload.picture,
         auth_provider: payload.auth_provider,
+        auth_method: payload.auth_method,
+        google_linked: Boolean(payload.google_linked),
+        local_password_enabled: Boolean(payload.local_password_enabled),
         permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
         must_change_password: Boolean(payload.must_change_password),
         password_expires_at: payload.password_expires_at || null,
@@ -81,6 +84,9 @@ function buildUserFromPayload(payload) {
     name: payload.name,
     picture: payload.picture,
     auth_provider: payload.auth_provider,
+    auth_method: payload.auth_method,
+    google_linked: Boolean(payload.google_linked),
+    local_password_enabled: Boolean(payload.local_password_enabled),
     permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
     must_change_password: Boolean(payload.must_change_password),
     password_expires_at: payload.password_expires_at || null,

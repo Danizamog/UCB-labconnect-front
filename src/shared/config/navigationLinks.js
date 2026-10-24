@@ -10,7 +10,7 @@ export const NAVIGATION_LINKS = [
   { id: 'ia_predicciones', label: 'Predicciones', icon: 'ia_predicciones', path: '/app/admin/predicciones', requiredAnyPermission: ['consultar_estadisticas'] },
   { id: 'tutorials_manage', label: 'Tutorias docentes', icon: 'tutorials_manage', path: '/app/tutorias/publicar', requiredAnyPermission: ['gestionar_tutorias_propias'] },
   { id: 'mis_clases', label: 'Mis clases', icon: 'mis_clases', path: '/app/docente/clases', requiredAnyPermission: ['gestionar_clases_propias', 'solicitar_recursos_clase'] },
-  { id: 'profiles', label: 'Cuentas de usuarios', icon: 'profiles', path: '/app/admin/perfiles', requiredAnyPermission: ['consultar_usuarios', 'crear_usuarios', 'modificar_usuarios', 'dar_baja_usuarios', 'desbloquear_usuarios', 'reiniciar_credenciales'] },
+  { id: 'profiles', label: 'Cuentas de usuarios', icon: 'profiles', path: '/app/admin/perfiles', requiredAnyPermission: ['consultar_usuarios', 'modificar_usuarios', 'dar_baja_usuarios', 'desbloquear_usuarios', 'reiniciar_credenciales'] },
   { id: 'roles', label: 'Roles y permisos', icon: 'roles', path: '/app/admin/roles', requiredAnyPermission: ['consultar_roles', 'gestionar_roles', 'asignar_roles'] },
   { id: 'penalties', label: 'Sanciones y bloqueos', icon: 'penalties', path: '/app/admin/penalizaciones', requiredAnyPermission: ['gestionar_penalizaciones'] },
   { id: 'areas', label: 'Areas academicas', icon: 'areas', path: '/app/admin/areas', requiredAnyPermission: ['gestionar_estructura_laboratorios'] },

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRight, CheckCircle2, Clock3, Copy, FileText, KeyRound, Mail, Plus, Search, ShieldAlert, ShieldCheck, Unlock, UserPlus, UserRoundCheck, UserX } from 'lucide-react'
-import { createUserProfile, deactivateUserProfile, listUserProfiles, resetUserPassword, unlockUserProfile, updateUserProfile } from '../services/profileService'
+import { AlertTriangle, ArrowRight, CheckCircle2, Clock3, Copy, FileText, KeyRound, Search, ShieldAlert, ShieldCheck, Unlock, UserRoundCheck, UserX } from 'lucide-react'
+import { deactivateUserProfile, listUserProfiles, resetUserPassword, unlockUserProfile, updateUserProfile } from '../services/profileService'
 import { listAssetResponsibilityFlags } from '../services/infrastructureService'
 import { assignUserRole, listRoles } from '../services/rolesService'
 import {
@@ -26,7 +26,6 @@ const defaultReactivationForm = {
   resolution_notes: '',
 }
 
-const defaultCreateForm = { username: '', name: '', profile_type: 'student', roleId: '' }
 
 const USER_PAGE_SIZE_OPTIONS = [8, 12, 20, 40]
 
@@ -149,14 +148,10 @@ function AdminProfilesPage({ user }) {
   const [reactivationForm, setReactivationForm] = useState(defaultReactivationForm)
   const [isLoadingContext, setIsLoadingContext] = useState(false)
   const [isReactivating, setIsReactivating] = useState(false)
-  const [showCreate, setShowCreate] = useState(false)
   const [detailTab, setDetailTab] = useState('profile')
-  const [createdCredential, setCreatedCredential] = useState(null)
-  const [createForm, setCreateForm] = useState(defaultCreateForm)
   const [temporaryPassword, setTemporaryPassword] = useState('')
   const [securityActionPending, setSecurityActionPending] = useState(false)
 
-  const canCreate = hasAnyPermission(user, ['crear_usuarios'])
   const canModify = hasAnyPermission(user, ['modificar_usuarios'])
   const canAssign = hasAnyPermission(user, ['asignar_roles'])
   const canManage = canModify || canAssign
@@ -433,33 +428,6 @@ function AdminProfilesPage({ user }) {
     }
   }
 
-  const handleCreate = async (event) => {
-    event.preventDefault()
-    resetFeedback()
-    setSecurityActionPending(true)
-    try {
-      const created = await createUserProfile({
-        username: createForm.username.trim().toLowerCase(),
-        name: createForm.name.trim(),
-        profile_type: createForm.profile_type,
-        is_active: true,
-      })
-      setCreatedCredential({ username: created.username, password: created.temporary_password, userCode: created.user_code })
-      setCreateForm(defaultCreateForm)
-      setShowCreate(false)
-      setMessage(`Usuario creado con código ${created.user_code || 'institucional'}.`)
-      if (createForm.roleId) {
-        try { await assignUserRole(created.id, createForm.roleId) }
-        catch (err) { setError(`La cuenta fue creada, pero no se pudo asignar el rol: ${err.message}`) }
-      }
-      await loadData()
-    } catch (err) {
-      setError(err.message || 'No se pudo crear el usuario.')
-    } finally {
-      setSecurityActionPending(false)
-    }
-  }
-
   const handleResetPassword = async () => {
     if (!editingUser) return
     resetFeedback()
@@ -541,40 +509,10 @@ function AdminProfilesPage({ user }) {
           <div><span>Bloqueados</span><strong>{summary.blocked}</strong></div>
           <div><span>Danos abiertos</span><strong>{summary.flagged}</strong></div>
         </div>
-        {canCreate ? <button type="button" className="profiles-primary profiles-create-action" onClick={() => { resetFeedback(); setShowCreate(true) }}><UserPlus size={18} /> Crear usuario</button> : null}
       </header>
 
       {message ? <p className="profiles-alert success">{message}</p> : null}
       {error ? <p className="profiles-alert error">{error}</p> : null}
-
-      {createdCredential ? <WorkflowDialog title="La cuenta está lista" eyebrow="Usuario creado" icon={CheckCircle2} description="Entrega esta credencial al usuario para su primer acceso." onClose={() => setCreatedCredential(null)} footer={<button type="button" className="profiles-primary" onClick={() => setCreatedCredential(null)}>Ya la resguardé <ArrowRight size={16} /></button>}>
-        {error ? <p className="workflow-dialog-error" role="alert">{error}</p> : null}
-        <div className="profiles-credential-identity"><Mail size={20} /><div><strong>{createdCredential.username}</strong><span>{createdCredential.userCode}</span></div><span className="profiles-status-pill success">Cuenta local</span></div>
-        <div className="profiles-credential-box"><span>Contraseña temporal · visualización única</span><code>{createdCredential.password}</code><button type="button" className="profiles-secondary" onClick={async () => {
-          try { await navigator.clipboard.writeText(createdCredential.password); setMessage('Contraseña temporal copiada.') }
-          catch { setError('No se pudo copiar. Puedes seleccionar la contraseña visible y copiarla manualmente.') }
-        }}><Copy size={15} /> {message === 'Contraseña temporal copiada.' ? 'Copiada' : 'Copiar contraseña'}</button></div>
-        <div className="workflow-note"><ShieldCheck size={19} /><div><strong>El siguiente paso es del usuario</strong><p>En su primer ingreso deberá elegir una nueva contraseña. Guarda esta credencial antes de cerrar: no volverá a mostrarse.</p></div></div>
-      </WorkflowDialog> : null}
-
-      {showCreate ? (
-        <WorkflowDialog title="Crear usuario" eyebrow="Gestión de identidades" icon={UserPlus} description="Registra una cuenta local para acceder a LabConnect." busy={securityActionPending} onClose={() => setShowCreate(false)} footer={<><button type="button" className="profiles-ghost" onClick={() => setShowCreate(false)} disabled={securityActionPending}>Cancelar</button><button type="submit" form="create-user-form" className="profiles-primary" disabled={securityActionPending}><UserPlus size={16} /> {securityActionPending ? 'Creando cuenta...' : 'Crear cuenta'}</button></>}>
-          {error ? <p className="workflow-dialog-error" role="alert">{error}</p> : null}
-          <form id="create-user-form" className="profiles-form profiles-create-form" onSubmit={handleCreate}>
-            <section><h3 className="workflow-section-title"><span>01</span> Identidad del usuario</h3>
-            <div className="profiles-form-grid">
-              <label><span>Nombre completo <b>*</b></span><input autoComplete="name" placeholder="Ej. María López Vargas" minLength={2} maxLength={160} value={createForm.name} onChange={(event) => setCreateForm((value) => ({ ...value, name: event.target.value }))} required /></label>
-              <label><span>Correo institucional</span><input type="email" pattern="[^@\s]+@ucb\.edu\.bo" title="Utiliza un correo con dominio @ucb.edu.bo" value={createForm.username} onChange={(event) => setCreateForm((value) => ({ ...value, username: event.target.value }))} placeholder="usuario@ucb.edu.bo" required /></label>
-            </div><p className="profiles-field-help">Solo correos @ucb.edu.bo. El identificador del usuario se genera automáticamente.</p></section>
-            <section><h3 className="workflow-section-title"><span>02</span> Perfil y acceso</h3><div className="profiles-form-grid">
-              <label><span>Tipo de perfil</span><select value={createForm.profile_type} onChange={(event) => setCreateForm((value) => ({ ...value, profile_type: event.target.value }))}><option value="student">Estudiante</option><option value="teacher">Docente</option><option value="staff">Personal</option><option value="guest">Invitado</option><option value="lab_manager">Encargado</option></select></label>
-              {canAssign ? <label><span>Rol inicial</span><select value={createForm.roleId} onChange={(event) => setCreateForm((value) => ({ ...value, roleId: event.target.value }))}><option value="">Sin rol</option>{roles.filter((role) => !['Administrador', 'Administrador de Accesos', 'OSI - Auditor de Seguridad'].includes(role.nombre)).map((role) => <option key={role.id} value={role.id}>{role.nombre}</option>)}</select></label> : null}
-            </div>
-            </section>
-            <div className="workflow-note"><KeyRound size={20} /><div><strong>Contraseña segura, generada automáticamente</strong><p>Al crear la cuenta verás una clave temporal de 20 caracteres. El usuario deberá cambiarla al ingresar por primera vez.</p></div></div>
-          </form>
-        </WorkflowDialog>
-      ) : null}
 
       <div className="profiles-grid">
         <section className="profiles-card profiles-directory-card">
@@ -770,7 +708,7 @@ function AdminProfilesPage({ user }) {
                       />
                     </label>
 
-                    <label><span>Correo institucional</span><input type="email" value={form.username} onChange={(event) => setForm((previous) => ({ ...previous, username: event.target.value }))} disabled={!canModify} required /></label>
+                    <label><span>Correo institucional</span><input type="email" value={form.username} onChange={(event) => setForm((previous) => ({ ...previous, username: event.target.value }))} disabled={!canModify || editingUser.google_linked} required /></label>
 
                     <label><span>Tipo de perfil</span><select value={form.profile_type} onChange={(event) => setForm((previous) => ({ ...previous, profile_type: event.target.value }))} disabled={!canModify}><option value="student">Estudiante</option><option value="teacher">Docente</option><option value="staff">Personal</option><option value="guest">Invitado</option><option value="lab_manager">Encargado</option></select></label>
 
@@ -812,10 +750,10 @@ function AdminProfilesPage({ user }) {
                   <div className="profiles-section-head"><div><h4>Credenciales y bloqueo</h4><p>Acciones independientes, auditadas y limitadas por permisos RBAC.</p></div></div>
                   <div className="profiles-validation-grid">
                     <article className={`profiles-validation-card ${editingUser.security_locked ? 'blocked' : 'success'}`}><span>Bloqueo de seguridad</span><strong>{editingUser.security_locked ? 'Bloqueado' : 'Sin bloqueo'}</strong><p>{editingUser.failed_login_attempts || 0} de 3 intentos fallidos.</p></article>
-                    <article className="profiles-validation-card"><span>Contraseña</span><strong>{editingUser.auth_provider === 'google' ? 'Google SSO' : editingUser.must_change_password ? 'Cambio obligatorio' : 'Vigente'}</strong><p>Vence: {formatDateTime(editingUser.password_expires_at)}</p></article>
+                    <article className="profiles-validation-card"><span>Contraseña</span><strong>{!editingUser.local_password_enabled ? 'Pendiente de configurar' : editingUser.must_change_password ? 'Cambio obligatorio' : 'Vigente'}</strong><p>Vence: {formatDateTime(editingUser.password_expires_at)}</p></article>
                   </div>
                   <div className="profiles-actions">
-                    {canResetPassword && editingUser.auth_provider !== 'google' ? <button type="button" className="profiles-secondary" onClick={handleResetPassword} disabled={securityActionPending}><KeyRound size={16} /> Reiniciar contraseña</button> : null}
+                    {canResetPassword ? <button type="button" className="profiles-secondary" onClick={handleResetPassword} disabled={securityActionPending}><KeyRound size={16} /> Reiniciar contraseña</button> : null}
                     {canUnlockSecurity && editingUser.security_locked ? <button type="button" className="profiles-secondary" onClick={handleUnlock} disabled={securityActionPending}><Unlock size={16} /> Desbloquear acceso</button> : null}
                     {canDeactivate && editingUser.is_active !== false ? <button type="button" className="profiles-danger" onClick={handleDeactivate} disabled={securityActionPending}><UserX size={16} /> Dar de baja</button> : null}
                   </div>

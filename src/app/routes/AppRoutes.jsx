@@ -89,12 +89,18 @@ function AppRoutes({ isAuthenticated, user, onLogin, onInstitutionalLogin, onRef
     onLogout?.()
   }
 
+  const handlePasswordEstablished = async () => {
+    const response = await onRefreshSession?.({ force: true })
+    if (!response?.success) throw new Error(response?.message || 'No se pudo renovar la sesión. Recarga la página para continuar.')
+    updateBrowserPath(APP_ROOT_PATH, { replace: true })
+  }
+
   if (!isAuthenticated) {
     return <LoginView onLogin={onLogin} onInstitutionalLogin={onInstitutionalLogin} />
   }
 
   if (user?.must_change_password) {
-    return <Suspense fallback={<p>Cargando cambio de contraseña...</p>}><MyAccountPage onLogout={handleLogout} requiredChange /></Suspense>
+    return <Suspense fallback={<p>Cargando cambio de contraseña...</p>}><MyAccountPage onLogout={handleLogout} onPasswordEstablished={handlePasswordEstablished} requiredChange /></Suspense>
   }
 
   return (
