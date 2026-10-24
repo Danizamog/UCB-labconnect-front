@@ -22,6 +22,7 @@ import {
   APP_ROOT_PATH,
   getSectionIdFromPath,
   normalizePath,
+  USER_ACCOUNT_PERMISSIONS,
 } from '../../../shared/config/navigationLinks'
 import { hasAnyPermission, hasRole } from '../../../shared/lib/permissions'
 import {
@@ -163,7 +164,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     lab_breakdown: [],
   })
   const canManageRoles = hasAnyPermission(user, ['consultar_roles', 'gestionar_roles', 'asignar_roles'])
-  const canManageProfiles = hasAnyPermission(user, ['consultar_usuarios', 'gestionar_usuarios', 'gestionar_estado_cuentas'])
+  const canManageProfiles = hasAnyPermission(user, USER_ACCOUNT_PERMISSIONS)
   const canManageStructure = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio', 'aprobar_clases', 'aprobar_tutorias'])
   const canViewAnalytics = hasAnyPermission(user, ['consultar_estadisticas'])
   const canManageSpaces = hasAnyPermission(user, ['gestionar_estructura_laboratorios', 'gestionar_horarios_laboratorio'])

@@ -9,7 +9,8 @@ const GOOGLE_PROVIDERS = new Set(['google_oidc', 'google'])
 const ALLOW_GOOGLE_ON_LOCALHOST = String(import.meta.env.VITE_ENABLE_GOOGLE_ON_LOCALHOST || '').trim().toLowerCase() === 'true'
 
 const MIN_USERNAME_LENGTH = 3
-const MIN_PASSWORD_LENGTH = 6
+const MIN_PASSWORD_LENGTH = 12
+const MAX_PASSWORD_LENGTH = 128
 
 function isLocalOrigin() {
   if (typeof window === 'undefined') return false
@@ -156,6 +157,11 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
   const credentialsTabEnabled = useMemo(() => typeof onLogin === 'function', [onLogin])
   const usernameValid = credentials.username.trim().length >= MIN_USERNAME_LENGTH
   const passwordValid = credentials.password.length >= MIN_PASSWORD_LENGTH
+    && credentials.password.length <= MAX_PASSWORD_LENGTH
+    && /[A-Z]/.test(credentials.password)
+    && /[a-z]/.test(credentials.password)
+    && /\d/.test(credentials.password)
+    && /[^A-Za-z0-9]/.test(credentials.password)
   const formValid = usernameValid && passwordValid
   const captchaRequired = Boolean(captchaConfig?.enabled)
   const captchaBlocked = captchaConfigLoading || Boolean(captchaConfigError) || !captchaConfig
@@ -169,7 +175,7 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
 
   const getPasswordHint = () => {
     if (!touched.password || credentials.password === '') return null
-    if (!passwordValid) return { text: `Minimo ${MIN_PASSWORD_LENGTH} caracteres`, type: 'error' }
+    if (!passwordValid) return { text: `Usa ${MIN_PASSWORD_LENGTH}-${MAX_PASSWORD_LENGTH} caracteres, mayuscula, minuscula, numero y simbolo`, type: 'error' }
     return { text: 'Contrasena valida', type: 'ok' }
   }
 
@@ -336,6 +342,7 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
                     placeholder={`Minimo ${MIN_PASSWORD_LENGTH} caracteres`}
                     autoComplete="current-password"
                     minLength={MIN_PASSWORD_LENGTH}
+                    maxLength={MAX_PASSWORD_LENGTH}
                     aria-invalid={touched.password && !passwordValid}
                     aria-describedby="password-hint"
                   />
