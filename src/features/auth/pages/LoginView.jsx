@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ucbEscudoLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
-import { getInstitutionalSSOConfig } from '../services/authService'
+import { getInstitutionalSSOConfig, getLoginCaptchaConfig } from '../services/authService'
+import RecaptchaCheckbox from '../components/RecaptchaCheckbox'
 import './LoginView.css'
 
 const GOOGLE_SCRIPT_SRC = 'https://accounts.google.com/gsi/client'
@@ -50,6 +51,12 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
   const [showPassword, setShowPassword] = useState(false)
   const [touched, setTouched] = useState({ username: false, password: false })
   const [credentials, setCredentials] = useState({ username: '', password: '' })
+  const [captchaConfig, setCaptchaConfig] = useState(null)
+  const [captchaConfigError, setCaptchaConfigError] = useState('')
+  const [captchaConfigLoading, setCaptchaConfigLoading] = useState(true)
+  const [captchaConfigRetry, setCaptchaConfigRetry] = useState(0)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaResetKey, setCaptchaResetKey] = useState(0)
   const googleButtonRef = useRef(null)
   const institutionalLoginRef = useRef(onInstitutionalLogin)
   const initializedGoogleClientIdRef = useRef('')
@@ -58,6 +65,14 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
   useEffect(() => {
     institutionalLoginRef.current = onInstitutionalLogin
   }, [onInstitutionalLogin])
+
+  useEffect(() => {
+    let cancelled = false
+    getLoginCaptchaConfig().then((config) => { if (!cancelled) setCaptchaConfig(config) })
+      .catch((err) => { if (!cancelled) setCaptchaConfigError(err.message) })
+      .finally(() => { if (!cancelled) setCaptchaConfigLoading(false) })
+    return () => { cancelled = true }
+  }, [captchaConfigRetry])
 
   useEffect(() => {
     let isMounted = true
@@ -142,6 +157,9 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
   const usernameValid = credentials.username.trim().length >= MIN_USERNAME_LENGTH
   const passwordValid = credentials.password.length >= MIN_PASSWORD_LENGTH
   const formValid = usernameValid && passwordValid
+  const captchaRequired = Boolean(captchaConfig?.enabled)
+  const captchaBlocked = captchaConfigLoading || Boolean(captchaConfigError) || !captchaConfig
+    || (captchaRequired && (!captchaConfig.configured || !captchaConfig.site_key || !captchaToken))
 
   const getUsernameHint = () => {
     if (!touched.username || credentials.username.trim() === '') return null
@@ -165,18 +183,25 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
       return
     }
 
+    if (credentialsSubmitting || captchaBlocked) {
+      setCredentialsError('Completa la verificación de seguridad para continuar.')
+      return
+    }
+
     setCredentialsError('')
     setCredentialsSubmitting(true)
     try {
       const response = await onLogin({
         email: credentials.username.trim(),
         password: credentials.password,
+        captcha_token: captchaRequired ? captchaToken : undefined,
       })
       if (!response?.success) {
         setCredentialsError(response?.message || 'No se pudo iniciar sesion con credenciales')
       }
     } finally {
       setCredentialsSubmitting(false)
+      if (captchaRequired) { setCaptchaToken(''); setCaptchaResetKey((value) => value + 1) }
     }
   }
 
@@ -330,10 +355,14 @@ function LoginView({ onLogin, onInstitutionalLogin }) {
                 ) : null}
               </div>
 
+              {captchaConfigLoading ? <p className="login-captcha-hint" role="status">Cargando protección de acceso…</p> : captchaConfigError ? <div className="login-captcha-error"><p role="alert">{captchaConfigError}</p><button type="button" onClick={() => { setCaptchaConfigLoading(true); setCaptchaConfigError(''); setCaptchaConfigRetry((value) => value + 1) }}>Volver a intentar</button></div> : captchaRequired ? (
+                captchaConfig.configured && captchaConfig.site_key ? <RecaptchaCheckbox key={`${captchaConfig.site_key}:${captchaResetKey}`} siteKey={captchaConfig.site_key} onChange={setCaptchaToken} /> : <p className="auth-error" role="alert">El acceso con credenciales está temporalmente no disponible. La verificación de seguridad requiere configuración.</p>
+              ) : null}
+
               <button
                 type="submit"
                 className="credentials-submit"
-                disabled={credentialsSubmitting || (touched.username && touched.password && !formValid)}
+                disabled={credentialsSubmitting || captchaBlocked || (touched.username && touched.password && !formValid)}
                 aria-busy={credentialsSubmitting}
               >
                 {credentialsSubmitting ? (

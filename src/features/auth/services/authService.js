@@ -95,7 +95,7 @@ function clearStoredSession() {
 }
 
 export async function signIn(credentials) {
-  const { email, password } = credentials
+  const { email, password, captcha_token } = credentials
 
   try {
     const response = await fetch(AUTH_LOGIN_ENDPOINT, {
@@ -106,6 +106,7 @@ export async function signIn(credentials) {
       body: JSON.stringify({
         username: email?.trim().toLowerCase(),
         password,
+        captcha_token,
       }),
     })
 
@@ -125,6 +126,15 @@ export async function signIn(credentials) {
       message: 'Error de conexion al autenticarse',
     }
   }
+}
+
+export async function getLoginCaptchaConfig() {
+  const response = await fetch(`${apiBase}/auth/captcha/config`, { cache: 'no-store' })
+  const data = await response.json().catch(() => null)
+  if (!response.ok || typeof data?.enabled !== 'boolean' || typeof data?.configured !== 'boolean') {
+    throw new Error('No se pudo verificar la protección del acceso. Vuelve a intentar.')
+  }
+  return data
 }
 
 export async function getInstitutionalSSOConfig() {
