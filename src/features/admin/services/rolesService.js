@@ -39,7 +39,7 @@ function clearRolesCache() {
   inFlightRequests.clear()
 }
 
-async function apiRequest(path, { method = 'GET', token, body, cacheTtlMs = 0, skipCache = false } = {}) {
+async function apiRequest(path, { method = 'GET', token, body, cacheTtlMs = 0, skipCache = false, signal } = {}) {
   const resolvedMethod = String(method || 'GET').toUpperCase()
   const resolvedToken = token || getAuthToken() || ''
   const url = `${API_BASE_URL}${path}`
@@ -60,6 +60,7 @@ async function apiRequest(path, { method = 'GET', token, body, cacheTtlMs = 0, s
 
   const fetchPromise = (async () => {
     const response = await fetch(url, {
+      signal,
       method: resolvedMethod,
       headers: buildHeaders(resolvedToken),
       body: body ? JSON.stringify(body) : undefined,
@@ -241,8 +242,8 @@ export async function assignUserRole(userId, roleId, { token, reason } = {}) {
   return mapUserRecord(record, roles)
 }
 
-export function listRoleHistory({ page = 1, query = '', action = '', date_from = '', date_to = '' } = {}) {
-  const params = new URLSearchParams({ page: String(page), per_page: '20' })
-  Object.entries({ query, action, date_from, date_to }).forEach(([key, value]) => { if (value) params.set(key, value) })
-  return apiRequest(`${ROLES_ENDPOINT}/history?${params}`)
+export function listRoleHistory({ page = 1, per_page = 20, query = '', action = '', date_from = '', date_to = '', snapshot_at = '' } = {}, { signal } = {}) {
+  const params = new URLSearchParams({ page: String(page), per_page: String(per_page) })
+  Object.entries({ query, action, date_from, date_to, snapshot_at }).forEach(([key, value]) => { if (value) params.set(key, value) })
+  return apiRequest(`${ROLES_ENDPOINT}/history?${params}`, { signal })
 }
