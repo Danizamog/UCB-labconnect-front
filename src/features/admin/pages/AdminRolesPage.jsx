@@ -1,113 +1,58 @@
-import { createElement, useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowRight, BookOpen, Check, ChevronDown, Eye, FlaskConical, KeyRound, LayoutGrid, LockKeyhole, Pencil, Plus, RefreshCw, Search, ShieldCheck, ShieldPlus, Table2, Trash2, Users, X } from 'lucide-react'
+import { createElement, Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { ArrowRight, BookOpen, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Eye, FlaskConical, History, KeyRound, LayoutGrid, Pencil, Plus, RefreshCw, Search, ShieldCheck, Table2, Trash2, Users, X } from 'lucide-react'
 import WorkflowDialog from '../../../shared/components/WorkflowDialog'
-import {
-  assignUserRole,
-  createRole,
-  deleteRole,
-  listPermissionsCatalog,
-  listRoles,
-  listUsersWithRoles,
-  updateRole,
-} from '../services/rolesService'
+import { assignUserRole, createRole, deleteRole, listPermissionsCatalog, listRoleHistory, listRoles, listUsersWithRoles, updateRole } from '../services/rolesService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import './AdminRolesPage.css'
 
-const PRIVILEGED_ROLE_NAMES = new Set(['Administrador', 'Administrador de Accesos', 'OSI - Auditor de Seguridad'])
-const SYSTEM_ROLE_NAMES = new Set([...PRIVILEGED_ROLE_NAMES, 'Estudiante', 'Docente', 'Encargado de Laboratorio', 'Invitado'])
-const PRIVILEGED_PERMISSION_NAMES = new Set([
-  'aprobar_clases',
-  'modificar_usuarios', 'dar_baja_usuarios', 'desbloquear_usuarios', 'reiniciar_credenciales',
-  'gestionar_roles', 'asignar_roles', 'consultar_auditoria_seguridad', 'consultar_eventos_autenticacion',
-  'consultar_sesiones_usuarios', 'consultar_incidentes_seguridad', 'revisar_accesos_rbac', 'exportar_reportes_seguridad',
-])
-
-const PERMISSION_ICONS = {
-  gestionar_clases_propias: '📚', aprobar_clases: '✅',
-  modificar_usuarios: '✏️', dar_baja_usuarios: '⛔', desbloquear_usuarios: '🔓', reiniciar_credenciales: '🗝️',
-  consultar_usuarios: '👥', gestionar_usuarios: '🧑‍💼', gestionar_estado_cuentas: '🔐', consultar_directorio_operativo: '📇',
-  consultar_roles: '🪪', gestionar_roles: '🛡️', asignar_roles: '🔑', iniciar_restablecimiento_credencial: '🔄',
-  gestionar_reservas: '📅', gestionar_reservas_materiales: '📦', gestionar_reglas_reserva: '📋',
-  gestionar_estructura_laboratorios: '🏢', gestionar_horarios_laboratorio: '🕒', gestionar_accesos_laboratorio: '🚪',
-  gestionar_penalizaciones: '⚠️', gestionar_inventario: '🧰', gestionar_stock: '📊', gestionar_estado_equipos: '🖥️',
-  gestionar_mantenimiento: '🛠️', gestionar_prestamos: '🤝', gestionar_reactivos_quimicos: '🧪',
-  registrar_tickets_equipo: '🎫',
-  gestionar_tutorias_propias: '🎓', aprobar_tutorias: '✅', gestionar_asistencia_tutorias: '📝',
-  gestionar_observaciones_tutorias: '💬', solicitar_recursos_clase: '📨', generar_reportes: '📄', consultar_estadisticas: '📈',
-  consultar_auditoria_seguridad: '🔎', consultar_eventos_autenticacion: '🔓', consultar_sesiones_usuarios: '💻',
-  consultar_incidentes_seguridad: '🚨', revisar_accesos_rbac: '🧭', exportar_reportes_seguridad: '📤',
-}
-
-const FALLBACK_PERMISSION_OPTIONS = [
-  'gestionar_clases_propias', 'aprobar_clases',
-  'consultar_usuarios', 'consultar_directorio_operativo',
-  'modificar_usuarios', 'dar_baja_usuarios', 'desbloquear_usuarios', 'reiniciar_credenciales',
-  'consultar_roles', 'gestionar_roles', 'asignar_roles',
-  'gestionar_reservas', 'gestionar_reservas_materiales', 'gestionar_reglas_reserva',
-  'gestionar_estructura_laboratorios', 'gestionar_horarios_laboratorio', 'gestionar_accesos_laboratorio',
-  'gestionar_penalizaciones', 'gestionar_inventario', 'gestionar_stock', 'gestionar_estado_equipos',
-  'gestionar_mantenimiento', 'registrar_tickets_equipo', 'gestionar_prestamos', 'gestionar_reactivos_quimicos',
-  'gestionar_tutorias_propias', 'aprobar_tutorias', 'gestionar_asistencia_tutorias',
-  'gestionar_observaciones_tutorias', 'solicitar_recursos_clase', 'generar_reportes', 'consultar_estadisticas',
-  'consultar_auditoria_seguridad', 'consultar_eventos_autenticacion', 'consultar_sesiones_usuarios',
-  'consultar_incidentes_seguridad', 'revisar_accesos_rbac', 'exportar_reportes_seguridad',
-].map((value) => ({ value, label: value.replaceAll('_', ' '), description: 'Permiso RBAC de LabConnect.', icon: getPermissionIcon(value) }))
-
-function getPermissionIcon(value) {
-  if (PERMISSION_ICONS[value]) return PERMISSION_ICONS[value]
-  if (/tutoria|clase|asistencia/.test(value)) return '🎓'
-  if (/equipo|inventario|mantenimiento/.test(value)) return '🧰'
-  if (/stock|material|reactivo/.test(value)) return '📦'
-  if (/usuario|cuenta|credencial/.test(value)) return '👤'
-  if (/reserva|horario|laboratorio/.test(value)) return '📅'
-  if (/reporte|estadistica/.test(value)) return '📊'
-  return '🔑'
-}
-
-const PERMISSION_GROUPS = [
+const SYSTEM_ROLES = new Set(['Administrador', 'Administrador de Accesos', 'OSI - Auditor de Seguridad', 'Estudiante', 'Docente', 'Encargado de Laboratorio', 'Invitado'])
+const GROUPS = [
   { id: 'identity', label: 'Usuarios y credenciales', icon: Users },
   { id: 'roles', label: 'Roles y accesos', icon: KeyRound },
-  { id: 'labs', label: 'Laboratorios y reservas', icon: FlaskConical },
-  { id: 'inventory', label: 'Inventario y préstamos', icon: LayoutGrid },
+  { id: 'labs', label: 'Laboratorios y reservas', icon: CalendarDays },
+  { id: 'inventory', label: 'Inventario y préstamos', icon: FlaskConical },
   { id: 'academic', label: 'Clases y tutorías', icon: BookOpen },
   { id: 'reports', label: 'Reportes y estadísticas', icon: Table2 },
   { id: 'security', label: 'Seguridad y auditoría', icon: ShieldCheck },
-  { id: 'other', label: 'Otras funciones', icon: KeyRound },
+  { id: 'other', label: 'Otras funciones', icon: LayoutGrid },
 ]
+const ACTIONS = { 'role.created': 'Rol creado', 'role.updated': 'Rol editado', 'role.deleted': 'Rol eliminado', 'user.role_assigned': 'Rol asignado', 'user.role_removed': 'Rol retirado' }
+const EMPTY_ROLE = { nombre: '', descripcion: '', permisos: [] }
+const normalize = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+const permissionLabel = (value) => String(value || '').replaceAll('_', ' ').replace(/^./, (letter) => letter.toUpperCase())
+const countLabel = (count) => `${count} ${count === 1 ? 'permiso' : 'permisos'}`
+const formatDate = (value) => {
+  const parsed = new Date(String(value || '').replace(' ', 'T'))
+  return Number.isNaN(parsed.getTime()) ? 'Fecha no disponible' : parsed.toLocaleString('es-BO', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/La_Paz' })
+}
 
-function permissionGroup(value) {
+function groupFor(value) {
   if (/auditoria|autenticacion|sesiones_usuarios|incidentes_seguridad|revisar_accesos|reportes_seguridad/.test(value)) return 'security'
   if (/roles/.test(value)) return 'roles'
   if (/usuario|cuenta|credencial|directorio/.test(value)) return 'identity'
   if (/tutoria|clase|asistencia/.test(value)) return 'academic'
   if (/inventario|stock|equipo|mantenimiento|prestamo|reactivo|material/.test(value)) return 'inventory'
   if (/reporte|estadistica/.test(value)) return 'reports'
-  if (/laboratorio|reserva|penalizacion/.test(value)) return 'labs'
+  if (/laboratorio|reserva|penalizacion|horario/.test(value)) return 'labs'
   return 'other'
 }
 
-function searchable(value) {
-  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+function PermissionIcon({ value, size = 16 }) {
+  return createElement(GROUPS.find((group) => group.id === groupFor(value))?.icon || KeyRound, { size, 'aria-hidden': true })
 }
 
-function permissionLabel(value) {
-  const label = String(value || '').replaceAll('_', ' ')
-  return label.charAt(0).toUpperCase() + label.slice(1)
+function ReasonField({ value, onChange }) {
+  return <label className="access-reason">Motivo del cambio <textarea required minLength={5} maxLength={500} rows={2} value={value} onChange={(event) => onChange(event.target.value)} placeholder="Describe por qué realizas este cambio…" /><small>Quedará registrado junto a tu identidad y los valores anteriores y nuevos.</small></label>
 }
-
-function permissionCount(count) {
-  return count + (count === 1 ? ' permiso' : ' permisos')
-}
-
-const EMPTY_ROLE = { nombre: '', descripcion: '', permisos: [] }
 
 function AdminRolesPage({ user, onSessionRefresh }) {
   const canEdit = hasAnyPermission(user, ['gestionar_roles'])
   const canAssign = hasAnyPermission(user, ['asignar_roles'])
-  const canViewAssignments = canAssign || hasAnyPermission(user, ['revisar_accesos_rbac'])
+  const canViewAssignments = canEdit || canAssign || hasAnyPermission(user, ['revisar_accesos_rbac'])
+  const canViewHistory = canEdit || canAssign || hasAnyPermission(user, ['revisar_accesos_rbac', 'consultar_auditoria_seguridad'])
   const [roles, setRoles] = useState([])
   const [users, setUsers] = useState([])
-  const [catalog, setCatalog] = useState(FALLBACK_PERMISSION_OPTIONS)
+  const [catalog, setCatalog] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('roles')
   const [search, setSearch] = useState('')
@@ -117,231 +62,135 @@ function AdminRolesPage({ user, onSessionRefresh }) {
   const [draft, setDraft] = useState(EMPTY_ROLE)
   const [permissionSearch, setPermissionSearch] = useState('')
   const [viewRole, setViewRole] = useState(null)
-  const [deleteTarget, setDeleteTarget] = useState(null)
   const [assignment, setAssignment] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [dialogError, setDialogError] = useState('')
-
+  const [moduleFilter, setModuleFilter] = useState('all')
+  const [hiddenRoles, setHiddenRoles] = useState([])
+  const [matrixMode, setMatrixMode] = useState('all')
+  const [historyVersion, setHistoryVersion] = useState(0)
   const load = useCallback(async () => {
     setLoading(true); setError('')
     try {
-      const [nextRoles, nextUsers, nextCatalog] = await Promise.all([
-        listRoles(), canViewAssignments ? listUsersWithRoles() : Promise.resolve([]),
-        listPermissionsCatalog().catch(() => FALLBACK_PERMISSION_OPTIONS),
-      ])
-      setRoles(nextRoles); setUsers(nextUsers)
-      setCatalog(Array.isArray(nextCatalog) && nextCatalog.length ? nextCatalog : FALLBACK_PERMISSION_OPTIONS)
+      const [nextRoles, nextUsers, nextCatalog] = await Promise.all([listRoles(), canViewAssignments ? listUsersWithRoles() : [], listPermissionsCatalog()])
+      setRoles(nextRoles); setUsers(nextUsers); setCatalog(nextCatalog)
     } catch (err) { setError(err.message || 'No se pudieron cargar los roles.') }
     finally { setLoading(false) }
   }, [canViewAssignments])
-
   useEffect(() => { load() }, [load])
 
-  // Include stored permissions absent from the current catalog so the matrix
-  // remains an accurate view and editing never silently discards them.
   const permissions = useMemo(() => {
     const options = new Map(catalog.map((item) => [item.value, item]))
-    roles.forEach((role) => (role.permisos || []).forEach((value) => {
-      if (!options.has(value)) options.set(value, { value, label: permissionLabel(value), description: 'Permiso registrado en este rol.' })
-    }))
+    roles.forEach((role) => role.permisos.forEach((value) => { if (!options.has(value)) options.set(value, { value, label: permissionLabel(value), legacy: true }) }))
     return [...options.values()]
   }, [catalog, roles])
-
-  const permissionById = useMemo(() => new Map(permissions.map((item) => [item.value, item])), [permissions])
+  const permissionById = new Map(permissions.map((item) => [item.value, item]))
   const labelFor = (value) => permissionById.get(value)?.label || permissionLabel(value)
-  const query = searchable(search)
-  const filteredRoles = roles.filter((role) => searchable(role.nombre + ' ' + (role.descripcion || '')).includes(query))
-  const filteredUsers = users.filter((account) => searchable([account.name, account.email, account.role?.nombre].join(' ')).includes(query))
-  const filteredPermissions = permissions.filter((item) => searchable(item.label + ' ' + item.value).includes(query))
   const selected = new Set(draft.permisos)
-  const catalogIds = new Set(catalog.map((item) => item.value))
-  const editorGroups = PERMISSION_GROUPS.map((group) => ({
-    ...group,
-    items: permissions.filter((item) => permissionGroup(item.value) === group.id && searchable(item.label + ' ' + item.description).includes(searchable(permissionSearch))),
-  })).filter((group) => group.items.length)
-  const roleBeingViewed = roles.find((role) => role.id === viewRole)
-  const assignedCount = (roleId) => users.filter((account) => account.roleId === roleId || account.role?.id === roleId).length
-  const accessAdminExists = users.some((account) => account.role?.nombre === 'Administrador de Accesos')
-
-  const canChangeAccount = (account) => {
-    const self = account.id === user?.user_id || searchable(account.email) === searchable(user?.username)
-    if (!canAssign || self) return false
-    if (!PRIVILEGED_ROLE_NAMES.has(account.role?.nombre)) return true
-    return user?.role === 'Administrador' && account.role?.nombre === 'Administrador' && !accessAdminExists
-  }
-  const choicesFor = (account) => roles.filter((role) => {
-    if (!PRIVILEGED_ROLE_NAMES.has(role.nombre)) return !PRIVILEGED_ROLE_NAMES.has(account.role?.nombre)
-    if (role.nombre === 'Administrador de Accesos') return user?.role === 'Administrador' && account.role?.nombre === 'Administrador' && !accessAdminExists
-    return role.nombre === 'OSI - Auditor de Seguridad' && user?.role === 'Administrador de Accesos' && !PRIVILEGED_ROLE_NAMES.has(account.role?.nombre)
-  })
-
+  const visibleRoles = roles.filter((role) => !hiddenRoles.includes(role.id))
+  const query = normalize(search)
+  const filteredRoles = roles.filter((role) => normalize(role.nombre + ' ' + role.descripcion).includes(query))
+  const filteredUsers = users.filter((account) => normalize([account.name, account.email, account.role?.nombre].join(' ')).includes(query))
+  const filteredPermissions = permissions.filter((item) => normalize(item.label + ' ' + item.value).includes(query)
+    && (moduleFilter === 'all' || groupFor(item.value) === moduleFilter)
+    && (matrixMode === 'all' || (matrixMode === 'shared' ? visibleRoles.length > 0 && visibleRoles.every((role) => role.permisos.includes(item.value)) : visibleRoles.some((role) => role.permisos.includes(item.value)))))
+  const grouped = (items) => GROUPS.map((group) => ({ ...group, items: items.filter((item) => groupFor(item.value) === group.id) })).filter((group) => group.items.length)
+  const viewedRole = roles.find((role) => role.id === viewRole)
+  const assignedCount = (id) => users.filter((account) => account.roleId === id).length
+  const reasonValid = reason.trim().length >= 5
   const openEditor = (role) => {
-    setDialogError(''); setPermissionSearch('')
-    setDraft(role ? { nombre: role.nombre, descripcion: role.descripcion || '', permisos: [...(role.permisos || [])] } : EMPTY_ROLE)
-    setEditor(role ? role.id : 'new')
+    setDraft(role ? { nombre: role.nombre, descripcion: role.descripcion || '', permisos: [...role.permisos] } : EMPTY_ROLE)
+    setEditor(role?.id || 'new'); setPermissionSearch(''); setReason(''); setDialogError('')
   }
-
-  const togglePermission = (value) => {
-    setDraft((current) => ({ ...current, permisos: current.permisos.includes(value) ? current.permisos.filter((item) => item !== value) : [...current.permisos, value] }))
+  const afterChange = async () => {
+    setHistoryVersion((version) => version + 1)
+    await onSessionRefresh?.({ force: true })
+    await load()
   }
-
   const saveRole = async (event) => {
     event.preventDefault()
-    if (busy || !draft.nombre.trim()) return
-    setBusy(true); setDialogError(''); setMessage('')
-    try {
-      const payload = { ...draft, nombre: draft.nombre.trim(), descripcion: draft.descripcion.trim() }
-      const saved = editor === 'new' ? await createRole(payload) : await updateRole(editor, payload)
-      setRoles((current) => editor === 'new' ? [saved, ...current] : current.map((role) => role.id === saved.id ? saved : role))
-      setUsers((current) => current.map((account) => account.roleId === saved.id || account.role?.id === saved.id ? { ...account, role: saved } : account))
-      setEditor(null); setMessage(editor === 'new' ? 'Rol creado correctamente.' : 'Rol actualizado correctamente.')
-      await onSessionRefresh?.()
-    } catch (err) { setDialogError(err.message || 'No se pudo guardar el rol.') }
-    finally { setBusy(false) }
-  }
-
-  const removeRole = async () => {
-    if (busy) return
+    if (busy || !reasonValid) return
     setBusy(true); setDialogError('')
     try {
-      await deleteRole(deleteTarget.id)
-      setRoles((current) => current.filter((role) => role.id !== deleteTarget.id))
-      setDeleteTarget(null); setMessage('Rol eliminado correctamente.')
-    } catch (err) { setDialogError(err.message || 'No se pudo eliminar el rol.') }
-    finally { setBusy(false) }
+      const payload = { ...draft, nombre: draft.nombre.trim(), descripcion: draft.descripcion.trim(), reason: reason.trim() }
+      if (editor === 'new') await createRole(payload)
+      else await updateRole(editor, payload)
+      setEditor(null); setMessage('Rol guardado. El cambio y su motivo quedaron registrados.'); await afterChange()
+    } catch (err) { setDialogError(err.message) } finally { setBusy(false) }
   }
-
   const saveAssignment = async () => {
-    if (busy) return
+    if (busy || !reasonValid) return
     setBusy(true); setDialogError('')
     try {
-      await assignUserRole(assignment.account.id, assignment.roleId || null)
-      const role = roles.find((item) => item.id === assignment.roleId) || null
-      setUsers((current) => current.map((account) => account.id === assignment.account.id ? { ...account, roleId: role?.id || null, role } : account))
-      setAssignment(null); setMessage('Asignación actualizada correctamente.')
-      await onSessionRefresh?.()
-      await load()
-    } catch (err) { setDialogError(err.message || 'No se pudo asignar el rol.') }
-    finally { setBusy(false) }
+      await assignUserRole(assignment.account.id, assignment.roleId || null, { reason: reason.trim() })
+      setAssignment(null); setMessage('Asignación actualizada y registrada en el historial.'); await afterChange()
+    } catch (err) { setDialogError(err.message) } finally { setBusy(false) }
   }
-
-  const tabs = [
-    { id: 'roles', label: 'Roles', icon: ShieldCheck, count: roles.length },
-    ...(canViewAssignments ? [{ id: 'users', label: 'Asignaciones', icon: Users, count: users.length }] : []),
-    { id: 'matrix', label: 'Matriz de accesos', icon: Table2 },
-  ]
+  const removeRole = async () => {
+    if (busy || !reasonValid) return
+    setBusy(true); setDialogError('')
+    try {
+      await deleteRole(deleteTarget.id, { reason: reason.trim() })
+      setDeleteTarget(null); setMessage('Rol eliminado. Se conserva el historial de sus cambios.'); await afterChange()
+    } catch (err) { setDialogError(err.message) } finally { setBusy(false) }
+  }
+  const tabs = [{ id: 'roles', label: 'Roles', icon: ShieldCheck }, ...(canViewAssignments ? [{ id: 'users', label: 'Asignaciones', icon: Users }] : []), { id: 'matrix', label: 'Matriz de accesos', icon: Table2 }, ...(canViewHistory ? [{ id: 'history', label: 'Historial', icon: History }] : [])]
 
   return <section className="access-page" aria-label="Administración de roles">
-    <header className="access-header">
-      <div><p className="access-eyebrow">Administración de accesos</p><h1>Roles y permisos</h1><p>Define qué puede hacer cada persona, según su responsabilidad.</p></div>
-      <div className="access-header-actions"><button className="access-button is-secondary" type="button" onClick={load} disabled={loading} aria-label="Actualizar roles"><RefreshCw size={16} className={loading ? 'access-spin' : ''} /> Actualizar</button>{canEdit ? <button type="button" className="access-button is-primary" onClick={() => openEditor()} disabled={loading}><Plus size={17} /> Crear rol</button> : null}</div>
-    </header>
-    <div className="access-stats">
-      <div><span className="access-stat-icon"><ShieldCheck size={20} /></span><span><strong>{roles.length}</strong><small>Roles registrados</small></span></div>
-      <div><span className="access-stat-icon is-teal"><KeyRound size={20} /></span><span><strong>{permissions.length}</strong><small>Permisos disponibles</small></span></div>
-      <div><span className="access-stat-icon is-gold"><LockKeyhole size={20} /></span><span><strong>{roles.filter((role) => PRIVILEGED_ROLE_NAMES.has(role.nombre)).length}</strong><small>Roles protegidos</small></span></div>
-      {canViewAssignments ? <div><span className="access-stat-icon"><Users size={20} /></span><span><strong>{users.filter((account) => account.roleId || account.role).length}</strong><small>Usuarios con rol</small></span></div> : null}
-    </div>
-    <div className="access-workspace">
-      <div className="access-workspace-toolbar">
-        <div className="access-tabs" role="tablist" aria-label="Vistas de roles" onKeyDown={(event) => {
-          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
-          const buttons = [...event.currentTarget.querySelectorAll('[role="tab"]')]
-          const index = buttons.indexOf(document.activeElement)
-          const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length
-          event.preventDefault(); buttons[next].focus(); buttons[next].click()
-        }}>
-          {tabs.map(({ id, label, icon, count }) => <button key={id} id={'access-tab-' + id} type="button" role="tab" aria-selected={tab === id} aria-controls="access-panel" tabIndex={tab === id ? 0 : -1} onClick={() => { setTab(id); setSearch('') }}>{createElement(icon, { size: 16 })}{label}{count !== undefined ? <span>{count}</span> : null}</button>)}
-        </div>
-        <label className="access-search"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === 'users' ? 'Buscar persona o rol…' : tab === 'matrix' ? 'Buscar permiso…' : 'Buscar rol…'} aria-label={tab === 'users' ? 'Buscar usuario' : tab === 'matrix' ? 'Buscar permiso en matriz' : 'Buscar rol'} />{search ? <button type="button" onClick={() => setSearch('')} aria-label="Limpiar búsqueda"><X size={14} /></button> : null}</label>
-      </div>
-      {error ? <p className="access-feedback is-error" role="alert">{error}</p> : null}
-      {message ? <p className="access-feedback is-success" role="status">{message}</p> : null}
-      <div id="access-panel" role="tabpanel" aria-labelledby={'access-tab-' + tab}>
-        {loading ? <div className="access-empty"><RefreshCw size={24} className="access-spin" /><h2>Cargando accesos</h2><p>Consultando roles y permisos del sistema…</p></div> : <>
-          {tab === 'roles' ? <>
-            <div className="access-section-heading"><div><h2>Roles del sistema</h2><p>Consulta sus capacidades o configura un rol personalizado.</p></div><span>{filteredRoles.length} roles</span></div>
-            <div className="access-role-grid">{filteredRoles.map((role) => {
-              const protectedRole = PRIVILEGED_ROLE_NAMES.has(role.nombre)
-              const Icon = protectedRole ? ShieldCheck : SYSTEM_ROLE_NAMES.has(role.nombre) ? Users : ShieldPlus
-              return <article className="access-role-card" key={role.id}>
-                <div className="access-card-top"><span className={'access-role-icon' + (protectedRole ? ' is-protected' : '')}><Icon size={23} strokeWidth={1.7} /></span><span className={'access-type' + (protectedRole ? ' is-protected' : '')}>{protectedRole ? <LockKeyhole size={11} /> : null}{protectedRole ? 'Protegido' : SYSTEM_ROLE_NAMES.has(role.nombre) ? 'Institucional' : 'Personalizado'}</span></div>
-                <h3>{role.nombre}</h3><p className="access-role-description">{role.descripcion || 'Accesos definidos según las funciones asignadas.'}</p>
-                <div className="access-role-meta"><span><KeyRound size={13} />{permissionCount((role.permisos || []).length)}</span>{canViewAssignments ? <span><Users size={13} />{assignedCount(role.id)} usuarios</span> : null}</div>
-                <div className="access-card-permissions">{(role.permisos || []).slice(0, 5).map((value) => <span className="roles-badge access-permission-mini" key={value} title={labelFor(value)} aria-label={labelFor(value)}>{getPermissionIcon(value)}</span>)}{(role.permisos || []).length > 5 ? <span className="access-more">+{role.permisos.length - 5}</span> : null}{!(role.permisos || []).length ? <span className="access-no-permissions">Autoservicio según su perfil</span> : null}</div>
-                <footer><button type="button" className="access-text-button" onClick={() => { setViewRole(role.id); setPermissionSearch('') }}><Eye size={15} /> Ver permisos</button><div>{canEdit && !protectedRole ? <button type="button" className="access-icon-button" aria-label={'Editar ' + role.nombre} title="Editar rol" onClick={() => openEditor(role)}><Pencil size={15} /></button> : null}{canEdit && !SYSTEM_ROLE_NAMES.has(role.nombre) ? <button type="button" className="access-icon-button is-danger" aria-label={'Eliminar ' + role.nombre} title="Eliminar rol" onClick={() => { setDeleteTarget(role); setDialogError('') }}><Trash2 size={15} /></button> : null}{protectedRole ? <span className="access-protected-note"><LockKeyhole size={12} /> Acceso controlado</span> : null}</div></footer>
-              </article>
-            })}</div>
-            {!filteredRoles.length ? <div className="access-empty"><ShieldCheck size={28} /><h2>No encontramos roles</h2><p>Prueba con otro nombre o crea un rol nuevo.</p></div> : null}
-          </> : null}
-          {tab === 'users' && canViewAssignments ? <>
-            <div className="access-section-heading"><div><h2>Asignación de roles</h2><p>{canAssign ? 'Selecciona una persona y confirma el rol que le corresponde.' : 'Consulta de solo lectura de los accesos asignados.'}</p></div><span>{filteredUsers.length} personas</span></div>
-            <div className="access-table-scroll"><table className="access-user-table"><thead><tr><th>Persona</th><th>Rol actual</th><th>Permisos</th><th>Acción</th></tr></thead><tbody>{filteredUsers.map((account) => <tr key={account.id}><td><div className="access-person"><span>{String(account.name || account.email || '?').slice(0, 1).toUpperCase()}</span><div><strong>{account.name || 'Sin nombre'}</strong><small>{account.email}</small></div></div></td><td><span className="access-user-role"><ShieldCheck size={13} />{account.role?.nombre || 'Sin rol'}</span></td><td><button type="button" className="access-text-button" disabled={!account.role?.id} onClick={() => { setViewRole(account.role.id); setPermissionSearch('') }}>{permissionCount((account.role?.permisos || []).length)} <Eye size={14} /></button></td><td>{canChangeAccount(account) ? <button type="button" className="access-button is-secondary" onClick={() => { setAssignment({ account, roleId: account.roleId || '' }); setDialogError('') }}>Cambiar rol <ArrowRight size={14} /></button> : <span className="access-protected-note"><LockKeyhole size={12} />{account.id === user?.user_id || searchable(account.email) === searchable(user?.username) ? 'Tu cuenta' : 'Solo consulta'}</span>}</td></tr>)}</tbody></table></div>
-            {!filteredUsers.length ? <div className="access-empty"><Users size={28} /><h2>No hay personas para mostrar</h2><p>Revisa los filtros de búsqueda.</p></div> : null}
-          </> : null}
-          {tab === 'matrix' ? <>
-            <div className="access-section-heading"><div><h2>Matriz de accesos</h2><p>Compara los permisos asignados a cada rol.</p></div><span className="access-matrix-legend"><Check size={13} /> Permitido <span>— Sin permiso</span></span></div>
-            <div className="access-matrix-scroll" tabIndex={0} role="region" aria-label="Matriz de accesos desplazable"><table className="access-matrix"><thead><tr><th>Funcionalidad</th>{roles.map((role) => <th key={role.id}>{role.nombre}<small>{permissionCount((role.permisos || []).length)}</small></th>)}</tr></thead><tbody>{PERMISSION_GROUPS.map((group) => {
-              const items = filteredPermissions.filter((item) => permissionGroup(item.value) === group.id)
-              if (!items.length) return null
-              return <MatrixGroup key={group.id} group={group} items={items} roles={roles} />
-            })}</tbody></table></div>
-            {!filteredPermissions.length ? <p className="access-empty">No se encontraron permisos con ese criterio.</p> : null}
-          </> : null}
+    <header className="access-header"><div><p className="access-eyebrow">Administración de accesos</p><h1>Roles y permisos</h1><p>Define responsabilidades, compara accesos y consulta quién realizó cada cambio.</p></div><div className="access-header-actions"><button type="button" className="access-button is-secondary" disabled={loading} onClick={() => { load(); setHistoryVersion((v) => v + 1) }}><RefreshCw size={15} /> Actualizar</button>{canEdit ? <button type="button" className="access-button is-primary" onClick={() => openEditor()}><Plus size={16} /> Crear rol</button> : null}</div></header>
+    <div className="access-stats"><div><span className="access-stat-icon"><ShieldCheck size={21} /></span><span><strong>{roles.length}</strong><small>Roles configurados</small></span></div><div><span className="access-stat-icon is-teal"><KeyRound size={21} /></span><span><strong>{permissions.length}</strong><small>Funciones independientes</small></span></div>{canViewAssignments ? <div><span className="access-stat-icon"><Users size={21} /></span><span><strong>{users.filter((account) => account.roleId).length}</strong><small>Personas con rol asignado</small></span></div> : null}<div><span className="access-stat-icon is-gold"><History size={21} /></span><span><strong className="access-stat-word">Trazabilidad</strong><small>Responsable, motivo y detalle</small></span></div></div>
+    {message ? <p className="access-alert is-success" role="status">{message}</p> : null}{error ? <p className="access-alert is-error" role="alert">{error}</p> : null}
+    <div className="access-workspace"><div className="access-workspace-toolbar"><div className="access-tabs" role="tablist" aria-label="Vistas de roles" onKeyDown={(event) => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+      const buttons = [...event.currentTarget.querySelectorAll('[role="tab"]')]
+      const index = buttons.indexOf(document.activeElement)
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length
+      event.preventDefault(); buttons[next].focus(); buttons[next].click()
+    }}>{tabs.map(({ id, label, icon }) => <button key={id} type="button" role="tab" id={`access-tab-${id}`} aria-selected={tab === id} aria-controls="access-panel" tabIndex={tab === id ? 0 : -1} onClick={() => { setTab(id); setSearch('') }}>{createElement(icon, { size: 16 })}{label}</button>)}</div>{tab !== 'history' ? <label className="access-search"><Search size={16} /><input aria-label={tab === 'matrix' ? 'Buscar permiso en matriz' : tab === 'users' ? 'Buscar usuario' : 'Buscar rol'} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tab === 'matrix' ? 'Buscar funcionalidad…' : 'Buscar…'} /></label> : null}</div>
+      <div id="access-panel" role="tabpanel" aria-labelledby={`access-tab-${tab}`}>
+        {loading ? <p className="access-empty" role="status">Cargando roles y accesos…</p> : error ? <p className="access-empty">Actualiza para volver a intentar.</p> : <>
+          {tab === 'roles' ? <><div className="access-section-heading"><div><h2>Responsabilidades del sistema</h2><p>Cada rol reúne las funciones de una responsabilidad. Todos se pueden asignar y configurar con los permisos correspondientes.</p></div><span>{filteredRoles.length} roles</span></div><div className="access-role-grid">{filteredRoles.map((role, index) => <article className={`access-role-card access-role-tone-${index % 4}`} key={role.id}><div className="access-role-top"><span className="access-role-icon"><ShieldCheck size={23} /></span><span className="access-role-kind">{SYSTEM_ROLES.has(role.nombre) ? 'Perfil base' : 'Personalizado'}</span></div><h3>{role.nombre}</h3><p className="access-role-description">{role.descripcion || 'Configura las funciones de esta responsabilidad.'}</p><div className="access-role-meta"><span><KeyRound size={13} />{countLabel(role.permisos.length)}</span>{canViewAssignments ? <span><Users size={13} />{assignedCount(role.id)} personas</span> : null}</div><div className="access-card-permissions">{[...new Set(role.permisos.map(groupFor))].slice(0, 5).map((id) => <span className="access-module-chip" key={id} title={GROUPS.find((g) => g.id === id)?.label}>{createElement(GROUPS.find((g) => g.id === id)?.icon || KeyRound, { size: 15 })}</span>)}{!role.permisos.length ? <span className="access-no-permissions">Autoservicio según su perfil</span> : null}</div><footer><button type="button" className="access-text-button" onClick={() => { setViewRole(role.id); setPermissionSearch('') }}><Eye size={15} /> Ver permisos</button><div>{canEdit ? <button type="button" className="access-icon-button" aria-label={`Editar ${role.nombre}`} onClick={() => openEditor(role)}><Pencil size={15} /></button> : null}{canEdit && !SYSTEM_ROLES.has(role.nombre) ? <button type="button" className="access-icon-button is-danger" aria-label={`Eliminar ${role.nombre}`} onClick={() => { setDeleteTarget(role); setReason(''); setDialogError('') }}><Trash2 size={15} /></button> : null}</div></footer></article>)}</div>{!filteredRoles.length ? <p className="access-empty">No hay roles que coincidan con la búsqueda.</p> : null}</> : null}
+          {tab === 'users' && canViewAssignments ? <><div className="access-section-heading"><div><h2>Asignaciones por persona</h2><p>{canAssign ? 'Puedes asignar cualquier rol. Cada modificación requiere un motivo y queda registrada.' : 'Consulta de las responsabilidades actuales.'}</p></div><span>{filteredUsers.length} personas</span></div><div className="access-table-scroll"><table className="access-user-table"><thead><tr><th>Persona</th><th>Rol actual</th><th>Permisos</th><th>Acción</th></tr></thead><tbody>{filteredUsers.map((account) => <tr key={account.id}><td><div className="access-person"><span>{String(account.name || account.email).slice(0, 1).toUpperCase()}</span><div><strong>{account.name || 'Sin nombre'}{account.id === user?.user_id ? <small>Tu cuenta</small> : null}</strong><small>{account.email}</small></div></div></td><td><span className="access-user-role"><ShieldCheck size={13} />{account.role?.nombre || 'Sin rol'}</span></td><td>{countLabel(account.role?.permisos.length || 0)}</td><td>{canAssign ? <button type="button" className="access-button is-secondary" onClick={() => { setAssignment({ account, roleId: account.roleId || '' }); setReason(''); setDialogError('') }}>Cambiar rol <ArrowRight size={14} /></button> : <span className="access-muted">Consulta</span>}</td></tr>)}</tbody></table></div>{!filteredUsers.length ? <p className="access-empty">No hay personas que coincidan con la búsqueda.</p> : null}</> : null}
+          {tab === 'matrix' ? <><div className="access-section-heading"><div><h2>Matriz de accesos</h2><p>Filtra módulos y compara únicamente los roles que necesitas.</p></div><span className="access-matrix-legend"><Check size={14} /> Permitido <span>— Sin permiso</span></span></div><div className="access-matrix-filters"><label>Módulo<select aria-label="Filtrar módulo" value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)}><option value="all">Todos los módulos</option>{GROUPS.map((group) => <option value={group.id} key={group.id}>{group.label}</option>)}</select></label><label>Mostrar<select aria-label="Filtrar coincidencias" value={matrixMode} onChange={(event) => setMatrixMode(event.target.value)}><option value="all">Todas las funciones</option><option value="any">Con acceso en algún rol</option><option value="shared">Compartidas por los roles visibles</option></select></label><span>{filteredPermissions.length} funciones · {visibleRoles.length} roles</span></div><div className="access-role-picker" aria-label="Roles visibles en la matriz">{roles.map((role) => <label key={role.id} className={!hiddenRoles.includes(role.id) ? 'is-selected' : ''}><input type="checkbox" checked={!hiddenRoles.includes(role.id)} onChange={() => setHiddenRoles((current) => current.includes(role.id) ? current.filter((id) => id !== role.id) : [...current, role.id])} />{role.nombre}</label>)}</div>{visibleRoles.length ? <div className="access-matrix-scroll" tabIndex={0} role="region" aria-label="Matriz de accesos desplazable"><table className="access-matrix"><thead><tr><th scope="col">Funcionalidad<small>Permisos agrupados por módulo</small></th>{visibleRoles.map((role) => <th scope="col" key={role.id}><span>{role.nombre}</span><small>{countLabel(role.permisos.length)}</small>{canEdit ? <button type="button" aria-label={`Editar permisos de ${role.nombre}`} onClick={() => openEditor(role)}><Pencil size={12} /> Editar</button> : null}</th>)}</tr></thead><tbody>{grouped(filteredPermissions).map((group) => <Fragment key={group.id}><tr className="access-matrix-group"><th colSpan={visibleRoles.length + 1}><span>{createElement(group.icon, { size: 15 })}{group.label}<small>{group.items.length} funciones</small></span></th></tr>{group.items.map((item) => <tr key={item.value}><th scope="row"><span className="access-matrix-function"><PermissionIcon value={item.value} /><span>{item.label}<small>{item.value}</small></span></span></th>{visibleRoles.map((role) => <td key={role.id} aria-label={`${role.nombre}: ${role.permisos.includes(item.value) ? 'permitido' : 'sin permiso'}`}>{role.permisos.includes(item.value) ? <span className="access-matrix-check"><Check size={15} /></span> : <span className="access-matrix-denied">—</span>}</td>)}</tr>)}</Fragment>)}</tbody></table>{!filteredPermissions.length ? <p className="access-empty">No hay funciones que coincidan con los filtros.</p> : null}</div> : <p className="access-empty">Selecciona al menos un rol para comparar sus accesos.</p>}</> : null}
+          {tab === 'history' && canViewHistory ? <RoleHistory key={historyVersion} /> : null}
         </>}
       </div>
     </div>
-
-    {editor ? <WorkflowDialog title={editor === 'new' ? 'Crear rol' : 'Editar rol'} eyebrow="Configurar capacidades" icon={ShieldPlus} description="Asigna únicamente las funciones necesarias para esta responsabilidad." wide busy={busy} onClose={() => setEditor(null)} footer={<><span className="access-selection-count"><KeyRound size={14} />{permissionCount(draft.permisos.length)} {draft.permisos.length === 1 ? 'seleccionado' : 'seleccionados'}</span><button className="access-button is-secondary" type="button" disabled={busy} onClick={() => setEditor(null)}>Cancelar</button><button className="access-button is-primary" form="access-role-form" type="submit" disabled={busy || !draft.nombre.trim()}>{busy ? 'Guardando…' : editor === 'new' ? 'Crear rol' : 'Guardar cambios'}<Check size={15} /></button></>}>
-      {dialogError ? <p className="workflow-dialog-error" role="alert">{dialogError}</p> : null}
-      <form id="access-role-form" className="access-editor" onSubmit={saveRole}>
-        <div className="access-editor-fields"><label>Nombre del rol <input required maxLength={100} placeholder="Ej. Asistente de inventario" value={draft.nombre} onChange={(event) => setDraft((current) => ({ ...current, nombre: event.target.value }))} /></label><label>Descripción<input maxLength={500} placeholder="¿Qué responsabilidad tendrá?" value={draft.descripcion} onChange={(event) => setDraft((current) => ({ ...current, descripcion: event.target.value }))} /></label></div>
-        <div className="access-editor-heading"><div><h3>Permisos por módulo</h3><p>Marca cada función de forma independiente.</p></div><label className="access-search"><Search size={15} /><input aria-label="Buscar permiso" placeholder="Buscar función…" value={permissionSearch} onChange={(event) => setPermissionSearch(event.target.value)} /></label></div>
-        <div className="access-permission-groups">{editorGroups.map(({ id, label, icon, items }) => <details key={id} className="access-permission-group" open={Boolean(permissionSearch) || undefined}>
-          <summary><span className="access-group-icon">{createElement(icon, { size: 17 })}</span><strong>{label}</strong><span>{items.filter((item) => selected.has(item.value)).length}/{items.length}</span><ChevronDown size={15} /></summary>
-          <div className="access-permission-options">{items.map((item) => {
-            const reserved = PRIVILEGED_PERMISSION_NAMES.has(item.value) || !catalogIds.has(item.value)
-            return <label key={item.value} className={'access-permission-option' + (selected.has(item.value) ? ' is-selected' : '') + (reserved ? ' is-reserved' : '')}><span className="access-option-icon" aria-hidden="true">{getPermissionIcon(item.value)}</span><span><strong>{item.label}</strong><small>{reserved ? (!catalogIds.has(item.value) ? 'Permiso heredado · solo consulta' : 'Reservado a roles protegidos') : item.description || 'Función independiente del sistema.'}</small></span>{reserved ? <LockKeyhole size={14} aria-label="Permiso reservado" /> : <input type="checkbox" checked={selected.has(item.value)} onChange={() => togglePermission(item.value)} aria-label={item.label} />}</label>
-          })}</div>
-        </details>)}</div>
-        {!editorGroups.length ? <p className="access-empty">No hay permisos que coincidan con tu búsqueda.</p> : null}
-        <div className="workflow-note"><ShieldCheck size={18} /><div><strong>Permisos independientes y controlados</strong><p>Los permisos de identidad y seguridad están reservados a los roles protegidos. Los roles personalizados mantienen el acceso mínimo necesario.</p></div></div>
-      </form>
+    {editor ? <WorkflowDialog title={editor === 'new' ? 'Crear rol' : `Editar ${draft.nombre}`} eyebrow="Configurar responsabilidad" icon={ShieldCheck} description="Selecciona las funciones de este rol. El historial conservará la configuración anterior y la nueva." wide busy={busy} onClose={() => setEditor(null)} footer={<><span className="access-selection-count">{countLabel(draft.permisos.length)} seleccionados</span><button type="button" className="access-button is-secondary" disabled={busy} onClick={() => setEditor(null)}>Cancelar</button><button type="submit" form="access-role-form" className="access-button is-primary" disabled={busy || !reasonValid || !draft.nombre.trim()}>{busy ? 'Guardando…' : 'Guardar cambios'}<Check size={15} /></button></>}>
+      {dialogError ? <p className="workflow-dialog-error" role="alert">{dialogError}</p> : null}<form id="access-role-form" className="access-editor" onSubmit={saveRole}><div className="access-editor-fields"><label>Nombre del rol<input required maxLength={100} value={draft.nombre} readOnly={editor !== 'new' && SYSTEM_ROLES.has(draft.nombre)} onChange={(event) => setDraft((current) => ({ ...current, nombre: event.target.value }))} />{editor !== 'new' && SYSTEM_ROLES.has(draft.nombre) ? <small>Nombre estable del perfil. Sus permisos y descripción son editables.</small> : null}</label><label>Descripción<input maxLength={500} value={draft.descripcion} onChange={(event) => setDraft((current) => ({ ...current, descripcion: event.target.value }))} /></label></div><div className="access-editor-heading"><div><h3>Permisos por módulo</h3><p>Activa o retira cada función de forma independiente.</p></div><label className="access-search"><Search size={15} /><input aria-label="Buscar permiso" placeholder="Buscar función…" value={permissionSearch} onChange={(event) => setPermissionSearch(event.target.value)} /></label></div><div className="access-permission-groups">{grouped(permissions.filter((item) => normalize(item.label + ' ' + item.value).includes(normalize(permissionSearch)))).map((group) => <details key={group.id} className="access-permission-group" open><summary><span className="access-group-icon">{createElement(group.icon, { size: 17 })}</span><strong>{group.label}</strong><span>{group.items.filter((item) => selected.has(item.value)).length}/{group.items.length}</span><ChevronDown size={15} /></summary><div className="access-permission-options">{group.items.map((item) => <label key={item.value} className={`access-permission-option${selected.has(item.value) ? ' is-selected' : ''}`}><span className="access-option-icon"><PermissionIcon value={item.value} /></span><span><strong>{item.label}</strong><small>{item.legacy ? 'Permiso heredado: puede conservarse o retirarse.' : item.description}</small></span><input type="checkbox" aria-label={item.label} checked={selected.has(item.value)} onChange={() => setDraft((current) => ({ ...current, permisos: current.permisos.includes(item.value) ? current.permisos.filter((value) => value !== item.value) : [...current.permisos, item.value] }))} /></label>)}</div></details>)}</div><ReasonField value={reason} onChange={setReason} /></form>
     </WorkflowDialog> : null}
-
-    {roleBeingViewed ? <WorkflowDialog title={roleBeingViewed.nombre} eyebrow="Permisos del rol" icon={ShieldCheck} description={roleBeingViewed.descripcion || 'Capacidades actualmente asignadas a este rol.'} wide onClose={() => setViewRole(null)} footer={<><span className="access-selection-count">{permissionCount((roleBeingViewed.permisos || []).length)} {(roleBeingViewed.permisos || []).length === 1 ? 'asignado' : 'asignados'}</span><button type="button" className="access-button is-secondary" onClick={() => setViewRole(null)}>Cerrar</button></>}>
-      <label className="access-search access-dialog-search"><Search size={16} /><input aria-label="Filtrar permisos del rol" placeholder="Buscar entre sus permisos…" value={permissionSearch} onChange={(event) => setPermissionSearch(event.target.value)} /></label>
-      {PERMISSION_GROUPS.map(({ id, label, icon }) => {
-        const values = (roleBeingViewed.permisos || []).filter((value) => permissionGroup(value) === id && searchable(labelFor(value) + ' ' + value).includes(searchable(permissionSearch)))
-        return values.length ? <section className="access-view-group" key={id}><h3>{createElement(icon, { size: 16 })}{label}<span>{values.length}</span></h3><div className="access-view-permissions">{values.map((value) => <div key={value}><span aria-hidden="true">{getPermissionIcon(value)}</span><div><strong>{labelFor(value)}</strong><small>{permissionById.get(value)?.description || 'Permiso registrado en el sistema.'}</small></div><Check size={14} /></div>)}</div></section> : null
-      })}
-      {!(roleBeingViewed.permisos || []).length ? <div className="access-empty"><KeyRound size={28} /><h2>Perfil de autoservicio</h2><p>Este rol no tiene permisos administrativos adicionales.</p></div> : null}
+    {viewedRole ? <WorkflowDialog title={viewedRole.nombre} eyebrow="Permisos actuales" icon={ShieldCheck} description={viewedRole.descripcion} wide onClose={() => setViewRole(null)} footer={<button type="button" className="access-button is-secondary" onClick={() => setViewRole(null)}>Cerrar</button>}><div className="access-view-permissions">{viewedRole.permisos.map((value) => <div key={value}><PermissionIcon value={value} /><div><strong>{labelFor(value)}</strong><small>{permissionById.get(value)?.description}</small></div><Check size={14} /></div>)}{!viewedRole.permisos.length ? <p className="access-empty">Este perfil no tiene permisos administrativos adicionales.</p> : null}</div></WorkflowDialog> : null}
+    {assignment ? <WorkflowDialog title="Cambiar rol" eyebrow="Asignación de acceso" icon={Users} description="Todos los roles están disponibles. El cambio quedará asociado a tu identidad." busy={busy} onClose={() => setAssignment(null)} footer={<><button type="button" className="access-button is-secondary" disabled={busy} onClick={() => setAssignment(null)}>Cancelar</button><button type="button" className="access-button is-primary" disabled={busy || !reasonValid || assignment.roleId === (assignment.account.roleId || '')} onClick={saveAssignment}>{busy ? 'Guardando…' : 'Confirmar asignación'}<Check size={15} /></button></>}>
+      {dialogError ? <p className="workflow-dialog-error" role="alert">{dialogError}</p> : null}<div className="access-assignment-person"><span className="access-role-icon"><Users size={23} /></span><div><strong>{assignment.account.name || 'Usuario'}</strong><small>{assignment.account.email}</small></div></div><div className="access-assignment-current"><span>Rol actual</span><strong>{assignment.account.role?.nombre || 'Sin rol'}</strong></div><label className="access-assignment-field">Nuevo rol<select aria-label="Nuevo rol" value={assignment.roleId} onChange={(event) => setAssignment((current) => ({ ...current, roleId: event.target.value }))}><option value="">Sin rol asignado</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.nombre}</option>)}</select></label><ReasonField value={reason} onChange={setReason} /><p className="access-context-note">Debe permanecer al menos una cuenta activa que pueda gestionar y asignar roles.</p>
     </WorkflowDialog> : null}
-
-    {assignment ? <WorkflowDialog title="Cambiar rol" eyebrow="Asignación de acceso" icon={Users} description="Revisa la asignación antes de confirmar el cambio." busy={busy} onClose={() => setAssignment(null)} footer={<><button className="access-button is-secondary" type="button" disabled={busy} onClick={() => setAssignment(null)}>Cancelar</button><button className="access-button is-primary" type="button" disabled={busy || assignment.roleId === (assignment.account.roleId || '')} onClick={saveAssignment}>{busy ? 'Actualizando…' : 'Confirmar asignación'}<Check size={15} /></button></>}>
-      {dialogError ? <p className="workflow-dialog-error" role="alert">{dialogError}</p> : null}
-      <div className="access-assignment-person"><span className="access-role-icon"><Users size={23} /></span><div><strong>{assignment.account.name || 'Usuario'}</strong><small>{assignment.account.email}</small></div></div>
-      <div className="access-assignment-current"><span>Rol actual</span><strong>{assignment.account.role?.nombre || 'Sin rol'}</strong></div>
-      <label className="access-assignment-field">Nuevo rol<select value={assignment.roleId} onChange={(event) => setAssignment((current) => ({ ...current, roleId: event.target.value }))} aria-label="Nuevo rol">
-        {PRIVILEGED_ROLE_NAMES.has(assignment.account.role?.nombre) ? <option value={assignment.account.roleId}>{assignment.account.role.nombre}</option> : <option value="">Sin rol asignado</option>}
-        {choicesFor(assignment.account).map((role) => <option value={role.id} key={role.id}>{role.nombre}</option>)}
-      </select></label>
-      <div className="workflow-note"><ShieldCheck size={18} /><div><strong>El cambio actualiza sus capacidades</strong><p>La persona recibirá los permisos del nuevo rol al validar su sesión. No puedes modificar tu propia asignación.</p></div></div>
-    </WorkflowDialog> : null}
-
-    {deleteTarget ? <WorkflowDialog title="Eliminar rol" eyebrow="Confirmar eliminación" icon={Trash2} busy={busy} onClose={() => setDeleteTarget(null)} footer={<><button type="button" className="access-button is-secondary" disabled={busy} onClick={() => setDeleteTarget(null)}>Cancelar</button><button type="button" className="access-button is-danger" disabled={busy} onClick={removeRole}>{busy ? 'Eliminando…' : 'Eliminar rol'}</button></>}>
-      {dialogError ? <p className="workflow-dialog-error" role="alert">{dialogError}</p> : null}
-      <p className="access-delete-copy">Vas a eliminar el rol <strong>{deleteTarget.nombre}</strong>. Esta acción no se puede deshacer.</p><div className="workflow-note"><LockKeyhole size={18} /><p>Si tiene usuarios asociados, el sistema impedirá su eliminación. Reasigna sus usuarios antes de eliminarlo.</p></div>
+    {deleteTarget ? <WorkflowDialog title="Eliminar rol" eyebrow="Confirmar eliminación" icon={Trash2} busy={busy} onClose={() => setDeleteTarget(null)} footer={<><button type="button" className="access-button is-secondary" disabled={busy} onClick={() => setDeleteTarget(null)}>Cancelar</button><button type="button" className="access-button is-danger" disabled={busy || !reasonValid} onClick={removeRole}>Eliminar rol</button></>}>
+      {dialogError ? <p className="workflow-dialog-error" role="alert">{dialogError}</p> : null}<p className="access-delete-copy">Eliminarás <strong>{deleteTarget.nombre}</strong>. Primero debe quedar sin usuarios asignados. Su historial se conservará.</p><ReasonField value={reason} onChange={setReason} />
     </WorkflowDialog> : null}
   </section>
 }
 
-function MatrixGroup({ group, items, roles }) {
-  const Icon = group.icon
-  return <><tr className="access-matrix-group"><th colSpan={roles.length + 1}><Icon size={14} />{group.label}<span>{items.length}</span></th></tr>{items.map((item) => <tr key={item.value}><th scope="row"><span aria-hidden="true">{getPermissionIcon(item.value)}</span>{item.label}</th>{roles.map((role) => {
-    const allowed = (role.permisos || []).includes(item.value)
-    return <td key={role.id} aria-label={role.nombre + ': ' + (allowed ? 'permitido' : 'sin permiso')}>{allowed ? <span className="access-matrix-check"><Check size={14} /></span> : <span className="access-matrix-denied">—</span>}</td>
-  })}</tr>)}</>
+function RoleHistory() {
+  const [filters, setFilters] = useState({ query: '', action: '', date_from: '', date_to: '', page: 1 })
+  const [data, setData] = useState({ items: [], totalItems: 0, totalPages: 0 })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [detail, setDetail] = useState(null)
+  useEffect(() => {
+    let active = true
+    const timer = window.setTimeout(() => {
+      setLoading(true); setError('')
+      listRoleHistory(filters).then((result) => { if (active) setData(result) }).catch((err) => { if (active) setError(err.message) }).finally(() => { if (active) setLoading(false) })
+    }, 250)
+    return () => { active = false; window.clearTimeout(timer) }
+  }, [filters])
+  const update = (key, value) => setFilters((current) => ({ ...current, [key]: value, page: 1 }))
+  const previousPermissions = detail?.before?.permisos || detail?.before?.permissions || []
+  const nextPermissions = detail?.after?.permisos || detail?.after?.permissions || []
+  const added = nextPermissions.filter((value) => !previousPermissions.includes(value))
+  const removed = previousPermissions.filter((value) => !nextPermissions.includes(value))
+  return <><div className="access-section-heading"><div><h2>Historial de cambios</h2><p>Registro de operaciones completadas. Horarios de Bolivia. Los registros se consultan y no se editan.</p></div><span>{data.totalItems} registros</span></div><div className="access-history-filters"><label className="access-search"><Search size={15} /><input aria-label="Buscar en historial" value={filters.query} placeholder="Responsable, rol, persona o motivo…" onChange={(event) => update('query', event.target.value)} /></label><label>Acción<select aria-label="Filtrar acción" value={filters.action} onChange={(event) => update('action', event.target.value)}><option value="">Todas las acciones</option>{Object.entries(ACTIONS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label>Desde<input type="date" aria-label="Historial desde" value={filters.date_from} onChange={(event) => update('date_from', event.target.value)} /></label><label>Hasta<input type="date" aria-label="Historial hasta" value={filters.date_to} onChange={(event) => update('date_to', event.target.value)} /></label></div>{error ? <p className="access-alert is-error" role="alert">{error}</p> : loading ? <p className="access-empty" role="status">Cargando historial…</p> : data.items.length ? <div className="access-history-list">{data.items.map((item) => <article key={item.id}><span className="access-history-icon"><History size={18} /></span><div><div className="access-history-title"><strong>{ACTIONS[item.action] || item.action}</strong><time>{formatDate(item.created)}</time></div><p>{item.role_name || 'Sin rol'}{item.target_email ? ` · ${item.target_email}` : ''}</p><small><Users size={12} />{item.actor_email}</small><p className="access-history-reason">{item.reason}</p></div><button type="button" className="access-button is-secondary" aria-label={`Ver detalle de ${item.role_name || item.action}`} onClick={() => setDetail(item)}><Eye size={14} /> Detalle</button></article>)}</div> : <div className="access-empty"><History size={28} /><h3>Sin cambios registrados</h3><p>Los nuevos cambios de roles y asignaciones aparecerán aquí.</p></div>}<div className="access-history-pagination"><span>Página {filters.page} de {Math.max(1, data.totalPages)}</span><button type="button" className="access-icon-button" aria-label="Historial anterior" disabled={loading || filters.page <= 1} onClick={() => setFilters((current) => ({ ...current, page: current.page - 1 }))}><ChevronLeft size={17} /></button><button type="button" className="access-icon-button" aria-label="Historial siguiente" disabled={loading || filters.page >= data.totalPages} onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}><ChevronRight size={17} /></button></div>{detail ? <WorkflowDialog title={ACTIONS[detail.action] || 'Detalle del cambio'} eyebrow="Trazabilidad RBAC" icon={ClipboardList} description={formatDate(detail.created)} wide onClose={() => setDetail(null)} footer={<button type="button" className="access-button is-secondary" onClick={() => setDetail(null)}>Cerrar</button>}><dl className="access-audit-summary"><div><dt>Responsable</dt><dd>{detail.actor_email}</dd></div><div><dt>Rol del responsable</dt><dd>{detail.actor_role}</dd></div><div><dt>Rol afectado</dt><dd>{detail.role_name || 'Sin rol'}</dd></div><div><dt>Persona afectada</dt><dd>{detail.target_email || 'Configuración del rol'}</dd></div></dl><div className="access-audit-reason"><strong>Motivo registrado</strong><p>{detail.reason}</p></div><div className="access-audit-diff">{[['Antes', detail.before], ['Después', detail.after]].map(([label, snapshot]) => <section key={label}><h3>{label}</h3><strong>{snapshot?.nombre || snapshot?.role_name || 'Sin rol'}</strong>{snapshot?.descripcion ? <p>{snapshot.descripcion}</p> : null}<p>{countLabel((snapshot?.permisos || snapshot?.permissions || []).length)}</p></section>)}</div><div className="access-audit-permissions"><section><h3><Plus size={15} /> Permisos añadidos ({added.length})</h3>{added.map((value) => <span key={value}>{permissionLabel(value)}</span>)}</section><section><h3><X size={15} /> Permisos retirados ({removed.length})</h3>{removed.map((value) => <span key={value}>{permissionLabel(value)}</span>)}</section></div></WorkflowDialog> : null}</>
 }
 
 export default AdminRolesPage

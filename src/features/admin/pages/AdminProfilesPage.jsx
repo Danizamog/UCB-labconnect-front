@@ -18,6 +18,7 @@ const defaultForm = {
   username: '',
   profile_type: 'student',
   roleId: '',
+  role_reason: '',
   is_active: true,
 }
 
@@ -356,6 +357,10 @@ function AdminProfilesPage({ user }) {
 
     try {
       const payload = {}
+      const previousRoleId = roles.find((role) => role.nombre === editingUser.role)?.id || ''
+      if (canAssign && form.roleId !== previousRoleId && (form.role_reason || '').trim().length < 5) {
+        throw new Error('Indica un motivo de al menos cinco caracteres para cambiar el rol.')
+      }
       const currentName = String(editingUser.name || '').trim()
       const nextName = String(form.name || '').trim()
       const currentIsActive = editingUser.is_active !== false
@@ -377,8 +382,8 @@ function AdminProfilesPage({ user }) {
       }
 
       const currentRoleId = roles.find((role) => role.nombre === editingUser.role)?.id || ''
-      if (canAssign && form.roleId && form.roleId !== currentRoleId) {
-        await assignUserRole(editingUser.id, form.roleId)
+      if (canAssign && form.roleId !== currentRoleId) {
+        await assignUserRole(editingUser.id, form.roleId || null, { reason: form.role_reason.trim() })
       }
 
       const data = await loadData()
@@ -388,7 +393,7 @@ function AdminProfilesPage({ user }) {
       if (canManagePenalties) {
         await loadReactivationContext(editingUser.id, { silent: true })
       }
-      setMessage(Object.keys(payload).length > 0 || (form.roleId && form.roleId !== currentRoleId) ? 'Perfil actualizado correctamente.' : 'No habia cambios pendientes para guardar.')
+      setMessage(Object.keys(payload).length > 0 || (canAssign && form.roleId !== currentRoleId) ? 'Perfil actualizado correctamente.' : 'No habia cambios pendientes para guardar.')
     } catch (err) {
       setError(err.message || 'No se pudo guardar el perfil')
     } finally {
@@ -720,11 +725,12 @@ function AdminProfilesPage({ user }) {
                         disabled={!canAssign}
                       >
                         <option value="">Sin rol asignado</option>
-                        {roles.filter((role) => !['Administrador', 'Administrador de Accesos', 'OSI - Auditor de Seguridad'].includes(role.nombre) || role.nombre === editingUser.role).map((role) => (
+                        {roles.map((role) => (
                           <option key={role.id} value={role.id}>{role.nombre}</option>
                         ))}
                       </select>
                     </label>
+                    {canAssign && form.roleId !== (roles.find((role) => role.nombre === editingUser.role)?.id || '') ? <label><span>Motivo del cambio de rol</span><input required minLength={5} maxLength={500} value={form.role_reason || ''} onChange={(event) => setForm((previous) => ({ ...previous, role_reason: event.target.value }))} placeholder="Motivo que quedará en el historial" /></label> : null}
                   </div>
                 </div>
 

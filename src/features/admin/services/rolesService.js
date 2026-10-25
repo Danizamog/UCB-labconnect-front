@@ -2,7 +2,10 @@ import { getAuthToken } from '../../../shared/utils/storage'
 
 const API_BASE_URL = (import.meta.env.VITE_GATEWAY_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
 const ROLES_ENDPOINT = import.meta.env.VITE_ROLES_ENDPOINT || '/roles'
-const USERS_ENDPOINT = import.meta.env.VITE_ROLE_USERS_ENDPOINT || '/roles/users'
+const configuredUsersEndpoint = import.meta.env.VITE_ROLE_USERS_ENDPOINT
+// El antiguo /users pertenece al directorio de auth y exige otros permisos.
+const USERS_ENDPOINT = !configuredUsersEndpoint || configuredUsersEndpoint === '/users'
+  ? `${ROLES_ENDPOINT}/users` : configuredUsersEndpoint
 const requestCache = new Map()
 const inFlightRequests = new Map()
 
@@ -174,6 +177,7 @@ export async function createRole(role, { token } = {}) {
       nombre: role.nombre,
       descripcion: role.descripcion,
       permisos: role.permisos,
+      reason: role.reason,
     },
   })
   clearRolesCache()
@@ -186,30 +190,21 @@ export async function updateRole(roleId, role, { token } = {}) {
     nombre: role.nombre,
     descripcion: role.descripcion,
     permisos: role.permisos,
+    reason: role.reason,
   }
 
-  let record
-
-  try {
-    record = await apiRequest(`${ROLES_ENDPOINT}/${roleId}`, {
+  const record = await apiRequest(`${ROLES_ENDPOINT}/${roleId}`, {
       method: 'PUT',
       token,
       body: payload,
     })
-  } catch {
-    record = await apiRequest(`${ROLES_ENDPOINT}/${roleId}`, {
-      method: 'PATCH',
-      token,
-      body: payload,
-    })
-  }
   clearRolesCache()
 
   return mapRoleRecord(record)
 }
 
-export async function deleteRole(roleId, { token } = {}) {
-  await apiRequest(`${ROLES_ENDPOINT}/${roleId}`, {
+export async function deleteRole(roleId, { token, reason } = {}) {
+  await apiRequest(`${ROLES_ENDPOINT}/${roleId}?reason=${encodeURIComponent(reason || '')}`, {
     method: 'DELETE',
     token,
   })
@@ -228,13 +223,14 @@ export async function listUsersWithRoles({ token } = {}) {
   return records.map((record) => mapUserRecord(record, roles))
 }
 
-export async function assignUserRole(userId, roleId, { token } = {}) {
+export async function assignUserRole(userId, roleId, { token, reason } = {}) {
   const [record, roles] = await Promise.all([
     apiRequest(`/roles/users/${userId}`, {
       method: 'PATCH',
       token,
       body: {
         roleId: roleId,
+        reason,
       },
     }),
     listRoles({ token }),
@@ -243,4 +239,10 @@ export async function assignUserRole(userId, roleId, { token } = {}) {
   clearRolesCache()
 
   return mapUserRecord(record, roles)
+}
+
+export function listRoleHistory({ page = 1, query = '', action = '', date_from = '', date_to = '' } = {}) {
+  const params = new URLSearchParams({ page: String(page), per_page: '20' })
+  Object.entries({ query, action, date_from, date_to }).forEach(([key, value]) => { if (value) params.set(key, value) })
+  return apiRequest(`${ROLES_ENDPOINT}/history?${params}`)
 }

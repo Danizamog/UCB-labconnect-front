@@ -185,3 +185,107 @@
   .access-matrix tbody th[scope="row"] { font-size: 10px; }
 }
 @media(prefers-reduced-motion:reduce) { .access-spin { animation: none; } .access-role-card,.access-button { transition: none; } }
+
+/* Roles, comparison and audit share the institutional palette. */
+.access-page { color: var(--ink-800, #19324f); }
+.access-header { border-top: 3px solid var(--ucb-blue, #063f77); }
+.access-header h1 { color: var(--ink-900, #0d223d); }
+.access-eyebrow { color: var(--ucb-blue, #063f77); }
+.access-header > div > p:last-child,.access-section-heading p { color: #596f86; }
+.access-section-heading p { max-width: 740px; line-height: 1.7; }
+.access-stats .access-stat-word { font-size: 17px; letter-spacing: -.02em; }
+.access-alert { margin: 0; padding: 12px 16px; border: 1px solid; border-radius: 10px; font-size: 13px; }
+.access-alert.is-success { background: #f0f9f3; border-color: #cde5d5; color: #286344; }
+.access-alert.is-error { background: #fff4f4; border-color: #efcccc; color: #9b343e; }
+.access-role-grid { align-items: stretch; }
+.access-role-card { border-top: 3px solid #8caccc; background: #fff; }
+.access-role-tone-1 { border-top-color: #7aaba0; }
+.access-role-tone-2 { border-top-color: #d4b46a; }
+.access-role-tone-3 { border-top-color: #a29ac5; }
+.access-role-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 18px; }
+.access-role-kind { padding: 4px 8px; background: #f3f6fa; border-radius: 6px; color: #576c82; font-size: 10px; }
+.access-role-description { color: #5c7187; font-size: 12px; flex: 1; }
+.access-role-meta { color: #526c85; }
+.access-role-meta span { font-size: 11px; }
+.access-no-permissions { color: #657a90; font-size: 11px; }
+.access-module-chip { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; color: #38617f; background: #f2f6fa; border: 1px solid #e2eaf2; }
+.access-role-card footer { margin-top: auto; }
+.access-matrix-filters { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; padding: 15px; background: #f6f8fb; border: 1px solid #e1e8f0; border-radius: 11px; }
+.access-matrix-filters label,.access-history-filters > label:not(.access-search) { display: grid; gap: 6px; font-size: 11px; color: #516a82; font-weight: 600; }
+.access-matrix-filters select,.access-history-filters select,.access-history-filters input[type="date"] { max-width: 100%; min-height: 37px; padding: 7px 10px; border: 1px solid #c5d3e1; border-radius: 7px; background: #fff; color: #244662; font: inherit; font-size: 12px; }
+.access-matrix-filters > span { margin-left: auto; padding: 9px 0; font-size: 11px; color: #657b91; }
+.access-role-picker { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0 20px; }
+.access-role-picker label { display: flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid #dbe4ee; border-radius: 7px; background: #fff; color: #697c90; font-size: 11px; cursor: pointer; }
+.access-role-picker label.is-selected { background: #f0f5fb; border-color: #afc7df; color: #204e78; }
+.access-role-picker input { margin: 0; accent-color: var(--ucb-blue, #063f77); width: 13px; height: 13px; }
+.access-matrix-scroll { max-height: 650px; isolation: isolate; }
+.access-matrix th,.access-matrix td { min-width: 140px; padding: 12px 14px; }
+.access-matrix thead th { background: #f0f4f9; color: #193d60; font-size: 11px; min-height: 90px; }
+.access-matrix thead th > span { display: block; max-width: 160px; margin: 0 auto; }
+.access-matrix thead th small { color: #5c738b; font-size: 10px; }
+.access-matrix thead th button { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; padding: 4px 8px; border: 1px solid #c3d3e4; border-radius: 5px; background: #fff; color: #315d84; font: inherit; font-size: 10px; cursor: pointer; }
+.access-matrix th:first-child { min-width: 280px; width: 280px; max-width: 320px; box-shadow: 2px 0 5px #19375006; }
+.access-matrix tbody tr:not(.access-matrix-group):nth-child(even) :is(th,td) { background: #fbfcfe; }
+.access-matrix tbody tr:not(.access-matrix-group):hover :is(th,td) { background: #f0f5fb; }
+.access-matrix tbody th[scope="row"] { color: #264762; }
+.access-matrix tbody th[scope="row"] > .access-matrix-function { display: flex; gap: 9px; align-items: flex-start; margin: 0; }
+.access-matrix-function > svg { flex-shrink: 0; margin-top: 2px; color: #5f7e9b; }
+.access-matrix-function small { display: block; margin-top: 4px; font-size: 9px; color: #74879b; overflow-wrap: anywhere; font-weight: 400; }
+.access-matrix-check { width: 26px; height: 26px; background: #e4f3eb; color: #28764f; border: 1px solid #c5e2d2; border-radius: 50%; }
+.access-matrix-denied { color: #95a5b6; }
+.access-matrix-group th { position: static; background: #eaf0f7; padding: 9px 14px; color: #3c5b78; }
+.access-matrix-group th > span { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 11px; color: inherit; }
+.access-matrix-group svg { margin: 0; }
+.access-matrix-group small { margin-left: 8px; color: #6d8196; font-size: 10px; font-weight: 400; }
+.access-reason { display: grid; gap: 8px; margin-top: 18px; color: #345470; font-size: 12px; font-weight: 650; }
+.access-reason textarea { width: 100%; resize: vertical; padding: 11px 12px; border: 1px solid #bccddd; border-radius: 8px; background: #fff; color: #193750; font: inherit; font-weight: 400; line-height: 1.6; }
+.access-reason small,.access-editor-fields label > small { color: #61778d; font-size: 10px; font-weight: 400; line-height: 1.6; }
+.access-editor-fields input[readonly] { background: #f4f7fa; }
+.access-context-note { margin-top: 16px; padding: 12px; border-radius: 8px; background: #f6f8fb; color: #596f86; font-size: 11px; line-height: 1.7; }
+.access-permission-option strong { color: #34546e; }
+.access-permission-option small { color: #60778c; }
+.access-history-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 22px; }
+.access-history-filters > .access-search { flex: 1; min-width: 200px; height: 38px; }
+.access-history-filters .access-search input { font-size: 12px; }
+.access-history-list { display: grid; gap: 11px; }
+.access-history-list article { display: flex; gap: 14px; align-items: flex-start; padding: 18px; border: 1px solid #e1e8f0; border-radius: 11px; background: #fff; }
+.access-history-icon { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; background: #eef3f9; border-radius: 10px; color: #4d7295; }
+.access-history-list article > div { flex: 1; min-width: 0; }
+.access-history-title { display: flex; align-items: center; justify-content: space-between; gap: 15px; font-size: 13px; color: #244762; }
+.access-history-title time { font-size: 10px; color: #657c92; font-weight: 400; }
+.access-history-list p { margin: 5px 0; font-size: 12px; color: #526c84; overflow-wrap: anywhere; }
+.access-history-list small { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #5e7991; overflow-wrap: anywhere; }
+.access-history-list .access-history-reason { margin-top: 11px; padding: 9px 11px; border-radius: 7px; background: #f7f9fc; color: #536c84; font-size: 11px; }
+.access-history-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.access-history-pagination span { font-size: 11px; color: #647d93; margin-right: 8px; }
+.access-icon-button:disabled { opacity: .4; cursor: not-allowed; }
+.access-audit-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 0; }
+.access-audit-summary dt { font-size: 11px; color: #637d92; }
+.access-audit-summary dd { margin: 5px 0 0; font-size: 13px; color: #294b67; overflow-wrap: anywhere; }
+.access-audit-reason { margin: 20px 0; padding: 15px; background: #f5f8fc; border-radius: 9px; font-size: 12px; color: #425f79; }
+.access-audit-reason p { margin-top: 6px; line-height: 1.7; white-space: pre-wrap; }
+.access-audit-diff,.access-audit-permissions { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.access-audit-diff section { padding: 15px; border: 1px solid #dfe8f0; border-radius: 9px; font-size: 12px; color: #48677f; }
+.access-audit-diff h3,.access-audit-permissions h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; font-size: 12px; color: #335671; }
+.access-audit-diff p { margin-top: 7px; line-height: 1.6; }
+.access-audit-permissions { margin-top: 20px; }
+.access-audit-permissions span { display: block; padding: 7px 9px; margin-bottom: 6px; border-radius: 6px; background: #f0f8f3; color: #357451; font-size: 11px; }
+.access-audit-permissions section + section span { background: #fff3f1; color: #a05b50; }
+.access-muted { color: #71869b; font-size: 11px; }
+.access-page :is(select,textarea):focus-visible { outline: 3px solid #79b2dc; outline-offset: 2px; }
+@media (max-width: 700px) {
+  .access-stats .access-stat-word { font-size: 13px; }
+  .access-matrix-filters { align-items: stretch; gap: 10px; }
+  .access-matrix-filters label { flex: 1 1 100%; min-width: 0; }
+  .access-matrix-filters > span { width: 100%; margin: 0; padding: 0; }
+  .access-role-picker label { font-size: 10px; }
+  .access-matrix th:first-child { min-width: 175px; max-width: 195px; }
+  .access-matrix th,.access-matrix td { min-width: 120px; padding: 10px; }
+  .access-matrix-function small { font-size: 8px; }
+  .access-history-list article { flex-wrap: wrap; padding: 14px; gap: 10px; }
+  .access-history-list article > div { min-width: 0; flex-basis: calc(100% - 50px); }
+  .access-history-list article > button { margin-left: auto; }
+  .access-history-title { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .access-history-filters > label:not(.access-search) { flex: 1; min-width: 120px; }
+  .access-audit-summary,.access-audit-diff,.access-audit-permissions { grid-template-columns: 1fr; }
+}
