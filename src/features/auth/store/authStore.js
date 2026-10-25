@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { clearStoredSession, revokeSession, signIn, signInWithInstitutionalSSO, validateSession } from '../services/authService'
+import { getAuthToken } from '../../../shared/utils/storage'
 
 const SESSION_REFRESH_COOLDOWN_MS = 15000
 
@@ -30,6 +31,9 @@ export function useAuthStore() {
 
   const clearSession = useCallback(() => {
     clearStoredSession()
+    userRef.current = null
+    lastRefreshAtRef.current = 0
+    refreshInFlightRef.current = null
     setIsAuthenticated(false)
     setUser(null)
   }, [])
@@ -55,6 +59,8 @@ export function useAuthStore() {
   }
 
   const refreshSession = useCallback(async ({ force = false } = {}) => {
+    const sessionToken = getAuthToken()
+    if (!sessionToken) return { success: false, shouldLogout: false }
     const now = Date.now()
     if (!force && refreshInFlightRef.current) {
       return refreshInFlightRef.current
@@ -68,6 +74,10 @@ export function useAuthStore() {
     refreshInFlightRef.current = refreshPromise
 
     const response = await refreshPromise
+
+    if (getAuthToken() !== sessionToken) {
+      return { success: false, shouldLogout: false }
+    }
 
     if (response.success) {
       applyAuthenticatedUser(response.user || null)
@@ -113,9 +123,10 @@ export function useAuthStore() {
     }
   }, [refreshSession])
 
-  const logout = async () => {
-    await revokeSession()
+  const logout = () => {
+    const token = getAuthToken()
     clearSession()
+    void revokeSession(token)
   }
 
   return {

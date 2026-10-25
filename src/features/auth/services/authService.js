@@ -265,6 +265,12 @@ export async function validateSession() {
 
       const data = await response.json().catch(() => ({}))
 
+      // Una validacion anterior al cierre de sesion no debe restaurar el usuario
+      // ni invalidar una cuenta que haya iniciado sesion despues.
+      if (getAuthToken() !== token) {
+        return { success: false, shouldLogout: false }
+      }
+
       if (!response.ok) {
         const shouldLogout = response.status === 401
         if (shouldLogout) {
@@ -313,11 +319,10 @@ export async function validateSession() {
   }
 }
 
-export async function revokeSession() {
-  const token = getAuthToken()
+export async function revokeSession(token = getAuthToken()) {
   if (!token) return
   try {
-    await fetch(AUTH_LOGOUT_ENDPOINT, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+    await fetch(AUTH_LOGOUT_ENDPOINT, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, keepalive: true })
   } catch {
     // El cierre local siempre debe completarse aunque el servidor no responda.
   }
