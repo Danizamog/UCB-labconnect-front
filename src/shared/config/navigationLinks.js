@@ -1,5 +1,10 @@
 export const LOGIN_PATH = '/login'
 export const APP_ROOT_PATH = '/app'
+export const SECURITY_VIEW_PERMISSIONS = [
+  'consultar_auditoria_seguridad', 'consultar_eventos_autenticacion', 'consultar_sesiones_usuarios',
+  'consultar_incidentes_seguridad', 'revisar_accesos_rbac', 'exportar_reportes_seguridad',
+  'gestionar_roles', 'asignar_roles',
+]
 export const USER_ACCOUNT_PERMISSIONS = [
   'consultar_usuarios',
   'modificar_usuarios',
@@ -11,7 +16,7 @@ export const USER_ACCOUNT_PERMISSIONS = [
 export const NAVIGATION_LINKS = [
   { id: 'home', label: 'Inicio', icon: 'home', path: APP_ROOT_PATH },
   { id: 'account', label: 'Mi cuenta', icon: 'account', path: '/app/mi-cuenta' },
-  { id: 'security', label: 'Auditoria de seguridad', icon: 'security', path: '/app/seguridad', requiredAnyPermission: ['consultar_auditoria_seguridad', 'revisar_accesos_rbac'] },
+  { id: 'security', label: 'Seguridad', icon: 'security', path: '/app/seguridad', requiredAnyPermission: SECURITY_VIEW_PERMISSIONS },
   { id: 'admin_reservas', label: 'Solicitudes y acceso', icon: 'admin_reservas', path: '/app/admin/reservas', requiredAnyPermission: ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio', 'aprobar_clases', 'aprobar_tutorias'] },
   { id: 'analytics', label: 'Analisis de uso', icon: 'analytics', path: '/app/admin/analisis', requiredAnyPermission: ['consultar_estadisticas'] },
   { id: 'ia_predicciones', label: 'Predicciones', icon: 'ia_predicciones', path: '/app/admin/predicciones', requiredAnyPermission: ['consultar_estadisticas'] },

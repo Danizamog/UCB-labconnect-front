@@ -1,7 +1,7 @@
 import { createElement, Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowRight, BookOpen, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Eye, FlaskConical, History, KeyRound, LayoutGrid, Pencil, Plus, RefreshCw, Search, ShieldCheck, Table2, Trash2, Users, X } from 'lucide-react'
+import { ArrowRight, BookOpen, CalendarDays, Check, ChevronDown, Eye, FlaskConical, History, KeyRound, LayoutGrid, Pencil, Plus, RefreshCw, Search, ShieldCheck, Table2, Trash2, Users } from 'lucide-react'
 import WorkflowDialog from '../../../shared/components/WorkflowDialog'
-import { assignUserRole, createRole, deleteRole, listPermissionsCatalog, listRoleHistory, listRoles, listUsersWithRoles, updateRole } from '../services/rolesService'
+import { assignUserRole, createRole, deleteRole, listPermissionsCatalog, listRoles, listUsersWithRoles, updateRole } from '../services/rolesService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import './AdminRolesPage.css'
 
@@ -16,15 +16,10 @@ const GROUPS = [
   { id: 'security', label: 'Seguridad y auditoría', icon: ShieldCheck },
   { id: 'other', label: 'Otras funciones', icon: LayoutGrid },
 ]
-const ACTIONS = { 'role.created': 'Rol creado', 'role.updated': 'Rol editado', 'role.deleted': 'Rol eliminado', 'user.role_assigned': 'Rol asignado', 'user.role_removed': 'Rol retirado' }
 const EMPTY_ROLE = { nombre: '', descripcion: '', permisos: [] }
 const normalize = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 const permissionLabel = (value) => String(value || '').replaceAll('_', ' ').replace(/^./, (letter) => letter.toUpperCase())
 const countLabel = (count) => `${count} ${count === 1 ? 'permiso' : 'permisos'}`
-const formatDate = (value) => {
-  const parsed = new Date(String(value || '').replace(' ', 'T'))
-  return Number.isNaN(parsed.getTime()) ? 'Fecha no disponible' : parsed.toLocaleString('es-BO', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/La_Paz' })
-}
 
 function groupFor(value) {
   if (/auditoria|autenticacion|sesiones_usuarios|incidentes_seguridad|revisar_accesos|reportes_seguridad/.test(value)) return 'security'
@@ -45,7 +40,7 @@ function ReasonField({ value, onChange }) {
   return <label className="access-reason">Motivo del cambio <textarea required minLength={5} maxLength={500} rows={2} value={value} onChange={(event) => onChange(event.target.value)} placeholder="Describe por qué realizas este cambio…" /><small>Quedará registrado junto a tu identidad y los valores anteriores y nuevos.</small></label>
 }
 
-function AdminRolesPage({ user, onSessionRefresh }) {
+function AdminRolesPage({ user, onSessionRefresh, onNavigate }) {
   const canEdit = hasAnyPermission(user, ['gestionar_roles'])
   const canAssign = hasAnyPermission(user, ['asignar_roles'])
   const canViewAssignments = canEdit || canAssign || hasAnyPermission(user, ['revisar_accesos_rbac'])
@@ -70,7 +65,6 @@ function AdminRolesPage({ user, onSessionRefresh }) {
   const [moduleFilter, setModuleFilter] = useState('all')
   const [hiddenRoles, setHiddenRoles] = useState([])
   const [matrixMode, setMatrixMode] = useState('all')
-  const [historyVersion, setHistoryVersion] = useState(0)
   const load = useCallback(async () => {
     setLoading(true); setError('')
     try {
@@ -105,7 +99,6 @@ function AdminRolesPage({ user, onSessionRefresh }) {
     setEditor(role?.id || 'new'); setPermissionSearch(''); setReason(''); setDialogError('')
   }
   const afterChange = async () => {
-    setHistoryVersion((version) => version + 1)
     await onSessionRefresh?.({ force: true })
     await load()
   }
@@ -136,10 +129,10 @@ function AdminRolesPage({ user, onSessionRefresh }) {
       setDeleteTarget(null); setMessage('Rol eliminado. Se conserva el historial de sus cambios.'); await afterChange()
     } catch (err) { setDialogError(err.message) } finally { setBusy(false) }
   }
-  const tabs = [{ id: 'roles', label: 'Roles', icon: ShieldCheck }, ...(canViewAssignments ? [{ id: 'users', label: 'Asignaciones', icon: Users }] : []), { id: 'matrix', label: 'Matriz de accesos', icon: Table2 }, ...(canViewHistory ? [{ id: 'history', label: 'Historial', icon: History }] : [])]
+  const tabs = [{ id: 'roles', label: 'Roles', icon: ShieldCheck }, ...(canViewAssignments ? [{ id: 'users', label: 'Asignaciones', icon: Users }] : []), { id: 'matrix', label: 'Matriz de accesos', icon: Table2 }]
 
   return <section className="access-page" aria-label="Administración de roles">
-    <header className="access-header"><div><p className="access-eyebrow">Administración de accesos</p><h1>Roles y permisos</h1><p>Define responsabilidades, compara accesos y consulta quién realizó cada cambio.</p></div><div className="access-header-actions"><button type="button" className="access-button is-secondary" disabled={loading} onClick={() => { load(); setHistoryVersion((v) => v + 1) }}><RefreshCw size={15} /> Actualizar</button>{canEdit ? <button type="button" className="access-button is-primary" onClick={() => openEditor()}><Plus size={16} /> Crear rol</button> : null}</div></header>
+    <header className="access-header"><div><p className="access-eyebrow">Administración de accesos</p><h1>Roles y permisos</h1><p>Define responsabilidades, compara accesos y consulta quién realizó cada cambio.</p></div><div className="access-header-actions"><button type="button" className="access-button is-secondary" disabled={loading} onClick={load}><RefreshCw size={15} /> Actualizar</button>{canViewHistory ? <a className="access-button is-secondary" href="/app/seguridad#roles" onClick={(event) => { if (onNavigate) { event.preventDefault(); onNavigate('/app/seguridad#roles') } }}><History size={15} /> Historial en Seguridad</a> : null}{canEdit ? <button type="button" className="access-button is-primary" onClick={() => openEditor()}><Plus size={16} /> Crear rol</button> : null}</div></header>
     <div className="access-stats"><div><span className="access-stat-icon"><ShieldCheck size={21} /></span><span><strong>{roles.length}</strong><small>Roles configurados</small></span></div><div><span className="access-stat-icon is-teal"><KeyRound size={21} /></span><span><strong>{permissions.length}</strong><small>Funciones independientes</small></span></div>{canViewAssignments ? <div><span className="access-stat-icon"><Users size={21} /></span><span><strong>{users.filter((account) => account.roleId).length}</strong><small>Personas con rol asignado</small></span></div> : null}<div><span className="access-stat-icon is-gold"><History size={21} /></span><span><strong className="access-stat-word">Trazabilidad</strong><small>Responsable, motivo y detalle</small></span></div></div>
     {message ? <p className="access-alert is-success" role="status">{message}</p> : null}{error ? <p className="access-alert is-error" role="alert">{error}</p> : null}
     <div className="access-workspace"><div className="access-workspace-toolbar"><div className="access-tabs" role="tablist" aria-label="Vistas de roles" onKeyDown={(event) => {
@@ -154,7 +147,6 @@ function AdminRolesPage({ user, onSessionRefresh }) {
           {tab === 'roles' ? <><div className="access-section-heading"><div><h2>Responsabilidades del sistema</h2><p>Cada rol reúne las funciones de una responsabilidad. Todos se pueden asignar y configurar con los permisos correspondientes.</p></div><span>{filteredRoles.length} roles</span></div><div className="access-role-grid">{filteredRoles.map((role, index) => <article className={`access-role-card access-role-tone-${index % 4}`} key={role.id}><div className="access-role-top"><span className="access-role-icon"><ShieldCheck size={23} /></span><span className="access-role-kind">{SYSTEM_ROLES.has(role.nombre) ? 'Perfil base' : 'Personalizado'}</span></div><h3>{role.nombre}</h3><p className="access-role-description">{role.descripcion || 'Configura las funciones de esta responsabilidad.'}</p><div className="access-role-meta"><span><KeyRound size={13} />{countLabel(role.permisos.length)}</span>{canViewAssignments ? <span><Users size={13} />{assignedCount(role.id)} personas</span> : null}</div><div className="access-card-permissions">{[...new Set(role.permisos.map(groupFor))].slice(0, 5).map((id) => <span className="access-module-chip" key={id} title={GROUPS.find((g) => g.id === id)?.label}>{createElement(GROUPS.find((g) => g.id === id)?.icon || KeyRound, { size: 15 })}</span>)}{!role.permisos.length ? <span className="access-no-permissions">Autoservicio según su perfil</span> : null}</div><footer><button type="button" className="access-text-button" onClick={() => { setViewRole(role.id); setPermissionSearch('') }}><Eye size={15} /> Ver permisos</button><div>{canEdit ? <button type="button" className="access-icon-button" aria-label={`Editar ${role.nombre}`} onClick={() => openEditor(role)}><Pencil size={15} /></button> : null}{canEdit && !SYSTEM_ROLES.has(role.nombre) ? <button type="button" className="access-icon-button is-danger" aria-label={`Eliminar ${role.nombre}`} onClick={() => { setDeleteTarget(role); setReason(''); setDialogError('') }}><Trash2 size={15} /></button> : null}</div></footer></article>)}</div>{!filteredRoles.length ? <p className="access-empty">No hay roles que coincidan con la búsqueda.</p> : null}</> : null}
           {tab === 'users' && canViewAssignments ? <><div className="access-section-heading"><div><h2>Asignaciones por persona</h2><p>{canAssign ? 'Puedes asignar cualquier rol. Cada modificación requiere un motivo y queda registrada.' : 'Consulta de las responsabilidades actuales.'}</p></div><span>{filteredUsers.length} personas</span></div><div className="access-table-scroll"><table className="access-user-table"><thead><tr><th>Persona</th><th>Rol actual</th><th>Permisos</th><th>Acción</th></tr></thead><tbody>{filteredUsers.map((account) => <tr key={account.id}><td><div className="access-person"><span>{String(account.name || account.email).slice(0, 1).toUpperCase()}</span><div><strong>{account.name || 'Sin nombre'}{account.id === user?.user_id ? <small>Tu cuenta</small> : null}</strong><small>{account.email}</small></div></div></td><td><span className="access-user-role"><ShieldCheck size={13} />{account.role?.nombre || 'Sin rol'}</span></td><td>{countLabel(account.role?.permisos.length || 0)}</td><td>{canAssign ? <button type="button" className="access-button is-secondary" onClick={() => { setAssignment({ account, roleId: account.roleId || '' }); setReason(''); setDialogError('') }}>Cambiar rol <ArrowRight size={14} /></button> : <span className="access-muted">Consulta</span>}</td></tr>)}</tbody></table></div>{!filteredUsers.length ? <p className="access-empty">No hay personas que coincidan con la búsqueda.</p> : null}</> : null}
           {tab === 'matrix' ? <><div className="access-section-heading"><div><h2>Matriz de accesos</h2><p>Filtra módulos y compara únicamente los roles que necesitas.</p></div><span className="access-matrix-legend"><Check size={14} /> Permitido <span>— Sin permiso</span></span></div><div className="access-matrix-filters"><label>Módulo<select aria-label="Filtrar módulo" value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)}><option value="all">Todos los módulos</option>{GROUPS.map((group) => <option value={group.id} key={group.id}>{group.label}</option>)}</select></label><label>Mostrar<select aria-label="Filtrar coincidencias" value={matrixMode} onChange={(event) => setMatrixMode(event.target.value)}><option value="all">Todas las funciones</option><option value="any">Con acceso en algún rol</option><option value="shared">Compartidas por los roles visibles</option></select></label><span>{filteredPermissions.length} funciones · {visibleRoles.length} roles</span></div><div className="access-role-picker" aria-label="Roles visibles en la matriz">{roles.map((role) => <label key={role.id} className={!hiddenRoles.includes(role.id) ? 'is-selected' : ''}><input type="checkbox" checked={!hiddenRoles.includes(role.id)} onChange={() => setHiddenRoles((current) => current.includes(role.id) ? current.filter((id) => id !== role.id) : [...current, role.id])} />{role.nombre}</label>)}</div>{visibleRoles.length ? <div className="access-matrix-scroll" tabIndex={0} role="region" aria-label="Matriz de accesos desplazable"><table className="access-matrix"><thead><tr><th scope="col">Funcionalidad<small>Permisos agrupados por módulo</small></th>{visibleRoles.map((role) => <th scope="col" key={role.id}><span>{role.nombre}</span><small>{countLabel(role.permisos.length)}</small>{canEdit ? <button type="button" aria-label={`Editar permisos de ${role.nombre}`} onClick={() => openEditor(role)}><Pencil size={12} /> Editar</button> : null}</th>)}</tr></thead><tbody>{grouped(filteredPermissions).map((group) => <Fragment key={group.id}><tr className="access-matrix-group"><th colSpan={visibleRoles.length + 1}><span>{createElement(group.icon, { size: 15 })}{group.label}<small>{group.items.length} funciones</small></span></th></tr>{group.items.map((item) => <tr key={item.value}><th scope="row"><span className="access-matrix-function"><PermissionIcon value={item.value} /><span>{item.label}<small>{item.value}</small></span></span></th>{visibleRoles.map((role) => <td key={role.id} aria-label={`${role.nombre}: ${role.permisos.includes(item.value) ? 'permitido' : 'sin permiso'}`}>{role.permisos.includes(item.value) ? <span className="access-matrix-check"><Check size={15} /></span> : <span className="access-matrix-denied">—</span>}</td>)}</tr>)}</Fragment>)}</tbody></table>{!filteredPermissions.length ? <p className="access-empty">No hay funciones que coincidan con los filtros.</p> : null}</div> : <p className="access-empty">Selecciona al menos un rol para comparar sus accesos.</p>}</> : null}
-          {tab === 'history' && canViewHistory ? <RoleHistory key={historyVersion} /> : null}
         </>}
       </div>
     </div>
@@ -169,28 +161,6 @@ function AdminRolesPage({ user, onSessionRefresh }) {
       {dialogError ? <p className="workflow-dialog-error" role="alert">{dialogError}</p> : null}<p className="access-delete-copy">Eliminarás <strong>{deleteTarget.nombre}</strong>. Primero debe quedar sin usuarios asignados. Su historial se conservará.</p><ReasonField value={reason} onChange={setReason} />
     </WorkflowDialog> : null}
   </section>
-}
-
-function RoleHistory() {
-  const [filters, setFilters] = useState({ query: '', action: '', date_from: '', date_to: '', page: 1 })
-  const [data, setData] = useState({ items: [], totalItems: 0, totalPages: 0 })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [detail, setDetail] = useState(null)
-  useEffect(() => {
-    let active = true
-    const timer = window.setTimeout(() => {
-      setLoading(true); setError('')
-      listRoleHistory(filters).then((result) => { if (active) setData(result) }).catch((err) => { if (active) setError(err.message) }).finally(() => { if (active) setLoading(false) })
-    }, 250)
-    return () => { active = false; window.clearTimeout(timer) }
-  }, [filters])
-  const update = (key, value) => setFilters((current) => ({ ...current, [key]: value, page: 1 }))
-  const previousPermissions = detail?.before?.permisos || detail?.before?.permissions || []
-  const nextPermissions = detail?.after?.permisos || detail?.after?.permissions || []
-  const added = nextPermissions.filter((value) => !previousPermissions.includes(value))
-  const removed = previousPermissions.filter((value) => !nextPermissions.includes(value))
-  return <><div className="access-section-heading"><div><h2>Historial de cambios</h2><p>Registro de operaciones completadas. Horarios de Bolivia. Los registros se consultan y no se editan.</p></div><span>{data.totalItems} registros</span></div><div className="access-history-filters"><label className="access-search"><Search size={15} /><input aria-label="Buscar en historial" value={filters.query} placeholder="Responsable, rol, persona o motivo…" onChange={(event) => update('query', event.target.value)} /></label><label>Acción<select aria-label="Filtrar acción" value={filters.action} onChange={(event) => update('action', event.target.value)}><option value="">Todas las acciones</option>{Object.entries(ACTIONS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label>Desde<input type="date" aria-label="Historial desde" value={filters.date_from} onChange={(event) => update('date_from', event.target.value)} /></label><label>Hasta<input type="date" aria-label="Historial hasta" value={filters.date_to} onChange={(event) => update('date_to', event.target.value)} /></label></div>{error ? <p className="access-alert is-error" role="alert">{error}</p> : loading ? <p className="access-empty" role="status">Cargando historial…</p> : data.items.length ? <div className="access-history-list">{data.items.map((item) => <article key={item.id}><span className="access-history-icon"><History size={18} /></span><div><div className="access-history-title"><strong>{ACTIONS[item.action] || item.action}</strong><time>{formatDate(item.created)}</time></div><p>{item.role_name || 'Sin rol'}{item.target_email ? ` · ${item.target_email}` : ''}</p><small><Users size={12} />{item.actor_email}</small><p className="access-history-reason">{item.reason}</p></div><button type="button" className="access-button is-secondary" aria-label={`Ver detalle de ${item.role_name || item.action}`} onClick={() => setDetail(item)}><Eye size={14} /> Detalle</button></article>)}</div> : <div className="access-empty"><History size={28} /><h3>Sin cambios registrados</h3><p>Los nuevos cambios de roles y asignaciones aparecerán aquí.</p></div>}<div className="access-history-pagination"><span>Página {filters.page} de {Math.max(1, data.totalPages)}</span><button type="button" className="access-icon-button" aria-label="Historial anterior" disabled={loading || filters.page <= 1} onClick={() => setFilters((current) => ({ ...current, page: current.page - 1 }))}><ChevronLeft size={17} /></button><button type="button" className="access-icon-button" aria-label="Historial siguiente" disabled={loading || filters.page >= data.totalPages} onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}><ChevronRight size={17} /></button></div>{detail ? <WorkflowDialog title={ACTIONS[detail.action] || 'Detalle del cambio'} eyebrow="Trazabilidad RBAC" icon={ClipboardList} description={formatDate(detail.created)} wide onClose={() => setDetail(null)} footer={<button type="button" className="access-button is-secondary" onClick={() => setDetail(null)}>Cerrar</button>}><dl className="access-audit-summary"><div><dt>Responsable</dt><dd>{detail.actor_email}</dd></div><div><dt>Rol del responsable</dt><dd>{detail.actor_role}</dd></div><div><dt>Rol afectado</dt><dd>{detail.role_name || 'Sin rol'}</dd></div><div><dt>Persona afectada</dt><dd>{detail.target_email || 'Configuración del rol'}</dd></div></dl><div className="access-audit-reason"><strong>Motivo registrado</strong><p>{detail.reason}</p></div><div className="access-audit-diff">{[['Antes', detail.before], ['Después', detail.after]].map(([label, snapshot]) => <section key={label}><h3>{label}</h3><strong>{snapshot?.nombre || snapshot?.role_name || 'Sin rol'}</strong>{snapshot?.descripcion ? <p>{snapshot.descripcion}</p> : null}<p>{countLabel((snapshot?.permisos || snapshot?.permissions || []).length)}</p></section>)}</div><div className="access-audit-permissions"><section><h3><Plus size={15} /> Permisos añadidos ({added.length})</h3>{added.map((value) => <span key={value}>{permissionLabel(value)}</span>)}</section><section><h3><X size={15} /> Permisos retirados ({removed.length})</h3>{removed.map((value) => <span key={value}>{permissionLabel(value)}</span>)}</section></div></WorkflowDialog> : null}</>
 }
 
 export default AdminRolesPage

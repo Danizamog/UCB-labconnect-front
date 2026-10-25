@@ -23,6 +23,7 @@ import {
   getSectionIdFromPath,
   normalizePath,
   USER_ACCOUNT_PERMISSIONS,
+  SECURITY_VIEW_PERMISSIONS,
 } from '../../../shared/config/navigationLinks'
 import { hasAnyPermission, hasRole } from '../../../shared/lib/permissions'
 import {
@@ -173,7 +174,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const canManageEquipos = hasAnyPermission(user, ['gestionar_inventario', 'gestionar_estado_equipos', 'gestionar_mantenimiento', 'gestionar_prestamos', 'registrar_tickets_equipo'])
   const canManageMateriales = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos', 'gestionar_reservas_materiales'])
   const canManageTutorials = hasAnyPermission(user, ['gestionar_tutorias_propias'])
-  const canAuditSecurity = hasAnyPermission(user, ['consultar_auditoria_seguridad', 'revisar_accesos_rbac'])
+  const canAuditSecurity = hasAnyPermission(user, SECURITY_VIEW_PERMISSIONS)
   const canUseReservations = hasRole(user, ['Estudiante', 'Docente', 'Encargado de Laboratorio'])
   const canUseTutorials = hasRole(user, ['Estudiante'])
   const canRequestClassResources = hasAnyPermission(user, ['solicitar_recursos_clase', 'gestionar_clases_propias'])
@@ -525,9 +526,9 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
         <section ref={contentWindowRef} className="content-window" aria-label="Ventana principal">
           <Suspense fallback={<div className="module-loading">Cargando modulo...</div>}>
           {activeSection === 'account' ? <MyAccountPage onLogout={onLogout} /> : null}
-          {canAuditSecurity && activeSection === 'security' ? <SecurityAuditPage /> : null}
+          {canAuditSecurity && activeSection === 'security' ? <SecurityAuditPage user={user} currentHash={currentHash} onNavigate={onNavigate} /> : null}
           {canManageProfiles && activeSection === 'profiles' ? <AdminProfilesPage user={user} /> : null}
-          {canManageRoles && activeSection === 'roles' ? <AdminRolesPage user={user} onSessionRefresh={onRefreshSession} /> : null}
+          {canManageRoles && activeSection === 'roles' ? <AdminRolesPage user={user} onSessionRefresh={onRefreshSession} onNavigate={onNavigate} /> : null}
           {canViewPenalties && activeSection === 'penalties' ? <AdminPenaltiesPage user={user} /> : null}
           {canManageStructure && activeSection === 'admin_reservas' ? (
             <AdminReservationsPage user={user} currentHash={currentHash} onNavigate={onNavigate} />
