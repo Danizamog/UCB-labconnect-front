@@ -203,7 +203,8 @@
 .access-role-tone-2 { border-top-color: #d4b46a; }
 .access-role-tone-3 { border-top-color: #a29ac5; }
 .access-role-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 18px; }
-.access-role-kind { padding: 4px 8px; background: #f3f6fa; border-radius: 6px; color: #576c82; font-size: 10px; }
+.access-role-kind { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; background: #f3f6fa; border-radius: 6px; color: #576c82; font-size: 10px; }
+.access-matrix thead th > .access-admin-lock { display: inline-flex; align-items: center; justify-content: center; gap: 4px; margin-top: 10px; color: #687e92; font-size: 9px; font-weight: 500; }
 .access-role-description { color: #5c7187; font-size: 12px; flex: 1; }
 .access-role-meta { color: #526c85; }
 .access-role-meta span { font-size: 11px; }
