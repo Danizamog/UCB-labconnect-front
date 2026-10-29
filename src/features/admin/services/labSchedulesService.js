@@ -77,6 +77,10 @@ function mapSchedule(record) {
     teacher_name: record?.teacher_name || '',
     approval_status: record?.approval_status || 'approved',
     approval_reason: record?.approval_reason || '',
+    original_schedule_id: record?.original_schedule_id || '',
+    original_snapshot: record?.original_snapshot || null,
+    current_schedule: record?.current_schedule || null,
+    source_changed: Boolean(record?.source_changed),
     created: record?.created || '',
     updated: record?.updated || '',
   }
@@ -98,6 +102,12 @@ export async function listLabSchedules({ laboratory_id, weekday, teacher_id } = 
 export async function listMyTeacherClasses() {
   const data = await request(`${reservationsBase}/lab-schedules?teacher_id=me`)
   return Array.isArray(data) ? data.map(mapSchedule) : []
+}
+
+export function getWeeklyClassAvailability({ laboratory_id, weekday, exclude_id = '' }) {
+  const params = new URLSearchParams({ laboratory_id, weekday: String(weekday) })
+  if (exclude_id) params.set('exclude_id', exclude_id)
+  return request(`${reservationsBase}/lab-schedules/availability?${params}`)
 }
 
 export async function createLabSchedule(payload) {

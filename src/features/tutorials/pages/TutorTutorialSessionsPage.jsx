@@ -6,6 +6,7 @@ import { listAdminLabs, listMaterials } from '../../admin/services/infrastructur
 import {
   createSupplyReservation,
   getLabAvailability,
+  subscribeReservationsRealtime,
 } from '../../reservations/services/reservationsService'
 import {
   createTutorialSession,
@@ -292,6 +293,13 @@ function TutorTutorialSessionsPage({ user }) {
       window.clearInterval(timer)
     }
   }, [])
+
+  useEffect(() => subscribeReservationsRealtime((event) => {
+    if (['lab_schedule', 'lab_block', 'lab_reservation', 'tutorial_session'].includes(event.topic)) {
+      setAvailabilityRefreshNonce((value) => value + 1)
+    }
+  }, { topics: ['lab_schedule', 'lab_block', 'lab_reservation', 'tutorial_session'],
+    onResync: () => setAvailabilityRefreshNonce((value) => value + 1) }), [])
 
   useEffect(() => {
     let cancelled = false

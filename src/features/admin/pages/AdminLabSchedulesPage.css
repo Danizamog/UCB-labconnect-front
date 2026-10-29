@@ -334,3 +334,8 @@
   font-size: 0.72rem;
   color: var(--ink-700, #3d5676);
 }
+
+.schedules-requests { margin: 16px 0; border: 1px solid var(--line-300, #d8e2ee); border-radius: 12px; padding: 15px; }
+.schedules-requests > summary { cursor: pointer; font-weight: 700; padding: 5px; }
+.schedules-requests[open] > summary { margin-bottom: 16px; }
+.schedules-modal .weekly-schedule-picker { margin: 15px 0; }

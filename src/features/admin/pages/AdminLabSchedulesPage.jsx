@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { listAdminLabs } from '../services/infrastructureService'
 import {
@@ -12,10 +12,12 @@ import {
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import { listOperationalUsers } from '../services/profileService'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
+import WeeklySchedulePicker from '../../reservations/components/WeeklySchedulePicker'
+import PendingClassesPanel from '../../reservations/pages/PendingClassesPanel'
+import { subscribeReservationsRealtime } from '../../reservations/services/reservationsService'
 import './AdminAssetsPage.css'
 import './AdminLabSchedulesPage.css'
 
-const BLOCK_STARTS = ACADEMIC_BLOCKS.map((block) => block.start_time)
 const BLOCK_ENDS = ACADEMIC_BLOCKS.map((block) => block.end_time)
 const REQUIRED_PERMISSIONS = ['gestionar_horarios_laboratorio']
 
@@ -30,8 +32,7 @@ const emptyForm = {
 }
 
 function isTeacherProfile(profile) {
-  const role = String(profile?.role || profile?.profile_type || '').toLowerCase()
-  return role.includes('docente')
+  return profile?.role === 'Docente'
 }
 
 function resolveProfileName(profile) {
@@ -70,6 +71,11 @@ function AdminLabSchedulesPage({ user }) {
   const [editorState, setEditorState] = useState(null)
   const [confirmModal, setConfirmModal] = useState(null)
   const [teacherProfiles, setTeacherProfiles] = useState([])
+  const [teachersError, setTeachersError] = useState('')
+  const [loadingTeachers, setLoadingTeachers] = useState(true)
+  const [scheduleValid, setScheduleValid] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
 
   const canManage = hasAnyPermission(user, REQUIRED_PERMISSIONS)
 
@@ -101,19 +107,18 @@ function AdminLabSchedulesPage({ user }) {
         if (cancelled) return
         const list = Array.isArray(profiles) ? profiles : []
         const docentes = list.filter((profile) => profile?.is_active !== false && isTeacherProfile(profile))
-        // Si por alguna razon ningun perfil declara rol Docente, ofrecemos todos
-        // los perfiles activos para no bloquear la asignacion.
-        setTeacherProfiles(docentes.length > 0 ? docentes : list.filter((profile) => profile?.is_active !== false))
+        setTeacherProfiles(docentes.sort((a, b) => resolveProfileName(a).localeCompare(resolveProfileName(b))))
       })
-      .catch(() => {
-        if (!cancelled) setTeacherProfiles([])
+      .catch((err) => {
+        if (!cancelled) { setTeacherProfiles([]); setTeachersError(err.message || 'No se pudieron cargar los docentes.') }
       })
+      .finally(() => { if (!cancelled) setLoadingTeachers(false) })
     return () => {
       cancelled = true
     }
   }, [])
 
-  const loadSchedules = async (labId) => {
+  const loadSchedules = useCallback(async (labId) => {
     if (!labId) {
       setSchedules([])
       return
@@ -121,18 +126,22 @@ function AdminLabSchedulesPage({ user }) {
     setLoadingSchedules(true)
     try {
       const data = await listLabSchedules({ laboratory_id: labId })
-      setSchedules(data)
+      setSchedules(data.filter((item) => item.approval_status === 'approved' && item.is_active && !item.original_schedule_id))
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudieron cargar los horarios')
     } finally {
       setLoadingSchedules(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     loadSchedules(selectedLabId)
-  }, [selectedLabId])
+  }, [selectedLabId, loadSchedules])
+
+  useEffect(() => subscribeReservationsRealtime((event) => {
+    if (event.topic === 'lab_schedule') loadSchedules(selectedLabId)
+  }, { topics: ['lab_schedule'], onResync: () => loadSchedules(selectedLabId) }), [loadSchedules, selectedLabId])
 
   const schedulesByWeekday = useMemo(() => buildScheduleIndex(schedules), [schedules])
 
@@ -143,6 +152,7 @@ function AdminLabSchedulesPage({ user }) {
 
   const openCreateForBlock = (weekday, block) => {
     if (!canManage) return
+    setScheduleValid(false)
     setEditorState({
       mode: 'create',
       form: {
@@ -156,6 +166,7 @@ function AdminLabSchedulesPage({ user }) {
 
   const openEdit = (schedule) => {
     if (!canManage) return
+    setScheduleValid(false)
     setEditorState({
       mode: 'edit',
       schedule,
@@ -202,7 +213,7 @@ function AdminLabSchedulesPage({ user }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    if (!editorState || !selectedLabId) return
+    if (!editorState || !selectedLabId || saving || !scheduleValid) return
     const { mode, form, schedule } = editorState
 
     if (!form.subject.trim()) {
@@ -214,6 +225,7 @@ function AdminLabSchedulesPage({ user }) {
       return
     }
 
+    setSaving(true)
     try {
       if (mode === 'create') {
         await createLabSchedule({
@@ -243,7 +255,7 @@ function AdminLabSchedulesPage({ user }) {
       setError('')
     } catch (err) {
       setError(err.message || 'No se pudo guardar la clase.')
-    }
+    } finally { setSaving(false) }
   }
 
   const handleDelete = (schedule) => {
@@ -291,6 +303,7 @@ function AdminLabSchedulesPage({ user }) {
 
       {message ? <p className="infra-alert infra-success">{message}</p> : null}
       {error ? <p className="infra-alert infra-error">{error}</p> : null}
+      {hasAnyPermission(user, ['aprobar_clases']) ? <details className="schedules-requests"><summary>Solicitudes de clases pendientes ({pendingCount})</summary><PendingClassesPanel labNameById={Object.fromEntries(labs.map((lab) => [lab.id, lab.name]))} onCountChange={setPendingCount} /></details> : null}
 
       <div className="infra-body schedules-body">
         <div className="schedules-toolbar">
@@ -421,36 +434,8 @@ function AdminLabSchedulesPage({ user }) {
                 </select>
               </label>
 
-              <label>
-                <span>Hora de inicio</span>
-                <select
-                  value={editorState.form.start_time}
-                  onChange={(event) => handleFormChange('start_time', event.target.value)}
-                  required
-                >
-                  <option value="">Selecciona</option>
-                  {BLOCK_STARTS.map((value) => (
-                    <option key={value} value={value}>{value}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                <span>Hora de fin</span>
-                <select
-                  value={editorState.form.end_time}
-                  onChange={(event) => handleFormChange('end_time', event.target.value)}
-                  required
-                >
-                  <option value="">Selecciona</option>
-                  {BLOCK_ENDS
-                    .filter((value) => !editorState.form.start_time || value > editorState.form.start_time)
-                    .map((value) => (
-                      <option key={value} value={value}>{value}</option>
-                    ))}
-                </select>
-              </label>
             </div>
+            <WeeklySchedulePicker laboratoryId={selectedLabId} weekday={editorState.form.weekday} excludeId={editorState.schedule?.id || ''} startTime={editorState.form.start_time} endTime={editorState.form.end_time} onValidityChange={setScheduleValid} onChange={(range) => setEditorState((previous) => ({ ...previous, form: { ...previous.form, ...range } }))} />
 
             <label className="schedules-modal-field">
               <span>Materia / clase</span>
@@ -467,7 +452,9 @@ function AdminLabSchedulesPage({ user }) {
               <span>Docente responsable (opcional)</span>
               <select
                 value={editorState.form.teacher_id || ''}
+                aria-label="Docente responsable"
                 onChange={(event) => handleTeacherChange(event.target.value)}
+                disabled={loadingTeachers || Boolean(teachersError)}
               >
                 <option value="">Sin docente asignado</option>
                 {editorState.form.teacher_id
@@ -478,10 +465,11 @@ function AdminLabSchedulesPage({ user }) {
                   ) : null}
                 {teacherProfiles.map((profile) => (
                   <option key={profile.id} value={profile.id}>
-                    {resolveProfileName(profile)}{profile.email ? ` — ${profile.email}` : ''}
+                    {resolveProfileName(profile)}{profile.username ? ` — ${profile.username}` : ''}
                   </option>
                 ))}
               </select>
+              {loadingTeachers ? <small>Cargando docentes…</small> : teachersError ? <small role="alert">{teachersError}</small> : teacherProfiles.length === 0 ? <small>No hay usuarios activos con rol Docente.</small> : null}
               <small className="schedules-modal-hint">
                 El docente asignado podra pedir materiales y equipos para esta clase desde su portal.
               </small>
@@ -505,8 +493,8 @@ function AdminLabSchedulesPage({ user }) {
               ) : <span />}
               <div className="schedules-modal-primary-actions">
                 <button type="button" className="schedules-modal-secondary" onClick={closeEditor}>Cancelar</button>
-                <button type="submit" className="schedules-modal-primary">
-                  {editorState.mode === 'create' ? 'Crear clase' : 'Guardar cambios'}
+                <button type="submit" className="schedules-modal-primary" disabled={saving || !scheduleValid || loadingTeachers || Boolean(teachersError)}>
+                  {saving ? 'Guardando…' : editorState.mode === 'create' ? 'Crear clase' : 'Guardar cambios'}
                 </button>
               </div>
             </footer>

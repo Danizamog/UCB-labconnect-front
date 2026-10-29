@@ -1,0 +1,8 @@
+.weekly-schedule-picker { display: grid; gap: 14px; }
+.weekly-slot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: 8px; }
+.weekly-slot-grid button { display: grid; gap: 5px; border: 1px solid #c5d9cc; border-radius: 9px; padding: 10px 8px; background: #f0f8f3; color: #28513c; text-align: left; cursor: pointer; }
+.weekly-slot-grid button strong { font-size: 12px; }
+.weekly-slot-grid button span { font-size: 10px; line-height: 1.5; }
+.weekly-slot-grid button[aria-pressed=true] { background: #174c73; border-color: #174c73; color: white; }
+.weekly-slot-grid button:disabled { cursor: not-allowed; background: #f3f4f6; border-color: #dde1e7; color: #737d89; }
+.weekly-slot-grid button:focus-visible { outline: 3px solid #77b4e1; outline-offset: 2px; }

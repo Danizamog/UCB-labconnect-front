@@ -1,0 +1,12 @@
+.class-change-comparison { overflow-x: auto; margin: 12px 0; }
+.class-change-comparison table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.class-change-comparison caption { text-align: left; font-weight: 700; margin-bottom: 8px; }
+.class-change-comparison th, .class-change-comparison td { text-align: left; vertical-align: top; padding: 9px; border-bottom: 1px solid #dce4ed; overflow-wrap: anywhere; }
+.teacher-class-change { padding: 12px; border: 1px solid #d9e3ed; border-radius: 9px; background: #f7f9fc; font-size: 12px; }
+.teacher-class-change p { line-height: 1.6; }
+.class-requests-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 16px; }
+.class-request-card { min-width: 0; }
+.class-rejection-field { display: grid; gap: 8px; font-size: 12px; font-weight: 600; margin: 14px 0; }
+.class-rejection-field textarea { box-sizing: border-box; width: 100%; min-height: 80px; padding: 10px; border: 1px solid #cedae6; border-radius: 8px; background: white; color: #193752; font: inherit; resize: vertical; }
+.class-request-card .reservations-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.class-request-card .reservations-actions button { min-height: 40px; }
