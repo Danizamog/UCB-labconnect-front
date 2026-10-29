@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatLocalDateTime } from '../../../shared/utils/formatters'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
-import { listAdminLabs, listAssetMaintenanceTickets, listAssets } from '../../admin/services/infrastructureService'
-import { listUserProfiles } from '../../admin/services/profileService'
+import { listAdminLabs, listAssetMaintenanceTickets, listAssetsCatalog } from '../../admin/services/infrastructureService'
+import { listOperationalUsers } from '../../admin/services/profileService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import PenaltyModal from './PenaltyModal'
 import {
@@ -192,7 +192,7 @@ function AdminPenaltiesPage({ user }) {
 
   const loadDisplaySupportData = useCallback(async () => {
     const [assetsResult, labsResult] = await Promise.allSettled([
-      listAssets(),
+      listAssetsCatalog(),
       listAdminLabs(),
     ])
 
@@ -216,7 +216,7 @@ function AdminPenaltiesPage({ user }) {
       const [reservationsResult, ticketsResult, profilesResult] = await Promise.allSettled([
         listReservationsPage({ pageSize: 200, sortBy: 'updated', sortType: 'DESC' }),
         listAssetMaintenanceTickets(),
-        listUserProfiles(),
+        listOperationalUsers('penalties'),
       ])
 
       if (reservationsResult.status === 'fulfilled') {

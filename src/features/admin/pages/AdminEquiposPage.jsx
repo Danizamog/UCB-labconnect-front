@@ -1,3 +1,4 @@
+import { equipmentAccess } from '../../../shared/lib/moduleAccess'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
@@ -14,9 +15,10 @@ import {
   listLoansDashboard,
   returnLoanRecord,
   updateAsset,
+  updateAssetStatus,
 } from '../services/infrastructureService'
-import { listUserProfiles } from '../services/profileService'
-import { hasAnyPermission, isAdminUser } from '../../../shared/lib/permissions'
+import { listOperationalUsers } from '../services/profileService'
+import { hasAnyPermission } from '../../../shared/lib/permissions'
 import { assetStatusBadgeClass, assetStatusLabel, formatDateTime, formatStatus } from '../../../shared/utils/formatters'
 import { downloadCsv, todayStamp } from '../../../shared/utils/exportCsv'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
@@ -124,10 +126,15 @@ function AdminEquiposPage({ user }) {
   const [userDirectoryMessage, setUserDirectoryMessage] = useState('')
   const [activeTab, setActiveTab] = useState('inventory') // 'inventory' | 'tickets' | 'loans'
 
+  const canExportReports = hasAnyPermission(user, ['generar_reportes'])
   const canManage = hasAnyPermission(user, ['gestionar_inventario'])
-  const canManageStatus = hasAnyPermission(user, ['gestionar_estado_equipos', 'gestionar_mantenimiento'])
-  const canCreateTickets = canManageStatus || hasAnyPermission(user, ['registrar_tickets_equipo'])
-  const canManageLoans = hasAnyPermission(user, ['gestionar_prestamos', 'gestionar_inventario', 'gestionar_estado_equipos'])
+  const access = equipmentAccess(user)
+  const canManageStatus = access.status
+  const canCreateTickets = access.tickets
+  const canCloseTickets = access.closeTickets
+  const canManageLoans = access.loans
+  const availableTabs = [access.inventory && 'inventory', canCreateTickets && 'tickets', canManageLoans && 'loans'].filter(Boolean)
+  const currentTab = availableTabs.includes(activeTab) ? activeTab : availableTabs[0]
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -136,8 +143,8 @@ function AdminEquiposPage({ user }) {
         listAdminLabs(),
         listAssets(),
         canCreateTickets ? listAssetMaintenanceTickets({ status: 'open' }) : Promise.resolve([]),
-        listLoansDashboard({ page: 1, perPage: LOAN_PAGE_SIZE }),
-        canManageLoans ? listUserProfiles() : Promise.resolve([]),
+        canManageLoans ? listLoansDashboard({ page: 1, perPage: LOAN_PAGE_SIZE }) : Promise.resolve(defaultLoanDashboard),
+        canManageLoans ? listOperationalUsers('loans') : Promise.resolve([]),
       ])
 
       if (labsResult.status !== 'fulfilled' || assetsResult.status !== 'fulfilled' || loansResult.status !== 'fulfilled') {
@@ -147,7 +154,7 @@ function AdminEquiposPage({ user }) {
       const nextAssets = assetsResult.value
       const nextLabs = labsResult.value
       const currentUserId = String(user?.user_id || '')
-      const isAdminViewer = isAdminUser(user)
+      const isAdminViewer = hasAnyPermission(user, ['gestionar_estructura_laboratorios'])
       const nextManagedLabIds = currentUserId
         ? nextLabs.filter((lab) => String(lab?.manager || '') === currentUserId).map((lab) => String(lab.id))
         : []
@@ -203,7 +210,7 @@ function AdminEquiposPage({ user }) {
     }
   }, [loanDashboard.active_loans_total_pages, loanPage])
 
-  const isAdmin = isAdminUser(user)
+  const isAdmin = hasAnyPermission(user, ['gestionar_estructura_laboratorios'])
   const managedLabIds = useMemo(() => {
     const currentUserId = String(user?.user_id || '')
     if (!currentUserId) return []
@@ -301,7 +308,7 @@ function AdminEquiposPage({ user }) {
   const loadAssetDetailHistory = async (assetId) => {
     setAssetHistoryLoadingId(assetId)
     try {
-      const [maintenanceHistory, loanHistory] = await Promise.all([listAssetStatusHistory(assetId), listAssetLoanHistory(assetId)])
+      const [maintenanceHistory, loanHistory] = await Promise.all([canCreateTickets ? listAssetStatusHistory(assetId) : Promise.resolve([]), canManageLoans ? listAssetLoanHistory(assetId) : Promise.resolve([])])
       setAssetStatusHistory((previous) => ({ ...previous, [assetId]: maintenanceHistory }))
       setAssetLoanHistory((previous) => ({ ...previous, [assetId]: loanHistory }))
     } catch (err) {
@@ -460,7 +467,7 @@ function AdminEquiposPage({ user }) {
   }
 
   const handleCloseTicket = async (ticketId) => {
-    if (!canManageStatus) return
+    if (!canCloseTickets) return
     const resolutionNotes = String(resolutionDrafts[ticketId] || '').trim()
     if (!resolutionNotes) {
       setError('Debes registrar la resolucion antes de cerrar el ticket.')
@@ -596,6 +603,7 @@ function AdminEquiposPage({ user }) {
   }
 
   const handleExportLoans = () => {
+    if (!canExportReports) return
     downloadCsv(
       `prestamos-activos-${todayStamp()}`,
       [
@@ -614,6 +622,7 @@ function AdminEquiposPage({ user }) {
   }
 
   const handleExportInventory = () => {
+    if (!canExportReports) return
     downloadCsv(
       `inventario-equipos-${todayStamp()}`,
       [
@@ -804,6 +813,14 @@ function AdminEquiposPage({ user }) {
                   </div>
                 </section>
 
+                {canManageStatus && selectedManagedAsset ? <label>Estado del equipo
+                  <select value={selectedManagedAsset.status} onChange={async (event) => {
+                    try { await updateAssetStatus(selectedManagedAsset.id, event.target.value); await loadData() }
+                    catch (err) { setError(err.message) }
+                  }}>
+                    <option value="available">Disponible</option><option value="maintenance">Mantenimiento</option><option value="damaged">Danado</option><option value="loaned">Prestado</option>
+                  </select>
+                </label> : null}
                 <div className="infra-manage-grid">
                   <button type="button" className="infra-manage-card" onClick={() => {
                     if (!selectedManagedAsset) return
@@ -897,7 +914,7 @@ function AdminEquiposPage({ user }) {
                     </label>
                     <label>
                       <span>Estado</span>
-                      <select value={form.status} onChange={(event) => setForm((previous) => ({ ...previous, status: event.target.value }))}>
+                      <select disabled={!canManageStatus} value={form.status} onChange={(event) => setForm((previous) => ({ ...previous, status: event.target.value }))}>
                         <option value="available">Disponible</option>
                         <option value="loaned">Prestado</option>
                         <option value="maintenance">Mantenimiento</option>
@@ -1147,38 +1164,39 @@ function AdminEquiposPage({ user }) {
       </header>
 
       <nav className="infra-tabs" role="tablist" aria-label="Secciones de equipos">
-        <button
+        {access.inventory ? (<button
           type="button"
           role="tab"
-          aria-selected={activeTab === 'inventory'}
-          className={`infra-tab-button ${activeTab === 'inventory' ? 'is-active' : ''}`}
+          aria-selected={currentTab === 'inventory'}
+          className={`infra-tab-button ${currentTab === 'inventory' ? 'is-active' : ''}`}
           onClick={() => setActiveTab('inventory')}
         >
           <span>Equipos</span>
           <span className="infra-tab-count">{visibleAssets.length}</span>
-        </button>
-        <button
+        </button>) : null}
+        {canCreateTickets ? (<button
           type="button"
           role="tab"
-          aria-selected={activeTab === 'tickets'}
-          className={`infra-tab-button ${activeTab === 'tickets' ? 'is-active' : ''}`}
+          aria-selected={currentTab === 'tickets'}
+          className={`infra-tab-button ${currentTab === 'tickets' ? 'is-active' : ''}`}
           onClick={() => setActiveTab('tickets')}
         >
           <span>Tickets de mantenimiento</span>
           <span className="infra-tab-count">{activeTickets.length}</span>
-        </button>
-        <button
+        </button>) : null}
+        {canManageLoans ? (<button
           type="button"
           role="tab"
-          aria-selected={activeTab === 'loans'}
-          className={`infra-tab-button ${activeTab === 'loans' ? 'is-active' : ''}`}
+          aria-selected={currentTab === 'loans'}
+          className={`infra-tab-button ${currentTab === 'loans' ? 'is-active' : ''}`}
           onClick={() => setActiveTab('loans')}
         >
           <span>Préstamos</span>
           <span className="infra-tab-count">{loanDashboard.active_count}</span>
-        </button>
+        </button>) : null}
       </nav>
 
+      {!isAdmin && managedLabIds.length === 0 && !loading ? <p className="infra-alert" role="status">Tienes acceso a esta funcion, pero necesitas un laboratorio asignado para operar sus equipos.</p> : null}
       {message ? <p className="infra-alert infra-success">{message}</p> : null}
       {error ? <p className="infra-alert infra-error">{error}</p> : null}
 
@@ -1186,7 +1204,7 @@ function AdminEquiposPage({ user }) {
         <p className="infra-empty">Cargando equipos...</p>
       ) : (
         <div className="infra-grid">
-          {activeTab === 'inventory' ? (
+          {currentTab === 'inventory' ? (
             <>
               <section className="infra-command-panel infra-card-full">
             <div className="infra-command-copy">
@@ -1267,7 +1285,7 @@ function AdminEquiposPage({ user }) {
                     </label>
                     <label>
                       <span>Estado</span>
-                      <select value={form.status} onChange={(event) => setForm((previous) => ({ ...previous, status: event.target.value }))}>
+                      <select disabled={!canManageStatus} value={form.status} onChange={(event) => setForm((previous) => ({ ...previous, status: event.target.value }))}>
                         <option value="available">Disponible</option>
                         <option value="loaned">Prestado</option>
                         <option value="maintenance">Mantenimiento</option>
@@ -1287,7 +1305,7 @@ function AdminEquiposPage({ user }) {
           </>
           ) : null}
 
-          {activeTab === 'tickets' ? (
+          {currentTab === 'tickets' ? (
             <section className="infra-card">
               <div className="infra-section-head">
                 <div>
@@ -1347,7 +1365,7 @@ function AdminEquiposPage({ user }) {
             <div className="infra-section-head">
               <div>
                 <h3>Tickets activos</h3>
-                <p>{canManageStatus ? 'Cierra cada ticket con su resolución para devolver el equipo a disponible.' : 'Registra fallas y consulta los tickets de tu laboratorio. El administrador realiza el cierre.'}</p>
+                <p>{canCloseTickets ? 'Cierra cada ticket con su resolución para devolver el equipo a disponible.' : 'Registra fallas y consulta los tickets de tu laboratorio. El administrador realiza el cierre.'}</p>
               </div>
             </div>
 
@@ -1374,7 +1392,7 @@ function AdminEquiposPage({ user }) {
                       <span><strong>Abierto:</strong> {formatDateTime(ticket.reported_at)} por {ticket.reported_by || 'Sin registro'}{ticket.reported_by_email ? ` (${ticket.reported_by_email})` : ''}</span>
                       {ticket.is_responsibility_flagged ? <span className="infra-negative">Responsable asociado: {ticket.responsible_borrower_name || ticket.responsible_borrower_email || 'Prestamo previo'}</span> : null}
                     </div>
-                    {canManageStatus ? <>
+                    {canCloseTickets ? <>
                       <label className="infra-ticket-resolution">
                         <span>Resolucion para cierre</span>
                         <textarea rows="3" value={resolutionDrafts[ticket.id] || ''} onChange={(event) => setResolutionDrafts((previous) => ({ ...previous, [ticket.id]: event.target.value }))} placeholder="Describe la reparacion realizada y el resultado." />
@@ -1392,7 +1410,7 @@ function AdminEquiposPage({ user }) {
           </section>
           ) : null}
 
-          {activeTab === 'loans' ? (
+          {currentTab === 'loans' ? (
           <section className="infra-card infra-card-full">
             <div className="infra-section-head">
               <div>
@@ -1455,14 +1473,14 @@ function AdminEquiposPage({ user }) {
                       <span className="infra-chip">Activos {loanDashboard.active_count}</span>
                       <span className="infra-chip">Historial {loanDashboard.total_records}</span>
                     </div>
-                    <button
+                    {canExportReports ? <button
                       type="button"
                       className="infra-secondary"
                       onClick={handleExportLoans}
                       disabled={loanDashboard.active_loans.length === 0}
                     >
                       ⬇ Descargar Excel
-                    </button>
+                    </button> : null}
                   </div>
                 </div>
 
@@ -1529,7 +1547,7 @@ function AdminEquiposPage({ user }) {
           </section>
           ) : null}
 
-          {activeTab === 'inventory' ? (
+          {currentTab === 'inventory' ? (
           <section className="infra-card infra-card-full">
             <div className="infra-section-head">
               <div>
@@ -1539,14 +1557,14 @@ function AdminEquiposPage({ user }) {
               <div className="infra-equipment-results">
                 <strong>{filteredAssets.length}</strong>
                 <span>{filteredAssets.length === 1 ? 'equipo encontrado' : 'equipos encontrados'}</span>
-                <button
+                {canExportReports ? <button
                   type="button"
                   className="infra-secondary"
                   onClick={handleExportInventory}
                   disabled={filteredAssets.length === 0}
                 >
                   ⬇ Descargar Excel
-                </button>
+                </button> : null}
               </div>
             </div>
 

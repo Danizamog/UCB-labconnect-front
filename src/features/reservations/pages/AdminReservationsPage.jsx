@@ -1,4 +1,6 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { reservationAccess } from '../../../shared/lib/moduleAccess'
+import ReservationRulesPanel from './ReservationRulesPanel'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   AlertCircle,
@@ -16,7 +18,7 @@ import {
   listEquipmentRequests,
   updateEquipmentRequestStatus,
 } from '../../admin/services/infrastructureService'
-import { listUserProfiles } from '../../admin/services/profileService'
+import { listOperationalUsers } from '../../admin/services/profileService'
 import {
   listPendingTutorialSessions,
   updateTutorialSessionApproval,
@@ -39,7 +41,7 @@ import {
 } from '../services/reservationsService'
 import ReservationEditModal from './ReservationEditModal'
 import PendingClassesPanel from './PendingClassesPanel'
-import { hasAnyPermission, isAdminUser } from '../../../shared/lib/permissions'
+import { hasAnyPermission } from '../../../shared/lib/permissions'
 import { formatDate, formatDateTime } from '../../../shared/utils/formatters'
 import { downloadCsv, todayStamp } from '../../../shared/utils/exportCsv'
 import './ReservationsPages.css'
@@ -74,6 +76,7 @@ const WHERE_EXAMPLES = [
 ]
 
 const ADMIN_RESERVATION_SECTIONS = [
+  { id: 'reglas-reserva', label: 'Reglas y bloqueos', helper: 'Configura periodos no disponibles para reservas.', tone: 'control' },
   { id: 'clases-pendientes', label: 'Clases pendientes', helper: 'Aprueba o rechaza los horarios enviados por docentes.', tone: 'requests' },
   {
     id: 'dashboard-acceso',
@@ -243,21 +246,30 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   const tableQueryRef = useRef({ ...defaultTableFilters, pageNumber: 0 })
   const realtimeRefreshTimeoutRef = useRef(null)
 
-  const canManage = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio', 'aprobar_tutorias'])
-  const canApproveTutorials = hasAnyPermission(user, ['aprobar_tutorias'])
-  const canApproveClasses = hasAnyPermission(user, ['aprobar_clases'])
-  const canManageTeacherRequests = hasAnyPermission(user, ['gestionar_reservas_materiales', 'gestionar_stock', 'gestionar_inventario'])
-  const isAdmin = isAdminUser(user)
+  const access = reservationAccess(user)
+  const canExportReports = hasAnyPermission(user, ['generar_reportes'])
+  const canManage = access.reservations
+  const canManageAccess = access.access
+  const canReadOperations = access.operations
+  const canApproveTutorials = access.tutorials
+  const canApproveClasses = access.classes
+  const canManageSupplies = access.supplies
+  const canManageEquipmentRequests = access.equipment
+  const canManageTeacherRequests = canManageSupplies || canManageEquipmentRequests
+  const isAdmin = hasAnyPermission(user, ['gestionar_estructura_laboratorios'])
   const availableSections = useMemo(() => ADMIN_RESERVATION_SECTIONS.filter((section) => {
     if (section.id === 'clases-pendientes') return canApproveClasses
     if (section.id === 'tutorias-pendientes') return canApproveTutorials
     if (section.id === 'solicitudes-docentes') return canManageTeacherRequests
-    return true
-  }), [canApproveTutorials, canManageTeacherRequests, canApproveClasses])
+    if (section.id === 'reglas-reserva') return access.rules
+    if (['ingreso-rapido', 'control-entradas-salidas', 'ocupacion-actual'].includes(section.id)) return canManageAccess
+    if (section.id === 'solicitudes-reserva') return canManage
+    return canReadOperations
+  }), [canApproveTutorials, canManageTeacherRequests, canApproveClasses, access.rules, canManageAccess, canManage, canReadOperations])
 
   useEffect(() => {
     if (!availableSections.some((section) => section.id === activeWorkspace)) {
-      setActiveWorkspace('dashboard-acceso')
+      setActiveWorkspace(availableSections[0]?.id || '')
     }
   }, [activeWorkspace, availableSections])
 
@@ -265,7 +277,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     try {
       const [labsResult, profilesResult] = await Promise.allSettled([
         listAdminLabs(),
-        listUserProfiles(),
+        canManageAccess ? listOperationalUsers('reservations') : Promise.resolve([]),
       ])
 
       if (labsResult.status !== 'fulfilled') {
@@ -278,7 +290,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
       setLabs(labsData)
       setProfiles(profilesData)
       const currentUserId = String(user?.user_id || '')
-      const eligibleLabs = isAdminUser(user)
+      const eligibleLabs = hasAnyPermission(user, ['gestionar_estructura_laboratorios'])
         ? labsData
         : labsData.filter((lab) => String(lab?.manager || '') === currentUserId)
       setWalkInForm((previous) => ({
@@ -290,15 +302,16 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     } catch (err) {
       setError(err.message || 'No se pudieron cargar los datos base del panel de reservas.')
     }
-  }, [user])
+  }, [user, canManageAccess])
 
   const loadOperationalData = useCallback(async () => {
+    if (!canReadOperations) return
     try {
       const today = todayDate()
       const [todayPage, statsResult, occupancyResult] = await Promise.allSettled([
         listReservationsPage({ date: today, pageSize: 100, sortBy: 'start_at', sortType: 'ASC' }),
         getReservationStats(),
-        getOccupancyDashboard(),
+        canManageAccess ? getOccupancyDashboard() : Promise.resolve({ current_occupancy: 0, active_sessions: [], lab_breakdown: [] }),
       ])
 
       if (occupancyResult.status !== 'fulfilled' || todayPage.status !== 'fulfilled') {
@@ -316,9 +329,10 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     } catch (err) {
       setError(err.message || 'No se pudo cargar el panel de reservas.')
     }
-  }, [])
+  }, [canReadOperations, canManageAccess])
 
   const loadTableData = useCallback(async (query) => {
+    if (!canManage) return
     setTableLoading(true)
     try {
       const page = await listReservationsPage(query)
@@ -338,19 +352,19 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     } finally {
       setTableLoading(false)
     }
-  }, [])
+  }, [canManage])
 
   const loadPendingTutorialsData = useCallback(async () => {
     setIsLoadingPendingTutorials(true)
     try {
       const sessions = await listPendingTutorialSessions()
       setPendingTutorials(sessions)
-      const allPendingSupplies = await listSupplyReservations({ status: 'pending', skipCache: true }).catch(() => [])
+      const allPendingSupplies = canManageSupplies ? await listSupplyReservations({ status: 'pending', skipCache: true }) : []
 
       const supplyResults = await Promise.all(
         sessions.map(async (session) => {
           try {
-            const linkedSupplies = await listSupplyReservations({
+            const linkedSupplies = !canManageSupplies ? [] : await listSupplyReservations({
               tutorial_session_id: session.id,
               skipCache: true,
             })
@@ -390,15 +404,15 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     } finally {
       setIsLoadingPendingTutorials(false)
     }
-  }, [])
+  }, [canManageSupplies])
 
   const loadTeacherRequests = useCallback(async () => {
     setIsLoadingTeacherRequests(true)
     try {
       const statusParam = teacherRequestStatusFilter || undefined
       const [supplies, equipment] = await Promise.all([
-        listSupplyReservations({ status: statusParam, skipCache: true }).catch(() => []),
-        listEquipmentRequests({ status: statusParam, skipCache: true }).catch(() => []),
+        canManageSupplies ? listSupplyReservations({ status: statusParam, skipCache: true }) : Promise.resolve([]),
+        canManageEquipmentRequests ? listEquipmentRequests({ status: statusParam, skipCache: true }) : Promise.resolve([]),
       ])
       // Las solicitudes de docentes son insumos/equipos con recurrence_group_id
       // y sin tutoria ni reserva de laboratorio asociada.
@@ -455,7 +469,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     } finally {
       setIsLoadingTeacherRequests(false)
     }
-  }, [teacherRequestStatusFilter])
+  }, [teacherRequestStatusFilter, canManageSupplies, canManageEquipmentRequests])
 
   const handleApproveTeacherGroup = async (group) => {
     setTeacherRequestActionId(group.id)
@@ -516,6 +530,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     loadReferenceData()
     loadOperationalData()
 
+    if (!canReadOperations) return undefined
     const unsubscribe = subscribeReservationsRealtime((event) => {
       if (event?.topic !== 'lab_reservation') return
 
@@ -557,7 +572,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
       window.clearTimeout(realtimeRefreshTimeoutRef.current)
       unsubscribe?.()
     }
-  }, [loadOperationalData, loadReferenceData, loadTableData])
+  }, [loadOperationalData, loadReferenceData, loadTableData, canReadOperations])
 
   useEffect(() => {
     loadTableData(tableQuery)
@@ -724,13 +739,13 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   const canApproveFromModal = Boolean(editingReservation && editingReservation.status === 'pending' && canManage)
   const canRejectFromModal = canApproveFromModal
   const canCancelFromModal = Boolean(editingReservation && canManage && ['pending', 'approved'].includes(editingReservation.status))
-  const canRegisterEntryFromModal = Boolean(editingReservation && editingReservation.status === 'approved' && canManage)
-  const canRegisterExitFromModal = Boolean(editingReservation && editingReservation.status === 'in_progress' && canManage)
+  const canRegisterEntryFromModal = Boolean(editingReservation && editingReservation.status === 'approved' && canManageAccess)
+  const canRegisterExitFromModal = Boolean(editingReservation && editingReservation.status === 'in_progress' && canManageAccess)
   const canMarkAbsentFromModal = Boolean(
     editingReservation
       && editingReservation.status === 'approved'
       && minutesSinceStart(editingReservation) >= 15
-      && canManage,
+      && canManageAccess,
   )
 
   const handleStartEdit = (reservation) => {
@@ -749,7 +764,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     setMessage('')
     setLinkedSupplyReservations([])
     setIsLoadingLinkedSupplies(true)
-    listSupplyReservations({ lab_reservation_id: reservation.id, skipCache: true })
+    ;(canManageSupplies ? listSupplyReservations({ lab_reservation_id: reservation.id, skipCache: true }) : Promise.resolve([]))
       .then((data) => {
         setLinkedSupplyReservations(Array.isArray(data) ? data : [])
       })
@@ -805,6 +820,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   }
 
   const handleRegisterEntry = async (reservation) => {
+    if (!canManageAccess) return
     setError('')
     setMessage('')
     setActioningId(reservation.id)
@@ -825,6 +841,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   }
 
   const handleRegisterExit = async (reservationId) => {
+    if (!canManageAccess) return
     setError('')
     setMessage('')
     setActioningId(reservationId)
@@ -840,6 +857,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   }
 
   const handleMarkAbsent = async (reservationId) => {
+    if (!canManageAccess) return
     setError('')
     setMessage('')
     setActioningId(reservationId)
@@ -855,7 +873,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   }
 
   const handleReservationModalAction = async (action) => {
-    if (!editingReservation || !canManage) {
+    if (!editingReservation || (['entry', 'exit', 'absent'].includes(action) ? !canManageAccess : !canManage)) {
       return
     }
 
@@ -864,6 +882,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
     setIsProcessingReservationAction(true)
 
     const cascadeSupplies = async (targetStatus) => {
+      if (!canManageSupplies) return { ok: 0, failed: [] }
       const toCascade = linkedSupplyReservations.filter((supply) => {
         if (targetStatus === 'approved') return supply.status === 'pending'
         if (targetStatus === 'cancelled') return supply.status !== 'cancelled'
@@ -1147,6 +1166,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
   const ActiveWorkspaceIcon = SECTION_ICON_MAP[activeWorkspaceMeta.id] || LayoutDashboard
 
   const handleExportReservations = () => {
+    if (!canExportReports) return
     downloadCsv(
       `reservas-${tableFilters.status || 'todas'}-${todayStamp()}`,
       [
@@ -1242,7 +1262,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
         </div>
       </section>
 
-      {activeWorkspace === 'dashboard-acceso' ? (
+      {activeWorkspace === 'dashboard-acceso' && canReadOperations ? (
         <section className="reservations-panel reservations-panel-secondary">
           <div className="reservations-panel-header">
             <h3>Resumen</h3>
@@ -1303,7 +1323,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
         </section>
       ) : null}
 
-      {activeWorkspace === 'ocupacion-actual' ? (
+      {activeWorkspace === 'ocupacion-actual' && canManageAccess ? (
         <section className="reservations-panel reservations-panel-secondary">
           <div className="reservations-panel-header">
             <h3>Ocupacion actual</h3>
@@ -1392,7 +1412,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
         </section>
       ) : null}
 
-      {activeWorkspace === 'ingreso-rapido' ? (
+      {activeWorkspace === 'ingreso-rapido' && canManageAccess ? (
         <section className="reservations-panel reservations-panel-secondary">
           <div className="reservations-panel-header">
             <h3>Ingreso rapido sin reserva previa</h3>
@@ -1544,7 +1564,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
             ) : null}
 
             <div className="reservations-actions">
-              <button type="submit" className="reservations-primary" disabled={!canManage || !isWalkInFormValid || isSavingWalkIn}>
+              <button type="submit" className="reservations-primary" disabled={!canManageAccess || !isWalkInFormValid || isSavingWalkIn}>
                 {isSavingWalkIn ? 'Registrando...' : 'Registrar walk-in'}
               </button>
             </div>
@@ -1552,7 +1572,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
         </section>
       ) : null}
 
-      {activeWorkspace === 'control-entradas-salidas' ? (
+      {activeWorkspace === 'control-entradas-salidas' && canManageAccess ? (
         <section className="reservations-panel reservations-panel-secondary">
           <div className="reservations-panel-header">
             <h3>Control de entradas y salidas del dia</h3>
@@ -1620,7 +1640,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
         </section>
       ) : null}
 
-      {activeWorkspace === 'solicitudes-reserva' ? (
+      {activeWorkspace === 'solicitudes-reserva' && canManage ? (
         <section className="reservations-panel reservations-panel-priority">
           <div className="reservations-panel-header reservations-panel-header--row">
             <div>
@@ -1629,14 +1649,14 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
                 Usa esta vista para buscar, filtrar y editar reservas. Los filtros rapidos estan arriba y las opciones avanzadas quedan ocultas hasta que las necesites.
               </p>
             </div>
-            <button
+            {canExportReports ? <button
               type="button"
               className="reservations-secondary"
               onClick={handleExportReservations}
               disabled={sortedTableReservations.length === 0}
             >
               ⬇ Descargar Excel
-            </button>
+            </button> : null}
           </div>
 
           <div className="reservations-filter-callout">
@@ -1879,6 +1899,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
         </section>
       ) : null}
 
+      {activeWorkspace === 'reglas-reserva' && access.rules ? <ReservationRulesPanel labs={labs} /> : null}
       {activeWorkspace === 'clases-pendientes' && canApproveClasses ? <PendingClassesPanel labNameById={labNameById} /> : null}
 
       {activeWorkspace === 'tutorias-pendientes' && canApproveTutorials ? (
@@ -2045,7 +2066,7 @@ function AdminReservationsPage({ user, currentHash = '', onNavigate }) {
         </section>
       ) : null}
 
-      {activeWorkspace === 'solicitudes-docentes' ? (
+      {activeWorkspace === 'solicitudes-docentes' && canManageTeacherRequests ? (
         <section className="reservations-panel reservations-panel-priority">
           <div className="reservations-panel-header reservations-panel-header--row">
             <div>

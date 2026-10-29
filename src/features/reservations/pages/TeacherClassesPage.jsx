@@ -58,6 +58,7 @@ function TeacherClassesPage({ user }) {
   const [classForm, setClassForm] = useState(null)
   const [savingClass, setSavingClass] = useState(false)
   const canManageClasses = hasPermission(user, 'gestionar_clases_propias')
+  const canRequestResources = hasPermission(user, 'solicitar_recursos_clase')
   const [classes, setClasses] = useState([])
   const [labs, setLabs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -115,6 +116,7 @@ function TeacherClassesPage({ user }) {
   }, [user])
 
   const loadRequests = useCallback(async () => {
+    if (!canRequestResources) return
     try {
       const [supplies, equipment] = await Promise.all([
         listSupplyReservations({ skipCache: true }).catch(() => []),
@@ -127,7 +129,7 @@ function TeacherClassesPage({ user }) {
     } catch {
       // no critico
     }
-  }, [userId])
+  }, [userId, canRequestResources])
 
   useEffect(() => {
     loadClasses()
@@ -185,6 +187,7 @@ function TeacherClassesPage({ user }) {
   )
 
   const handleSubmit = async () => {
+    if (!canRequestResources) return
     if (!activeClass || isSubmitting) return
     if (totalSelected === 0) {
       setError('Selecciona al menos un material o equipo para solicitar.')
@@ -360,9 +363,9 @@ function TeacherClassesPage({ user }) {
                   </div>
                   {klass.description ? <p className="teacher-class-desc">{klass.description}</p> : null}
                   {canManageClasses ? <button type="button" className="reservations-secondary" onClick={() => openClassEditor(klass)}>Modificar clase</button> : null}
-                  <button type="button" className="reservations-primary" disabled={klass.approval_status !== 'approved' || !klass.is_active} onClick={() => openClass(klass)}>
+                  {canRequestResources ? <button type="button" className="reservations-primary" disabled={klass.approval_status !== 'approved' || !klass.is_active} onClick={() => openClass(klass)}>
                     Ver clase y pedir recursos
-                  </button>
+                  </button> : null}
                 </article>
               )
             })}
@@ -370,7 +373,7 @@ function TeacherClassesPage({ user }) {
         )}
       </section>
 
-      <section className="reservations-panel">
+      {canRequestResources ? <section className="reservations-panel">
         <div className="reservations-panel-header">
           <h3>Mis solicitudes</h3>
           <p className="reservations-panel-subtitle">Estado de los materiales y equipos que pediste para tus clases.</p>
@@ -403,7 +406,7 @@ function TeacherClassesPage({ user }) {
             ))}
           </div>
         )}
-      </section>
+      </section> : null}
 
       {activeClass ? (
         <div className="teacher-builder-backdrop" role="dialog" aria-modal="true" onMouseDown={(e) => { if (e.target === e.currentTarget) closeClass() }}>

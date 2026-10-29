@@ -14,6 +14,8 @@ function TutorialSessionDetailModal({
   attendanceDrafts = {},
   onAttendanceDraftChange = null,
   isSavingAttendanceList = false,
+  canEditAttendance = true,
+  canEditObservations = true,
 }) {
   const TUTOR_OBSERVATION_MAX_LENGTH = 500
 
@@ -175,7 +177,7 @@ function TutorialSessionDetailModal({
                           <td>{formatDate(student.created_at)}</td>
                           <td>{formatTime(student.created_at)}</td>
                           <td>
-                            {typeof onAttendanceDraftChange === 'function' ? (
+                            {canEditAttendance && typeof onAttendanceDraftChange === 'function' ? (
                               <label className="tutorial-attendance-toggle">
                                 <input
                                   type="checkbox"
@@ -192,7 +194,7 @@ function TutorialSessionDetailModal({
                             )}
                           </td>
                           <td>
-                            {typeof onAttendanceDraftChange === 'function' ? (
+                            {canEditObservations && typeof onAttendanceDraftChange === 'function' ? (
                               <div className="tutorial-attendance-observation">
                                 <textarea
                                   rows="3"

@@ -10,14 +10,14 @@ import {
   updateLabSchedule,
 } from '../services/labSchedulesService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
-import { listUserProfiles } from '../services/profileService'
+import { listOperationalUsers } from '../services/profileService'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import './AdminAssetsPage.css'
 import './AdminLabSchedulesPage.css'
 
 const BLOCK_STARTS = ACADEMIC_BLOCKS.map((block) => block.start_time)
 const BLOCK_ENDS = ACADEMIC_BLOCKS.map((block) => block.end_time)
-const REQUIRED_PERMISSIONS = ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio']
+const REQUIRED_PERMISSIONS = ['gestionar_horarios_laboratorio']
 
 const emptyForm = {
   weekday: 0,
@@ -96,7 +96,7 @@ function AdminLabSchedulesPage({ user }) {
 
   useEffect(() => {
     let cancelled = false
-    listUserProfiles()
+    listOperationalUsers('schedules')
       .then((profiles) => {
         if (cancelled) return
         const list = Array.isArray(profiles) ? profiles : []

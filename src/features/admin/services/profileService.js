@@ -21,7 +21,7 @@ function cloneCachedValue(value) {
 
 function buildRequestCacheKey(url, options = {}) {
   const method = String(options.method || 'GET').toUpperCase()
-  return `${method}:${url}`
+  return `${getAuthToken() || "anonymous"}:${method}:${url}`
 }
 
 function clearProfilesCache() {
@@ -89,8 +89,13 @@ async function request(url, options = {}) {
   }
 }
 
-export function listUserProfiles() {
-  return request(`${profilesBase}/`, { cacheTtlMs: 30000 })
+export async function listUserProfiles() {
+  const result = []
+  for (let page = 1; ; page += 1) {
+    const rows = await request(`${profilesBase}/?page=${page}&per_page=200`, { cacheTtlMs: 15000 })
+    result.push(...rows)
+    if (rows.length < 200) return result
+  }
 }
 
 export function updateUserProfile(userId, payload) {
@@ -120,4 +125,14 @@ export function resetUserPassword(userId) {
 
 export function getPasswordPolicy() {
   return request(`${profilesBase}/policy/password`, { cacheTtlMs: 300000 })
+}
+
+// Solo identidad minima; no consulta roles administrativos ni datos de seguridad.
+export async function listOperationalUsers(purpose) {
+  const result = []
+  for (let page = 1; ; page += 1) {
+    const rows = await request(`${profilesBase}/operational-directory?purpose=${encodeURIComponent(purpose)}&page=${page}&per_page=200`, { cacheTtlMs: 15000 })
+    result.push(...rows)
+    if (rows.length < 200) return result
+  }
 }

@@ -1,3 +1,4 @@
+import { hasAnyPermission } from '../../../shared/lib/permissions'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jsPDF } from 'jspdf'
 import ucbEscudoLogo from '../../../assets/branding/ucb-san-pablo-escudo.png'
@@ -254,7 +255,10 @@ function getSlotLabel(slot, dateValue, referenceNow) {
   return 'Disponible'
 }
 
-function TutorTutorialSessionsPage() {
+function TutorTutorialSessionsPage({ user }) {
+  const canPublish = hasAnyPermission(user, ['gestionar_tutorias_propias'])
+  const canAttendance = hasAnyPermission(user, ['gestionar_asistencia_tutorias'])
+  const canObserve = hasAnyPermission(user, ['gestionar_observaciones_tutorias'])
   const [form, setForm] = useState(() => createDefaultForm())
   const [editingSessionId, setEditingSessionId] = useState('')
   const [sessions, setSessions] = useState([])
@@ -683,13 +687,13 @@ function TutorTutorialSessionsPage() {
       }
 
       return (
-        draft.attended !== (student?.attended === true)
-        || String(draft.performance_observation || '') !== String(student?.performance_observation || '')
+        (canAttendance && draft.attended !== (student?.attended === true))
+        || (canObserve && String(draft.performance_observation || '') !== String(student?.performance_observation || ''))
       )
     })
 
     const normalizedObservationDraft = String(observationDraft || '').trim().slice(0, MAX_TUTOR_OBSERVATION_LENGTH)
-    const observationChanged = normalizedObservationDraft !== String(focusedSession.tutor_observation || '')
+    const observationChanged = canObserve && normalizedObservationDraft !== String(focusedSession.tutor_observation || '')
 
     if (!observationChanged && changedAttendance.length === 0) {
       setMessage('No hay cambios pendientes por guardar en la lista.')
@@ -714,7 +718,7 @@ function TutorTutorialSessionsPage() {
           attended: false,
           performance_observation: '',
         }
-        updatedSession = await updateTutorialEnrollmentAttendance(updatedSession.id, studentId, draft)
+        updatedSession = await updateTutorialEnrollmentAttendance(updatedSession.id, studentId, { ...(canAttendance ? { attended: draft.attended } : {}), ...(canObserve ? { performance_observation: draft.performance_observation } : {}) })
       }
 
       setFocusedSession(updatedSession)
@@ -988,7 +992,7 @@ function TutorTutorialSessionsPage() {
       {message ? <p className="tutorials-message success">{message}</p> : null}
       {error ? <p className="tutorials-message error">{error}</p> : null}
 
-      <section className="tutorials-panel">
+      {canPublish ? <section className="tutorials-panel">
         <details className="ux-extra-toggle" open={Boolean(editingSessionId)}>
           <summary>{editingSessionId ? 'Editar bloque seleccionado' : 'Publicar nueva tutoria'}</summary>
           <div className="ux-extra-toggle-content">
@@ -1289,7 +1293,7 @@ function TutorTutorialSessionsPage() {
             </form>
           </div>
         </details>
-      </section>
+      </section> : null}
 
       <section className="tutorials-panel">
         <div className="tutorials-panel-header">
@@ -1361,6 +1365,7 @@ function TutorTutorialSessionsPage() {
                   >
                     Tomar lista
                   </button>
+                  {canPublish ? <>
                   <button
                     type="button"
                     className="tutorials-secondary tutorial-card-secondary-action"
@@ -1378,6 +1383,7 @@ function TutorTutorialSessionsPage() {
                   >
                     {deletingId === session.id ? 'Eliminando...' : 'Eliminar bloque'}
                   </button>
+                  </> : null}
                 </div>
               </article>
               )
@@ -1392,13 +1398,15 @@ function TutorTutorialSessionsPage() {
           title="Tomar lista"
           showEnrollmentDetails
           observationDraft={observationDraft}
-          onObservationDraftChange={(value) => setObservationDraft(String(value || '').slice(0, MAX_TUTOR_OBSERVATION_LENGTH))}
+          onObservationDraftChange={canObserve ? (value) => setObservationDraft(String(value || '').slice(0, MAX_TUTOR_OBSERVATION_LENGTH)) : null}
           onPrimaryAction={handleSaveAttendanceList}
           primaryActionLabel={isSavingAttendanceList ? 'Guardando lista...' : 'Guardar lista'}
-          primaryActionDisabled={isSavingAttendanceList}
+          primaryActionDisabled={isSavingAttendanceList || (!canAttendance && !canObserve)}
           observationHint="Desde aqui puedes marcar asistencia y registrar observaciones individuales por cada estudiante inscrito en la tutoria."
           attendanceDrafts={attendanceDrafts}
-          onAttendanceDraftChange={handleAttendanceDraftChange}
+          onAttendanceDraftChange={canAttendance || canObserve ? handleAttendanceDraftChange : null}
+          canEditAttendance={canAttendance}
+          canEditObservations={canObserve}
           isSavingAttendanceList={isSavingAttendanceList}
           enrollmentDownloadActions={{
             onDownloadPdf: () => handleDownloadEnrolledPdf(focusedSession),

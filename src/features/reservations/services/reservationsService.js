@@ -8,6 +8,18 @@ const requestCache = new Map()
 const inFlightRequests = new Map()
 const AVAILABILITY_CACHE_TTL_MS = 15 * 1000
 
+export function listLabBlocks() {
+  return request(`${reservationsBase}/lab-blocks`)
+}
+
+export function createLabBlock(payload) {
+  return request(`${reservationsBase}/lab-blocks`, { method: 'POST', body: JSON.stringify(payload) })
+}
+
+export function deleteLabBlock(id) {
+  return request(`${reservationsBase}/lab-blocks/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
 
 
 function authHeaders(withJson = false) {
@@ -209,7 +221,9 @@ export function isLabAccessibleToUser(lab, user) {
   const permissions = Array.isArray(user?.permissions) ? user.permissions : []
 
   const allowedRoles = normalizeStringArray(lab?.allowed_roles)
-  if (allowedRoles.length > 0 && !allowedRoles.includes(String(user?.role || '').trim())) {
+  const effectiveRoles = [String(user?.role || '').trim().toLowerCase()]
+  if (effectiveRoles.includes('encargado de laboratorio')) effectiveRoles.push('estudiante')
+  if (allowedRoles.length > 0 && !allowedRoles.some((role) => effectiveRoles.includes(role.toLowerCase()))) {
     return false
   }
 

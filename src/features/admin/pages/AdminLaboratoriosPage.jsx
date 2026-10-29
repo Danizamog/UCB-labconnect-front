@@ -8,7 +8,7 @@ import {
   listAdminLabsPaginated,
   updateLab,
 } from '../services/infrastructureService'
-import { listUsersWithRoles } from '../services/rolesService'
+import { listOperationalUsers } from '../services/profileService'
 import { hasAnyPermission } from '../../../shared/lib/permissions'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
 import './AdminAssetsPage.css'
@@ -24,6 +24,22 @@ const defaultForm = {
 }
 
 const LAB_PAGE_SIZE_OPTIONS = [8, 12, 20, 40]
+
+function normalizeManagerText(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+}
+
+function managerLabel(manager) {
+  return manager.name?.trim() || manager.username || manager.email || manager.id
+}
+
+function isEligibleManager(manager) {
+  const role = normalizeManagerText(typeof manager.role === 'object' ? manager.role?.nombre : manager.role)
+  return manager.is_active !== false && [
+    'encargado de laboratorio', 'ayudante de laboratorio', 'ayudante de laboratorios',
+    'ayudantes de laboratorio', 'ayudantes de laboratorios', 'administrador',
+  ].includes(role)
+}
 
 function AdminLaboratoriosPage({ user }) {
   const [areas, setAreas] = useState([])
@@ -46,18 +62,16 @@ function AdminLaboratoriosPage({ user }) {
   const [totalPages, setTotalPages] = useState(0)
   const [initialLoad, setInitialLoad] = useState(true)
 
-  const canManage = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
+  const canManage = hasAnyPermission(user, ['gestionar_estructura_laboratorios'])
 
   const loadReferenceData = async () => {
     try {
       const [areasData, usersData] = await Promise.all([
         listAdminAreas(),
-        listUsersWithRoles(),
+        listOperationalUsers('laboratories'),
       ])
       setAreas(areasData)
-      const potentialManagers = usersData.filter(
-        (u) => u.role?.nombre === 'Encargado de Laboratorio' || u.role?.nombre === 'Administrador'
-      )
+      const potentialManagers = usersData.filter(isEligibleManager)
       setManagers(potentialManagers)
     } catch (err) {
       setError(err.message || 'No se pudieron cargar las areas o encargados')
@@ -111,9 +125,14 @@ function AdminLaboratoriosPage({ user }) {
   )
 
   const managerNameById = useMemo(
-    () => Object.fromEntries(managers.map((u) => [String(u.id), u.name || u.email || 'Usuario'])),
+    () => Object.fromEntries(managers.map((u) => [String(u.id), managerLabel(u)])),
     [managers],
   )
+
+  const matchingManagers = managers.filter((manager) => normalizeManagerText([
+    manager.name, manager.username, manager.email, manager.id,
+    typeof manager.role === 'object' ? manager.role?.nombre : manager.role,
+  ].filter(Boolean).join(' ')).includes(normalizeManagerText(managerQuery)))
 
   const safeTotalPages = Math.max(totalPages, 1)
 
@@ -426,25 +445,38 @@ function AdminLaboratoriosPage({ user }) {
                                   value={managerQuery}
                                   onChange={(e) => { setManagerQuery(e.target.value); setForm((prev) => ({ ...prev, manager: '' })); setShowManagerOptions(true) }}
                                   onFocus={() => setShowManagerOptions(true)}
-                                  placeholder="Buscar encargado..."
+                                  placeholder="Buscar ayudante por nombre o correo..."
                                   disabled={!canManage}
                                   aria-autocomplete="list"
+                                  aria-expanded={showManagerOptions}
+                                  aria-controls="laboratory-manager-options"
                                 />
                                 {showManagerOptions && (
-                                  <ul className="infra-autocomplete-list" role="listbox">
-
-                                    {managers
-                                      .filter((m) => ((m.name || m.email || m.id) || '').toLowerCase().includes((managerQuery || '').toLowerCase()))
-                                      .slice(0, 12)
+                                  <ul id="laboratory-manager-options" className="infra-autocomplete-list" role="listbox" aria-label="Ayudantes y encargados disponibles">
+                                    {matchingManagers
                                       .map((m) => (
                                         <li
                                           key={m.id}
                                           className="infra-autocomplete-item"
-                                          onMouseDown={(e) => { e.preventDefault(); setForm((prev) => ({ ...prev, manager: m.id })); setManagerQuery(m.name || m.email || m.id); setShowManagerOptions(false) }}
+                                          role="option"
+                                          aria-selected={String(form.manager) === String(m.id)}
+                                          tabIndex={0}
+                                          onMouseDown={(e) => e.preventDefault()}
+                                          onClick={() => { setForm((prev) => ({ ...prev, manager: m.id })); setManagerQuery(managerLabel(m)); setShowManagerOptions(false) }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                              e.preventDefault()
+                                              setForm((prev) => ({ ...prev, manager: m.id }))
+                                              setManagerQuery(managerLabel(m))
+                                              setShowManagerOptions(false)
+                                            }
+                                          }}
                                         >
-                                          {m.name || m.email || m.id}
+                                          <strong>{managerLabel(m)}</strong>
+                                          <small style={{ display: 'block' }}>{m.username || m.email || ''} · {typeof m.role === 'object' ? m.role?.nombre : m.role}</small>
                                         </li>
                                       ))}
+                                    {matchingManagers.length === 0 ? <li className="infra-autocomplete-item" role="option" aria-selected={false}>No hay ayudantes o encargados activos que coincidan.</li> : null}
                                   </ul>
                                 )}
                               </div>

@@ -1,3 +1,5 @@
+import OperationalDirectoryPage from '../../admin/pages/OperationalDirectoryPage'
+import { MATERIAL_PERMISSIONS, RESERVATION_PERMISSIONS, TUTORIAL_PERMISSIONS } from '../../../shared/lib/moduleAccess'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowRight,
@@ -164,16 +166,18 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     active_sessions: [],
     lab_breakdown: [],
   })
-  const canManageRoles = hasAnyPermission(user, ['consultar_roles', 'gestionar_roles', 'asignar_roles'])
+  const canManageRoles = hasAnyPermission(user, ['consultar_roles', 'gestionar_roles', 'asignar_roles', 'revisar_accesos_rbac'])
+  const canViewDirectory = hasAnyPermission(user, ['consultar_directorio_operativo'])
   const canManageProfiles = hasAnyPermission(user, USER_ACCOUNT_PERMISSIONS)
-  const canManageStructure = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio', 'aprobar_clases', 'aprobar_tutorias'])
+  const canManageStructure = hasAnyPermission(user, RESERVATION_PERMISSIONS)
   const canViewAnalytics = hasAnyPermission(user, ['consultar_estadisticas'])
-  const canManageSpaces = hasAnyPermission(user, ['gestionar_estructura_laboratorios', 'gestionar_horarios_laboratorio'])
+  const canManageSpaces = hasAnyPermission(user, ['gestionar_estructura_laboratorios'])
+  const canManageSchedules = hasAnyPermission(user, ['gestionar_horarios_laboratorio'])
   const canManagePenalties = hasAnyPermission(user, ['gestionar_penalizaciones'])
   const canViewPenalties = canManagePenalties
   const canManageEquipos = hasAnyPermission(user, ['gestionar_inventario', 'gestionar_estado_equipos', 'gestionar_mantenimiento', 'gestionar_prestamos', 'registrar_tickets_equipo'])
-  const canManageMateriales = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos', 'gestionar_reservas_materiales'])
-  const canManageTutorials = hasAnyPermission(user, ['gestionar_tutorias_propias'])
+  const canManageMateriales = hasAnyPermission(user, MATERIAL_PERMISSIONS)
+  const canManageTutorials = hasAnyPermission(user, TUTORIAL_PERMISSIONS)
   const canAuditSecurity = hasAnyPermission(user, SECURITY_VIEW_PERMISSIONS)
   const canUseReservations = hasRole(user, ['Estudiante', 'Docente', 'Encargado de Laboratorio'])
   const canUseTutorials = hasRole(user, ['Estudiante'])
@@ -184,7 +188,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const activeSection = getSectionIdFromPath(currentPath) || 'home'
   const showScrollToTopButton = SCROLL_TO_TOP_SECTIONS.has(activeSection)
   const shouldTrackAgenda = canUseReservations && activeSection === 'home'
-  const shouldTrackOperationsSnapshot = canManageStructure && activeSection === 'home'
+  const shouldTrackOperationsSnapshot = hasAnyPermission(user, ['gestionar_accesos_laboratorio']) && activeSection === 'home'
   const unreadNotificationsCount = notifications.filter((notification) => !notification.is_read).length
   const agendaItems = buildAgendaItems(agendaSummary).slice(0, 6)
   const normalizedHomeLabSearch = useMemo(() => normalizeLabSearchValue(debouncedHomeLabSearch), [debouncedHomeLabSearch])
@@ -291,12 +295,13 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
       (activeSection === 'ia_predicciones' && canViewAnalytics) ||
       (activeSection === 'tutorials_manage' && canManageTutorials) ||
       (activeSection === 'mis_clases' && canRequestClassResources) ||
+      (activeSection === 'directory' && canViewDirectory) ||
       (activeSection === 'profiles' && canManageProfiles) ||
       (activeSection === 'roles' && canManageRoles) ||
       (activeSection === 'penalties' && canViewPenalties) ||
       (activeSection === 'areas' && canManageSpaces) ||
       (activeSection === 'laboratorios' && canManageSpaces) ||
-      (activeSection === 'horarios_laboratorios' && canManageSpaces) ||
+      (activeSection === 'horarios_laboratorios' && canManageSchedules) ||
       (activeSection === 'equipos' && canManageEquipos) ||
       (activeSection === 'materiales' && canManageMateriales) ||
       (canUseReservations && activeSection === 'calendar') ||
@@ -320,8 +325,10 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     canManagePenalties,
     canViewPenalties,
     canManageProfiles,
+    canViewDirectory,
     canManageRoles,
     canManageSpaces,
+    canManageSchedules,
     canManageStructure,
     canManageTutorials,
     canRequestClassResources,
@@ -527,6 +534,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
           <Suspense fallback={<div className="module-loading">Cargando modulo...</div>}>
           {activeSection === 'account' ? <MyAccountPage onLogout={onLogout} /> : null}
           {canAuditSecurity && activeSection === 'security' ? <SecurityAuditPage user={user} currentHash={currentHash} onNavigate={onNavigate} /> : null}
+          {canViewDirectory && activeSection === 'directory' ? <OperationalDirectoryPage /> : null}
           {canManageProfiles && activeSection === 'profiles' ? <AdminProfilesPage user={user} /> : null}
           {canManageRoles && activeSection === 'roles' ? <AdminRolesPage user={user} onSessionRefresh={onRefreshSession} onNavigate={onNavigate} /> : null}
           {canViewPenalties && activeSection === 'penalties' ? <AdminPenaltiesPage user={user} /> : null}
@@ -535,11 +543,11 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
           ) : null}
           {canViewAnalytics && activeSection === 'analytics' ? <AdminLabAnalyticsPage user={user} /> : null}
           {canViewAnalytics && activeSection === 'ia_predicciones' ? <AdminPredictionsPage user={user} /> : null}
-          {canManageTutorials && activeSection === 'tutorials_manage' ? <TutorTutorialSessionsPage /> : null}
+          {canManageTutorials && activeSection === 'tutorials_manage' ? <TutorTutorialSessionsPage user={user} /> : null}
           {canRequestClassResources && activeSection === 'mis_clases' ? <TeacherClassesPage user={user} /> : null}
           {canManageSpaces && activeSection === 'areas' ? <AdminAreasPage user={user} /> : null}
           {canManageSpaces && activeSection === 'laboratorios' ? <AdminLaboratoriosPage user={user} /> : null}
-          {canManageSpaces && activeSection === 'horarios_laboratorios' ? <AdminLabSchedulesPage user={user} /> : null}
+          {canManageSchedules && activeSection === 'horarios_laboratorios' ? <AdminLabSchedulesPage user={user} /> : null}
           {canManageEquipos && activeSection === 'equipos' ? <AdminEquiposPage user={user} /> : null}
           {canManageMateriales && activeSection === 'materiales' ? <AdminMaterialesPage user={user} /> : null}
           {canUseReservations && activeSection === 'calendar' ? <UserAvailabilityCalendarPage user={user} /> : null}

@@ -171,9 +171,9 @@ function AdminProfilesPage({ user }) {
     try {
       const [profileResult, roleResult, flagResult, penaltyResult] = await Promise.allSettled([
         listUserProfiles(),
-        listRoles(),
-        listAssetResponsibilityFlags(),
-        listPenalties({ active_only: true }),
+        canAssign || hasAnyPermission(user, ['consultar_roles', 'gestionar_roles']) ? listRoles() : Promise.resolve([]),
+        hasAnyPermission(user, ['gestionar_mantenimiento', 'consultar_directorio_operativo']) ? listAssetResponsibilityFlags() : Promise.resolve([]),
+        canManagePenalties || hasAnyPermission(user, ['consultar_usuarios']) ? listPenalties({ active_only: true }) : Promise.resolve({ items: [] }),
       ])
 
       if (profileResult.status !== 'fulfilled' || roleResult.status !== 'fulfilled') {
@@ -434,7 +434,7 @@ function AdminProfilesPage({ user }) {
   }
 
   const handleResetPassword = async () => {
-    if (!editingUser) return
+    if (!editingUser || !canResetPassword) return
     resetFeedback()
     setSecurityActionPending(true)
     try {
@@ -451,7 +451,7 @@ function AdminProfilesPage({ user }) {
   }
 
   const handleUnlock = async () => {
-    if (!editingUser) return
+    if (!editingUser || !canUnlockSecurity) return
     resetFeedback()
     setSecurityActionPending(true)
     try {
@@ -467,7 +467,7 @@ function AdminProfilesPage({ user }) {
   }
 
   const handleDeactivate = () => {
-    if (!editingUser) return
+    if (!editingUser || !canDeactivate) return
     setConfirmModal({
       title: 'Dar de baja usuario',
       message: `Se desactivará ${editingUser.username} y se cerrarán sus sesiones. El historial no se elimina.`,
@@ -719,7 +719,7 @@ function AdminProfilesPage({ user }) {
 
                     <label>
                       <span>Rol</span>
-                      <select
+                      {canAssign ? <select
                         value={form.roleId}
                         onChange={(event) => setForm((previous) => ({ ...previous, roleId: event.target.value }))}
                         disabled={!canAssign}
@@ -728,7 +728,7 @@ function AdminProfilesPage({ user }) {
                         {roles.map((role) => (
                           <option key={role.id} value={role.id}>{role.nombre}</option>
                         ))}
-                      </select>
+                      </select> : <span>{editingUser.role || 'Sin rol'}</span>}
                     </label>
                     {canAssign && form.roleId !== (roles.find((role) => role.nombre === editingUser.role)?.id || '') ? <label><span>Motivo del cambio de rol</span><input required minLength={5} maxLength={500} value={form.role_reason || ''} onChange={(event) => setForm((previous) => ({ ...previous, role_reason: event.target.value }))} placeholder="Motivo que quedará en el historial" /></label> : null}
                   </div>

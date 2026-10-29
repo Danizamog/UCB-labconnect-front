@@ -22,7 +22,7 @@ function AdminAreasPage({ user }) {
   const [form, setForm] = useState(defaultForm)
   const [confirmModal, setConfirmModal] = useState(null)
 
-  const canManage = hasAnyPermission(user, ['gestionar_reservas', 'gestionar_reglas_reserva', 'gestionar_accesos_laboratorio'])
+  const canManage = hasAnyPermission(user, ['gestionar_estructura_laboratorios'])
 
   const loadData = async () => {
     setLoading(true)

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Search, X, UserCheck } from 'lucide-react'
-import { listUsersWithRoles } from '../../admin/services/rolesService'
+import { listOperationalUsers } from '../../admin/services/profileService'
 import './PickerModals.css'
 
 const TEACHER_ROLE_NAME = 'docente'
@@ -15,7 +15,7 @@ function normalize(value) {
 }
 
 function isTeacher(user) {
-  return normalize(user?.role?.nombre) === TEACHER_ROLE_NAME
+  return normalize(user?.role) === TEACHER_ROLE_NAME
 }
 
 // Ventana para buscar y seleccionar al docente responsable (solo usuarios con rol Docente).
@@ -38,7 +38,7 @@ function TeacherPickerModal({ open, onClose, onSelect, selectedTeacherId = '' })
     requestRef.current = reqId
     setIsLoading(true)
     setError('')
-    listUsersWithRoles()
+    listOperationalUsers('teachers')
       .then((users) => {
         if (reqId !== requestRef.current) return
         setTeachers((Array.isArray(users) ? users : []).filter(isTeacher))
@@ -61,7 +61,7 @@ function TeacherPickerModal({ open, onClose, onSelect, selectedTeacherId = '' })
   const filtered = useMemo(() => {
     const term = normalize(search)
     if (!term) return teachers
-    return teachers.filter((t) => `${normalize(t.name)} ${normalize(t.email)}`.includes(term))
+    return teachers.filter((t) => `${normalize(t.name)} ${normalize(t.username)}`.includes(term))
   }, [teachers, search])
 
   if (!open) return null
@@ -115,14 +115,14 @@ function TeacherPickerModal({ open, onClose, onSelect, selectedTeacherId = '' })
                   type="button"
                   className={`picker-row${isSelected ? ' is-selected' : ''}`}
                   onClick={() => {
-                    onSelect({ id: String(teacher.id), name: teacher.name || teacher.email || 'Docente' })
+                    onSelect({ id: String(teacher.id), name: teacher.name || teacher.username || 'Docente' })
                     onClose()
                   }}
                 >
                   <span className="picker-row-icon"><UserCheck size={18} /></span>
                   <span className="picker-row-body">
                     <strong>{teacher.name || 'Sin nombre'}</strong>
-                    <span>{teacher.email || 'Sin correo'}</span>
+                    <span>{teacher.username || 'Sin correo'}</span>
                   </span>
                   {isSelected ? <span className="picker-row-badge">Seleccionado</span> : null}
                 </button>

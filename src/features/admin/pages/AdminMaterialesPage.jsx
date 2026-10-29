@@ -1,3 +1,4 @@
+import { materialAccess } from '../../../shared/lib/moduleAccess'
 import { useEffect, useMemo, useState } from 'react'
 import {
   createMaterial,
@@ -12,13 +13,13 @@ import {
   MATERIAL_CATEGORIES,
   normalizeCategory,
 } from '../services/infrastructureService'
-import { listUserProfiles } from '../services/profileService'
+import { listOperationalUsers } from '../services/profileService'
 import {
   createSupplyReservation,
   listSupplyReservations,
   updateSupplyReservationStatus,
 } from '../../reservations/services/reservationsService'
-import { hasAnyPermission, isAdminUser } from '../../../shared/lib/permissions'
+import { hasAnyPermission } from '../../../shared/lib/permissions'
 import { formatDateTime, movementTypeLabel } from '../../../shared/utils/formatters'
 import { downloadCsv, todayStamp } from '../../../shared/utils/exportCsv'
 import ConfirmModal from '../../../shared/components/ConfirmModal'
@@ -84,12 +85,18 @@ function AdminMaterialesPage({ user }) {
 
   const [confirmModal, setConfirmModal] = useState(null)
 
-  const canManageMaterials = hasAnyPermission(user, ['gestionar_reactivos_quimicos'])
+  const access = materialAccess(user)
+  const canManageMaterials = access.stock
+  const canManageRequests = access.requests
+  const canViewCatalog = access.catalog
+  const availableTabs = [canViewCatalog && 'catalog', access.movements && 'movements', access.reports && 'reports', canManageRequests && 'requests'].filter(Boolean)
+  const currentTab = availableTabs.includes(activeTab) ? activeTab : availableTabs[0]
   const canMoveStock = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos', 'gestionar_reservas_materiales'])
   const canRegisterNewStock = hasAnyPermission(user, ['gestionar_stock', 'gestionar_reactivos_quimicos'])
-  const canViewReports = hasAnyPermission(user, ['generar_reportes', 'consultar_estadisticas', 'gestionar_stock', 'gestionar_reactivos_quimicos'])
+  const canViewReports = access.reports
+  const canExportReports = hasAnyPermission(user, ['generar_reportes'])
   const canManage = canManageMaterials || canMoveStock
-  const isAdmin = isAdminUser(user)
+  const isAdmin = hasAnyPermission(user, ['gestionar_estructura_laboratorios'])
 
   const fetchReportData = async () => {
     if (!canViewReports) return null
@@ -135,7 +142,7 @@ function AdminMaterialesPage({ user }) {
     try {
       const [labsData, materialsData] = await Promise.all([
         listAdminLabs(),
-        listMaterials(),
+        canViewCatalog ? listMaterials() : Promise.resolve([]),
       ])
       setLabs(labsData)
       setMaterials(materialsData)
@@ -150,7 +157,7 @@ function AdminMaterialesPage({ user }) {
     await fetchUsageReportData()
 
     try {
-      const movementsData = await listMaterialMovements(null, 25)
+      const movementsData = access.movements ? await listMaterialMovements(null, 25) : []
       setMaterialMovements(movementsData)
     } catch {
       // historial de movimientos no critico
@@ -160,6 +167,7 @@ function AdminMaterialesPage({ user }) {
   }
 
   const fetchSupplyReservations = async (statusFilter = supplyStatusFilter) => {
+    if (!canManageRequests) return
     setSupplyLoading(true)
     try {
       const data = await listSupplyReservations({
@@ -293,7 +301,7 @@ function AdminMaterialesPage({ user }) {
     let cancelled = false
     const timer = window.setTimeout(async () => {
       try {
-        const profiles = await listUserProfiles()
+        const profiles = await listOperationalUsers('materials')
         if (cancelled) return
         const matches = (Array.isArray(profiles) ? profiles : [])
           .filter((profile) => {
@@ -467,6 +475,7 @@ function AdminMaterialesPage({ user }) {
   const usageReportItems = useMemo(() => (Array.isArray(usageReport?.items) ? usageReport.items : []), [usageReport])
 
   const handleExportStockReport = () => {
+    if (!canExportReports) return
     downloadCsv(
       `reporte-stock-bajo-${todayStamp()}`,
       [
@@ -486,6 +495,7 @@ function AdminMaterialesPage({ user }) {
   }
 
   const handleExportUsageReport = () => {
+    if (!canExportReports) return
     downloadCsv(
       `reporte-uso-insumos-${todayStamp()}`,
       [
@@ -850,41 +860,41 @@ function AdminMaterialesPage({ user }) {
       </header>
 
       <nav className="infra-tabs" role="tablist" aria-label="Secciones de materiales">
-        <button
+        {canViewCatalog ? (<button
           type="button"
           role="tab"
-          aria-selected={activeTab === 'catalog'}
-          className={`infra-tab-button ${activeTab === 'catalog' ? 'is-active' : ''}`}
+          aria-selected={currentTab === 'catalog'}
+          className={`infra-tab-button ${currentTab === 'catalog' ? 'is-active' : ''}`}
           onClick={() => setActiveTab('catalog')}
         >
           <span>Catálogo</span>
           <span className="infra-tab-count">{visibleMaterials.length}</span>
-        </button>
-        <button
+        </button>) : null}
+        {access.movements ? (<button
           type="button"
           role="tab"
-          aria-selected={activeTab === 'movements'}
-          className={`infra-tab-button ${activeTab === 'movements' ? 'is-active' : ''}`}
+          aria-selected={currentTab === 'movements'}
+          className={`infra-tab-button ${currentTab === 'movements' ? 'is-active' : ''}`}
           onClick={() => setActiveTab('movements')}
         >
           <span>Movimientos de stock</span>
           <span className="infra-tab-count">{materialMovements.length}</span>
-        </button>
+        </button>) : null}
         {canViewReports ? <button
           type="button"
           role="tab"
-          aria-selected={activeTab === 'reports'}
-          className={`infra-tab-button ${activeTab === 'reports' ? 'is-active' : ''}`}
+          aria-selected={currentTab === 'reports'}
+          className={`infra-tab-button ${currentTab === 'reports' ? 'is-active' : ''}`}
           onClick={() => setActiveTab('reports')}
         >
           <span>Reportes</span>
           <span className="infra-tab-count">{stockAlertsCount}</span>
         </button> : null}
-        <button
+        {canManageRequests ? (<button
           type="button"
           role="tab"
-          aria-selected={activeTab === 'requests'}
-          className={`infra-tab-button ${activeTab === 'requests' ? 'is-active' : ''}`}
+          aria-selected={currentTab === 'requests'}
+          className={`infra-tab-button ${currentTab === 'requests' ? 'is-active' : ''}`}
           onClick={() => {
             setActiveTab('requests')
             fetchSupplyReservations(supplyStatusFilter)
@@ -894,9 +904,10 @@ function AdminMaterialesPage({ user }) {
           <span className="infra-tab-count">
             {supplyReservations.filter((reservation) => reservation.status === 'pending').length}
           </span>
-        </button>
+        </button>) : null}
       </nav>
 
+      {!isAdmin && managedLabIds.length === 0 && !loading ? <p className="infra-alert" role="status">Tienes acceso a esta funcion, pero necesitas un laboratorio asignado para operar sus materiales.</p> : null}
       {message ? <p className="infra-alert infra-success">{message}</p> : null}
       {error ? <p className="infra-alert infra-error">{error}</p> : null}
 
@@ -904,7 +915,7 @@ function AdminMaterialesPage({ user }) {
         <p className="infra-empty">Cargando materiales...</p>
       ) : (
         <div className="infra-grid">
-          {activeTab === 'catalog' ? (
+          {currentTab === 'catalog' ? (
             <>
           <section className="infra-command-panel infra-card-full">
             <div className="infra-command-copy">
@@ -942,7 +953,7 @@ function AdminMaterialesPage({ user }) {
             </>
           ) : null}
 
-          {activeTab === 'movements' ? (
+          {currentTab === 'movements' ? (
           <section className="infra-card">
             <section className="infra-stock-ops">
               {canMoveStock ? (
@@ -1083,7 +1094,7 @@ function AdminMaterialesPage({ user }) {
           </section>
           ) : null}
 
-          {activeTab === 'reports' ? (
+          {currentTab === 'reports' ? (
           <>
           <section className="infra-card infra-low-stock-report">
             <div className="infra-section-head">
@@ -1092,14 +1103,14 @@ function AdminMaterialesPage({ user }) {
                 <h3>Materiales con stock bajo</h3>
                 <p>Solo aparecen materiales cuyo stock actual llego al umbral minimo configurado o esta por debajo.</p>
               </div>
-              <button
+              {canExportReports ? <button
                 type="button"
                 className="infra-secondary"
                 onClick={handleExportStockReport}
                 disabled={lowStockReportItems.length === 0}
               >
                 ⬇ Descargar Excel
-              </button>
+              </button> : null}
             </div>
 
             <form className="infra-form" onSubmit={handleReportSubmit}>
@@ -1232,14 +1243,14 @@ function AdminMaterialesPage({ user }) {
                 <h3>Reporte de uso de insumos</h3>
                 <p>Analiza el consumo de materiales agrupado por prácticas y usuarios.</p>
               </div>
-              <button
+              {canExportReports ? <button
                 type="button"
                 className="infra-secondary"
                 onClick={handleExportUsageReport}
                 disabled={usageReportItems.length === 0}
               >
                 ⬇ Descargar Excel
-              </button>
+              </button> : null}
             </div>
 
             <form className="infra-form" onSubmit={handleUsageReportSubmit}>
@@ -1371,7 +1382,7 @@ function AdminMaterialesPage({ user }) {
           </>
           ) : null}
 
-          {activeTab === 'requests' ? (
+          {currentTab === 'requests' ? (
           <section className="infra-card infra-card-full">
             <div className="infra-section-head">
               <div>
@@ -1602,7 +1613,7 @@ function AdminMaterialesPage({ user }) {
           </section>
           ) : null}
 
-          {activeTab === 'catalog' ? (
+          {currentTab === 'catalog' ? (
           <section className="infra-card infra-materials-catalog">
             <div className="infra-section-head">
               <div>

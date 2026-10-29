@@ -22,7 +22,7 @@ function cloneCachedValue(value) {
 
 function buildRequestCacheKey(url, options = {}) {
   const method = String(options.method || 'GET').toUpperCase()
-  return `${method}:${url}`
+  return `${getAuthToken() || "anonymous"}:${method}:${url}`
 }
 
 function clearInfrastructureCache() {
