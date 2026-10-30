@@ -148,8 +148,8 @@ function mapTutorialSession(record) {
     })),
     created: record?.created || '',
     updated: record?.updated || '',
-    enrolled_count: enrolledStudents.length,
-    seats_left: Math.max(Number(record?.max_students || 0) - enrolledStudents.length, 0),
+    enrolled_count: Number(record?.enrolled_count ?? enrolledStudents.length),
+    seats_left: Number(record?.seats_left ?? Math.max(Number(record?.max_students || 0) - enrolledStudents.length, 0)),
   }
 }
 
