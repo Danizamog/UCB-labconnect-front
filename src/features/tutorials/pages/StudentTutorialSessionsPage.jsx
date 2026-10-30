@@ -12,6 +12,7 @@ import {
 import { listAdminLabs as getLaboratories } from '../../admin/services/infrastructureService'
 import { FOCUSED_TUTORIAL_KEY, OPEN_TUTORIAL_EVENT } from '../utils/focusTutorialNavigation'
 import { Search, X } from 'lucide-react'
+import { hasRole } from '../../../shared/lib/permissions'
 import './TutorialPages.css'
 
 const CLOCK_REFRESH_MS = 30 * 1000
@@ -97,6 +98,7 @@ function buildReceiptQrPayload(session, enrollment) {
 }
 
 function StudentTutorialSessionsPage({ user }) {
+  const canEnroll = hasRole(user, ['Estudiante'])
   const [sessions, setSessions] = useState([])
   const [mySessions, setMySessions] = useState([])
   const [laboratories, setLaboratories] = useState([])
@@ -140,13 +142,17 @@ function StudentTutorialSessionsPage({ user }) {
   }, [])
 
   const loadMyEnrollments = useCallback(async () => {
+    if (!canEnroll) {
+      setMySessions([])
+      return
+    }
     try {
       const enrolledSessions = await listMyEnrolledTutorialSessions()
       setMySessions(enrolledSessions)
     } catch {
       // ignore — la cartelera publica sigue siendo util sin las inscripciones
     }
-  }, [])
+  }, [canEnroll])
 
   const publicReloadTimerRef = useRef(null)
   const myReloadTimerRef = useRef(null)
@@ -348,6 +354,7 @@ function StudentTutorialSessionsPage({ user }) {
   }
 
   const handleEnroll = async (session) => {
+    if (!canEnroll) return
     setEnrollingId(session.id)
     setError('')
     setMessage('')
@@ -372,6 +379,7 @@ function StudentTutorialSessionsPage({ user }) {
   }
 
   const handleCancelEnrollment = async (session) => {
+    if (!canEnroll) return
     setCancellingId(session.id)
     setError('')
     setMessage('')
@@ -606,7 +614,7 @@ function StudentTutorialSessionsPage({ user }) {
           </div>
 
           <div className="tutorial-focus-actions">
-            {focusedState?.isOwnSession ? (
+            {!canEnroll ? <p>Consulta disponible. Solo Estudiante puede inscribirse.</p> : focusedState?.isOwnSession ? (
               <button type="button" className="tutorials-secondary" disabled>
                 Es tu tutoria
               </button>
@@ -659,7 +667,7 @@ function StudentTutorialSessionsPage({ user }) {
         </section>
       ) : null}
 
-      <section className="tutorials-panel">
+      <section className="tutorials-panel" hidden={!canEnroll}>
         <div className="tutorials-panel-header">
           <h3>Mis tutorias</h3>
           <p className="tutorials-panel-subtitle">
@@ -896,7 +904,7 @@ function StudentTutorialSessionsPage({ user }) {
                       Ver detalle
                     </button>
 
-                    {sessionState.isOwnSession ? (
+                    {!canEnroll ? <span>Solo consulta</span> : sessionState.isOwnSession ? (
                       <button type="button" className="tutorials-secondary" disabled>
                         Es tu tutoria
                       </button>

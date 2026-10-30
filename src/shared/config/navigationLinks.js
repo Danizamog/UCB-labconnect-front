@@ -32,11 +32,11 @@ export const NAVIGATION_LINKS = [
   { id: 'horarios_laboratorios', label: 'Horarios de laboratorios', icon: 'horarios_laboratorios', path: '/app/admin/horarios-laboratorios', requiredAnyPermission: ['gestionar_horarios_laboratorio'] },
   { id: 'equipos', label: 'Equipos y prestamos', icon: 'equipos', path: '/app/admin/equipos', requiredAnyPermission: ['gestionar_inventario', 'gestionar_estado_equipos', 'gestionar_mantenimiento', 'gestionar_prestamos', 'registrar_tickets_equipo'] },
   { id: 'materiales', label: 'Materiales y stock', icon: 'materiales', path: '/app/admin/materiales', requiredAnyPermission: MATERIAL_PERMISSIONS },
-  { id: 'calendar', label: 'Ver disponibilidad', icon: 'calendar', path: '/app/reservas/calendario', allowedRoles: ['Estudiante', 'Docente', 'Encargado de Laboratorio'] },
-  { id: 'tutorials_public', label: 'Apoyo y tutorias', icon: 'tutorials_public', path: '/app/tutorias', allowedRoles: ['Estudiante'] },
+  { id: 'calendar', label: 'Ver disponibilidad', icon: 'calendar', path: '/app/reservas/calendario', allowedRoles: ['Estudiante', 'Invitado', 'Docente', 'Encargado de Laboratorio'] },
+  { id: 'tutorials_public', label: 'Apoyo y tutorias', icon: 'tutorials_public', path: '/app/tutorias', allowedRoles: ['Estudiante', 'Invitado'] },
   { id: 'tutorials_history', label: 'Historial Tutorias', icon: 'history', path: '/app/tutorias/historial', allowedRoles: ['Estudiante'] },
   { id: 'history', label: 'Historial', icon: 'history', path: '/app/historial', allowedRoles: ['Estudiante', 'Docente', 'Encargado de Laboratorio'] },
-  { id: 'reserve', label: 'Reservar laboratorio', icon: 'reserve', path: '/app/reservas/nueva', allowedRoles: ['Estudiante', 'Docente', 'Encargado de Laboratorio'] },
+  { id: 'reserve', label: 'Reservar laboratorio', icon: 'reserve', path: '/app/reservas/nueva', allowedRoles: ['Estudiante'] },
   { id: 'logout', label: 'Salir', action: 'logout', icon: 'logout' },
 ]
 

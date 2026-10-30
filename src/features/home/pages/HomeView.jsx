@@ -179,8 +179,10 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   const canManageMateriales = hasAnyPermission(user, MATERIAL_PERMISSIONS)
   const canManageTutorials = hasAnyPermission(user, TUTORIAL_PERMISSIONS)
   const canAuditSecurity = hasAnyPermission(user, SECURITY_VIEW_PERMISSIONS)
-  const canUseReservations = hasRole(user, ['Estudiante', 'Docente', 'Encargado de Laboratorio'])
-  const canUseTutorials = hasRole(user, ['Estudiante'])
+  const canUseReservations = hasRole(user, ['Estudiante'])
+  const canViewAvailability = hasRole(user, ['Estudiante', 'Invitado', 'Docente', 'Encargado de Laboratorio'])
+  const canUseTutorials = hasRole(user, ['Estudiante', 'Invitado'])
+  const canViewTutorialHistory = hasRole(user, ['Estudiante'])
   const canRequestClassResources = hasAnyPermission(user, ['solicitar_recursos_clase', 'gestionar_clases_propias'])
   const hasManagementModules =
     canManageRoles || canManageProfiles || canManageStructure || canManagePenalties || canManageEquipos || canManageMateriales || canManageTutorials
@@ -242,7 +244,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
   }, [shouldTrackOperationsSnapshot])
 
   const loadHomeLabs = useCallback(async () => {
-    if (activeSection !== 'home' || (!canManageSpaces && !canUseReservations)) {
+    if (activeSection !== 'home' || (!canManageSpaces && !canViewAvailability)) {
       setHomeLabs([])
       setHomeLabsError('')
       setHomeLabsLoading(false)
@@ -260,7 +262,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     } finally {
       setHomeLabsLoading(false)
     }
-  }, [activeSection, canManageSpaces, canUseReservations, user])
+  }, [activeSection, canManageSpaces, canViewAvailability, user])
 
   const loadAgendaSummary = useCallback(async (options = {}) => {
     if (!shouldTrackAgenda) {
@@ -304,9 +306,9 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
       (activeSection === 'horarios_laboratorios' && canManageSchedules) ||
       (activeSection === 'equipos' && canManageEquipos) ||
       (activeSection === 'materiales' && canManageMateriales) ||
-      (canUseReservations && activeSection === 'calendar') ||
+      (canViewAvailability && activeSection === 'calendar') ||
       (canUseTutorials && activeSection === 'tutorials_public') ||
-      (canUseTutorials && activeSection === 'tutorials_history') ||
+      (canViewTutorialHistory && activeSection === 'tutorials_history') ||
       (canUseReservations && activeSection === 'history') ||
       (canUseReservations && activeSection === 'reserve')
 
@@ -336,6 +338,8 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
     canAuditSecurity,
     canUseReservations,
     canUseTutorials,
+    canViewAvailability,
+    canViewTutorialHistory,
     currentPath,
     onNavigate,
   ])
@@ -550,9 +554,9 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
           {canManageSchedules && activeSection === 'horarios_laboratorios' ? <AdminLabSchedulesPage user={user} /> : null}
           {canManageEquipos && activeSection === 'equipos' ? <AdminEquiposPage user={user} /> : null}
           {canManageMateriales && activeSection === 'materiales' ? <AdminMaterialesPage user={user} /> : null}
-          {canUseReservations && activeSection === 'calendar' ? <UserAvailabilityCalendarPage user={user} /> : null}
+          {canViewAvailability && activeSection === 'calendar' ? <UserAvailabilityCalendarPage user={user} /> : null}
           {canUseTutorials && activeSection === 'tutorials_public' ? <StudentTutorialSessionsPage user={user} /> : null}
-          {canUseTutorials && activeSection === 'tutorials_history' ? <UserTutorialAttendanceHistoryPage user={user} /> : null}
+          {canViewTutorialHistory && activeSection === 'tutorials_history' ? <UserTutorialAttendanceHistoryPage user={user} /> : null}
           {canUseReservations && activeSection === 'history' ? <UserHistoryPage user={user} /> : null}
           {canUseReservations && activeSection === 'reserve' ? (
             <UserReserveLabPage
@@ -702,7 +706,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
                   </div> : null}
                 </section>
 
-                {canManageSpaces || canUseReservations ? <section className="home-modern-section home-lab-search-section" aria-label="Buscar laboratorios">
+                {canManageSpaces || canViewAvailability ? <section className="home-modern-section home-lab-search-section" aria-label="Buscar laboratorios">
                   <div className="home-modern-section-head home-lab-search-head">
                     <div>
                       <p className="home-modern-kicker">Laboratorios</p>
@@ -734,7 +738,7 @@ function HomeView({ user, currentPath, currentHash, onNavigate, onRefreshSession
                             key={lab.id}
                             type="button"
                             className="home-lab-result-card"
-                            onClick={() => onNavigate?.(canOperateLabs ? '/app/admin/laboratorios' : '/app/reservas/nueva')}
+                            onClick={() => onNavigate?.(canManageSpaces ? '/app/admin/laboratorios' : canUseReservations ? '/app/reservas/nueva' : '/app/reservas/calendario')}
                           >
                             <span className="home-lab-result-icon">
                               <FlaskConical size={20} aria-hidden="true" />
